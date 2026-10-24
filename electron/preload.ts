@@ -34,6 +34,9 @@ export const electronAPI = {
   deleteJob: async (jobId: string): Promise<boolean> => {
     return ipcRenderer.invoke('jobs:delete', jobId);
   },
+  verifyJobAssets: async (jobId: string): Promise<{ asset: any; exists: boolean }[]> => {
+    return ipcRenderer.invoke('jobs:verify-assets', jobId);
+  },
 
   // Printing
   getPrinters: async (): Promise<any[]> => {

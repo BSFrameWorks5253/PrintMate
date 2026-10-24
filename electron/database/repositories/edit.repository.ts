@@ -86,4 +86,8 @@ export class EditRepository {
       [assetId]
     );
   }
+
+  getRevisions(assetId: string): DbEdit[] {
+    return this.getHistory(assetId);
+  }
 }

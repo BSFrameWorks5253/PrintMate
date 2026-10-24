@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { Database } from 'sql.js';
 import { queryAll, queryOne, execute } from '../database';
 
@@ -66,5 +67,29 @@ export class AssetRepository {
 
   delete(id: string): void {
     execute(this.db, 'DELETE FROM job_assets WHERE id = ?', [id]);
+  }
+
+  /**
+   * Check if the asset's referenced original source file actually exists on the filesystem
+   */
+  checkSourceExists(asset: DbAsset): boolean {
+    if (!asset.original_path) return false;
+    if (asset.original_path.startsWith('data:')) return true;
+    try {
+      return fs.existsSync(asset.original_path);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check all assets belonging to a job and detect missing/moved source files
+   */
+  verifyJobAssets(jobId: string): { asset: DbAsset; exists: boolean }[] {
+    const assets = this.getByJobId(jobId);
+    return assets.map((asset) => ({
+      asset,
+      exists: this.checkSourceExists(asset),
+    }));
   }
 }

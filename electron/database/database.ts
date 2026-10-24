@@ -57,7 +57,7 @@ export async function initDatabase(): Promise<Database> {
   return dbInstance;
 }
 
-function runMigrations(db: Database): void {
+export function runMigrations(db: Database): void {
   // Migration tracking table
   db.run(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -294,4 +294,24 @@ export function queryOne<T = any>(db: Database, sql: string, params: any[] = [])
 export function execute(db: Database, sql: string, params: any[] = []): void {
   db.run(sql, params);
   saveDatabase();
+}
+
+/**
+ * Run a callback inside an atomic transaction with automatic rollback on error
+ */
+export function withTransaction<T>(db: Database, fn: () => T): T {
+  db.run('BEGIN TRANSACTION;');
+  try {
+    const result = fn();
+    db.run('COMMIT;');
+    saveDatabase();
+    return result;
+  } catch (error) {
+    try {
+      db.run('ROLLBACK;');
+    } catch {
+      // Ignore rollback failure if already rolled back
+    }
+    throw error;
+  }
 }
