@@ -37,3 +37,42 @@
   z-index: 10;
   box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15);
 }
+
+/* ==========================================================================
+   Strict Print Isolation: Pure Clean Passport Photos on Physical Paper
+   ========================================================================== */
+@media print {
+  body, html {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    width: 152.4mm !important;
+    height: 101.6mm !important;
+    max-width: 152.4mm !important;
+    max-height: 101.6mm !important;
+    aspect-ratio: 152.4 / 101.6 !important;
+    overflow: hidden !important;
+  }
+
+  @page {
+    margin: 0;
+    size: auto;
+  }
+}

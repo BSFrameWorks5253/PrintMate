@@ -213,8 +213,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       }
     }
 
-    const marginMm = count > 8 ? 4 : 6;
-    const gapMm = count > 8 ? 0 : 0.5; // Divider lines between cells like Image 2
+    const marginMm = count > 8 ? 3 : 5;
+    const gapMm = count > 8 ? 0 : 0.5; // Divider lines between cells like Image 1 & 2
 
     const availW = paperW - (marginMm * 2) - ((cols - 1) * gapMm);
     const availH = paperH - (marginMm * 2) - ((rows - 1) * gapMm);
@@ -224,19 +224,25 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
     const standardW = 35; // 35mm
     const standardH = 45; // 45mm
-    const passportRatio = standardW / standardH; // 0.7778
+    const passportRatio = standardW / standardH; // 35 / 45 = 0.77778
+
+    // Fit strictly inside available cell bounds preserving 35:45 ratio
+    const fitW = Math.min(maxCellW, maxCellH * passportRatio);
+    const fitH = fitW / passportRatio;
 
     let finalPhotoW = standardW;
     let finalPhotoH = standardH;
     let isShrunk = false;
 
-    // SHRINK LOGIC: If count > 8 (or if standard 35x45mm doesn't fit on this paper)
-    if (count > 8 || maxCellW < standardW || maxCellH < standardH) {
-      isShrunk = true;
-      // Fit proportionally within maxCellW and maxCellH maintaining 35:45 ratio
-      const fitW = Math.min(maxCellW, maxCellH * passportRatio);
+    // Check if standard 35x45mm fits on sheet without expanding page
+    if (count <= 8 && maxCellW >= standardW && maxCellH >= standardH) {
+      finalPhotoW = standardW;
+      finalPhotoH = standardH;
+      isShrunk = false;
+    } else {
       finalPhotoW = Math.round(fitW * 10) / 10;
-      finalPhotoH = Math.round((finalPhotoW / passportRatio) * 10) / 10;
+      finalPhotoH = Math.round(fitH * 10) / 10;
+      isShrunk = true;
     }
 
     return {
@@ -479,13 +485,14 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     ctx.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
 
     const pxPerMm = sheetCanvas.width / selectedPaper.widthMm;
-    const { cols, rows, photoWidthMm, photoHeightMm } = layout;
+    const { cols, rows, photoWidthMm, photoHeightMm, gapMm } = layout;
 
     const photoPxW = Math.round(photoWidthMm * pxPerMm);
     const photoPxH = Math.round(photoHeightMm * pxPerMm);
+    const gapPx = Math.round(gapMm * pxPerMm);
 
-    const totalGridW = cols * photoPxW;
-    const totalGridH = rows * photoPxH;
+    const totalGridW = (cols * photoPxW) + ((cols - 1) * gapPx);
+    const totalGridH = (rows * photoPxH) + ((rows - 1) * gapPx);
 
     const startX = Math.round((sheetCanvas.width - totalGridW) / 2);
     const startY = Math.round((sheetCanvas.height - totalGridH) / 2);
@@ -498,12 +505,12 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     for (let i = 0; i < count; i++) {
       const c = i % cols;
       const r = Math.floor(i / cols);
-      const x = startX + (c * photoPxW);
-      const y = startY + (r * photoPxH);
+      const x = startX + (c * (photoPxW + gapPx));
+      const y = startY + (r * (photoPxH + gapPx));
 
       ctx.drawImage(singlePhoto, x, y, photoPxW, photoPxH);
 
-      // Draw thin cutting divider lines on sheet (Image 2 style)
+      // Draw thin cutting divider lines on sheet (Image 1 & 2 style)
       if (showCutDividers) {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 1;
@@ -1034,60 +1041,80 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     <span>300 DPI High Resolution</span>
                   </div>
 
-                  {/* PRINT-AREA DIV (Rendered on paper via @media print) */}
-                  <div
-                    ref={printSheetRef}
-                    className="print-area bg-white text-black shadow-2xl relative transition-all"
-                    style={{
-                      // 4x6 landscape photo paper ratio (152.4mm / 101.6mm = 1.500)
-                      width: selectedPaper.id === '4x6' ? '640px' : '520px',
-                      aspectRatio: `${selectedPaper.widthMm} / ${selectedPaper.heightMm}`,
-                      padding: `${layout.marginMm * 2}px`,
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {/* The Grid of Passport Photos */}
-                    <div
-                      className="w-full h-full grid"
-                      style={{
-                        gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
-                        gridTemplateRows: `repeat(${layout.rows}, 1fr)`,
-                        gap: `${layout.gapMm}px`,
-                        alignItems: 'center',
-                        justifyItems: 'center',
-                      }}
-                    >
-                      {Array.from({ length: Math.min(layout.cols * layout.rows, photoCount) }).map((_, idx) => (
+                  {/* PRINT-AREA DIV (Rendered on paper via @media print with locked 4x6 / A4 aspect ratio) */}
+                  {(() => {
+                    // Preview Sheet Fixed Dimensions (guarantees sheet NEVER stretches or changes ratio)
+                    const previewSheetW = selectedPaper.id === '4x6' ? 640 : 520;
+                    const previewSheetH = Math.round(previewSheetW * (selectedPaper.heightMm / selectedPaper.widthMm));
+                    const pxPerMm = previewSheetW / selectedPaper.widthMm;
+
+                    const previewPhotoW = Math.floor(layout.photoWidthMm * pxPerMm);
+                    const previewPhotoH = Math.floor(layout.photoHeightMm * pxPerMm);
+                    const previewGapPx = Math.round(layout.gapMm * pxPerMm);
+
+                    return (
+                      <div
+                        ref={printSheetRef}
+                        className="print-area bg-white text-black shadow-2xl relative transition-all"
+                        style={{
+                          width: `${previewSheetW}px`,
+                          height: `${previewSheetH}px`,
+                          maxWidth: '100%',
+                          maxHeight: `${previewSheetH}px`,
+                          aspectRatio: `${selectedPaper.widthMm} / ${selectedPaper.heightMm}`,
+                          boxSizing: 'border-box',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {/* The Centered Grid of Passport Photos */}
                         <div
-                          key={idx}
-                          className="w-full h-full flex items-center justify-center relative"
                           style={{
-                            border: showCutDividers ? '0.75px solid #000000' : 'none',
-                            boxSizing: 'border-box',
-                            padding: borderStyle === 'studio_classic' ? '3px' : '0px',
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${layout.cols}, ${previewPhotoW}px)`,
+                            gridTemplateRows: `repeat(${layout.rows}, ${previewPhotoH}px)`,
+                            gap: `${previewGapPx}px`,
+                            justifyContent: 'center',
+                            alignContent: 'center',
                           }}
                         >
-                          {/* Inner photo container with Studio Border (Image 1 & 2) */}
-                          <div
-                            className="w-full h-full relative overflow-hidden flex items-center justify-center bg-white"
-                            style={{
-                              border: borderStyle === 'studio_classic' || borderStyle === 'black_border' ? '1.5px solid #000000' : 'none',
-                              boxSizing: 'border-box',
-                            }}
-                          >
-                            <img
-                              src={previewPhotoDataUrl || ''}
-                              alt={`Passport ${idx + 1}`}
-                              className="w-full h-full object-cover block"
+                          {Array.from({ length: Math.min(layout.cols * layout.rows, photoCount) }).map((_, idx) => (
+                            <div
+                              key={idx}
+                              className="relative flex items-center justify-center overflow-hidden"
                               style={{
-                                transform: 'scale(1.01)', // prevent subpixel gaps
+                                width: `${previewPhotoW}px`,
+                                height: `${previewPhotoH}px`,
+                                border: showCutDividers ? '0.75px solid #000000' : 'none',
+                                boxSizing: 'border-box',
+                                padding: borderStyle === 'studio_classic' ? '2.5px' : '0px',
                               }}
-                            />
-                          </div>
+                            >
+                              {/* Inner photo container with Studio Border (Image 1 & 2) */}
+                              <div
+                                className="w-full h-full relative overflow-hidden flex items-center justify-center bg-white"
+                                style={{
+                                  border: borderStyle === 'studio_classic' || borderStyle === 'black_border' ? '1.5px solid #000000' : 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                              >
+                                <img
+                                  src={previewPhotoDataUrl || ''}
+                                  alt={`Passport ${idx + 1}`}
+                                  className="w-full h-full object-cover block"
+                                  style={{
+                                    transform: 'scale(1.01)', // prevent subpixel gaps
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
