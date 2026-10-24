@@ -1,0 +1,78 @@
+/* ==========================================================================
+   Page-Wise Styling: Print Studio (Multi-Layout & Duplex Printing)
+   ========================================================================== */
+
+/* Physical Paper Sheet Canvas Preview */
+.print-sheet-paper {
+  background-color: #ffffff;
+  color: #000000;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+/* Slot Hover Action Bar */
+.slot-action-overlay {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  z-index: 20;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.15s ease;
+}
+
+/* Lamination Pouch Center Fold Guide */
+.fold-guide-line {
+  border-right: 2px dashed #f43f5e;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   Strict Print Isolation: Pure Clean Images On Physical Paper Only
+   ========================================================================== */
+@media print {
+  /* Hide all UI elements, toolbars, guides, and background containers */
+  body, html {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print,
+  .slot-action-overlay,
+  .fold-guide-line span,
+  header,
+  footer,
+  nav {
+    display: none !important;
+  }
+
+  .print-area {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  @page {
+    margin: 0;
+    size: auto;
+  }
+}

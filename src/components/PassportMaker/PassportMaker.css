@@ -1,0 +1,39 @@
+/* ==========================================================================
+   Page-Wise Styling: Passport Size Photo Maker Studio (4x6 / 4R 300 DPI)
+   ========================================================================== */
+
+/* 4x6 Photo Paper Sheet Canvas */
+.passport-sheet-paper {
+  background-color: #ffffff;
+  color: #000000;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  transition: all 0.25s ease-out;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Studio Classic Thin White Border */
+.passport-classic-border {
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  background-color: #ffffff;
+}
+
+/* Print Cutting Line Guides */
+.passport-cut-guide {
+  position: absolute;
+  pointer-events: none;
+  border: 0.5px dashed rgba(100, 116, 139, 0.4);
+}
+
+/* Photo Slot Hover Zoom */
+.passport-slot-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.passport-slot-card:hover {
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.2);
+}
