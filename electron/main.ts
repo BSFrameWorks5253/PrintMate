@@ -1,10 +1,14 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { initDatabase, saveDatabase } from './database/database';
 import { registerFileIpc } from './ipc/files.ipc';
 import { registerJobIpc } from './ipc/job.ipc';
 import { registerPrintIpc } from './ipc/print.ipc';
 import { registerSettingsIpc } from './ipc/settings.ipc';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 
