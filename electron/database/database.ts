@@ -195,7 +195,7 @@ function runMigrations(db: Database): void {
         duplex_mode TEXT NOT NULL DEFAULT 'simplex',
         paper_source TEXT,
         scaling_mode TEXT NOT NULL DEFAULT 'actual_size',
-        collate INTEGER NOT NULL DEFAULT 1,
+        "collate" INTEGER NOT NULL DEFAULT 1,
         page_range TEXT,
         driver_options_json TEXT,
         created_at TEXT NOT NULL,

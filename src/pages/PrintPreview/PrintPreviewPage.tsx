@@ -241,7 +241,7 @@ export const PrintPreviewPage: React.FC<PrintPreviewPageProps> = ({ onNavigate }
               width: `${pagePxW}px`,
               height: `${pagePxH}px`,
               backgroundColor: currentPage.background_color || '#FFFFFF',
-              boxShadow: '0 12px 48px rgba(0, 0, 0, 0.75)',
+              boxShadow: '0 8px 32px rgba(15, 23, 42, 0.15)',
               position: 'relative',
               borderRadius: '2px',
               overflow: 'hidden',
@@ -307,7 +307,7 @@ export const PrintPreviewPage: React.FC<PrintPreviewPageProps> = ({ onNavigate }
           userSelect: 'none',
         }}
       >
-        <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+        <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
           Print & Export Studio
         </span>
 

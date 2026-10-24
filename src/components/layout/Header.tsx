@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onSelectTab }) => {
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '-0.3px', color: '#ffffff' }}>
+            <span style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
               PrintMate
             </span>
             <span className="badge badge-cyan" style={{ fontSize: '9px', padding: '1px 5px' }}>
@@ -99,11 +99,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onSelectTab }) => {
                 padding: '8px 14px',
                 borderRadius: 'var(--radius-sm)',
                 fontSize: '13px',
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                backgroundColor: isActive ? 'var(--bg-elevated)' : 'transparent',
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                backgroundColor: isActive ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
                 border: '1px solid',
-                borderColor: isActive ? 'var(--border-medium)' : 'transparent',
+                borderColor: isActive ? 'rgba(37, 99, 235, 0.25)' : 'transparent',
                 cursor: 'pointer',
                 transition: 'all var(--transition-fast)',
               }}

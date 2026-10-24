@@ -63,7 +63,7 @@ export const JobHistoryPage: React.FC<JobHistoryPageProps> = ({ onNavigate }) =>
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
             Job History & Archives
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -96,7 +96,7 @@ export const JobHistoryPage: React.FC<JobHistoryPageProps> = ({ onNavigate }) =>
       ) : filtered.length === 0 ? (
         <div className="glass-panel" style={{ padding: '60px', textAlign: 'center' }}>
           <History size={48} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
             No print jobs found
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -124,7 +124,7 @@ export const JobHistoryPage: React.FC<JobHistoryPageProps> = ({ onNavigate }) =>
                     width: '40px',
                     height: '40px',
                     borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'var(--bg-elevated)',
+                    backgroundColor: 'var(--bg-tertiary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -133,7 +133,7 @@ export const JobHistoryPage: React.FC<JobHistoryPageProps> = ({ onNavigate }) =>
                   <Printer size={20} color="var(--accent-blue)" />
                 </div>
                 <div>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                     {job.name}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>

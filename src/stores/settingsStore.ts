@@ -14,7 +14,7 @@ interface SettingsState {
 }
 
 const defaultSettings: AppSettings = {
-  theme: 'dark',
+  theme: 'light',
   default_paper_size: 'A4',
   default_orientation: 'portrait',
   default_margin_mm: 5,

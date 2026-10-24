@@ -19,7 +19,7 @@ async function createWindow() {
     minWidth: 1080,
     minHeight: 700,
     title: 'PrintMate — Xerox & Print Studio',
-    backgroundColor: '#0b0f17',
+    backgroundColor: '#f8fafc',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -31,12 +31,14 @@ async function createWindow() {
   // Remove default menu bar for clean professional printing-app feel
   mainWindow.setMenuBarVisibility(false);
 
+  // Register file and print IPC operations unconditionally
+  registerFileIpc(mainWindow);
+  registerPrintIpc(mainWindow);
+
   // Initialize SQLite database
   try {
     const db = await initDatabase();
-    registerFileIpc(mainWindow);
     registerJobIpc(db);
-    registerPrintIpc(mainWindow);
     registerSettingsIpc(db);
   } catch (err) {
     console.error('Failed to initialize database and IPC:', err);

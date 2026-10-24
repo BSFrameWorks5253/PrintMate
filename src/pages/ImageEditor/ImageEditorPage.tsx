@@ -205,42 +205,120 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     });
   };
 
-  const handleAddMoreFiles = async () => {
-    if (!window.electronAPI) return;
-    try {
-      const files = await window.electronAPI.selectImages();
-      if (files.length === 0) return;
+  const addFileInputRef = useRef<HTMLInputElement | null>(null);
 
-      const newAssets = await Promise.all(
-        files.map(async (f, idx) => {
-          const dataUrl = await window.electronAPI!.readFileAsDataUrl(f.path);
-          return {
-            id: crypto.randomUUID(),
-            job_id: activeAsset.job_id,
-            original_path: f.path,
-            original_name: f.name,
-            mime_type: 'image/jpeg',
-            file_extension: f.name.split('.').pop() || 'jpg',
-            file_size_bytes: f.size,
-            source_width: null,
-            source_height: null,
-            page_count: 1,
-            asset_type: 'image' as const,
-            import_status: 'ready' as const,
-            sort_order: assets.length + idx,
-            created_at: new Date().toISOString(),
-            preview_url: dataUrl,
-          };
-        })
-      );
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleProcessAddFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    const fileArr = Array.from(files);
+    const newAssets: any[] = [];
+
+    for (let i = 0; i < fileArr.length; i++) {
+      const f = fileArr[i];
+      let dataUrl = '';
+      if (window.electronAPI && (f as any).path) {
+        try {
+          dataUrl = await window.electronAPI.readFileAsDataUrl((f as any).path);
+        } catch {
+          dataUrl = await readFileAsDataUrl(f);
+        }
+      } else {
+        dataUrl = await readFileAsDataUrl(f);
+      }
+
+      newAssets.push({
+        id: crypto.randomUUID(),
+        job_id: activeAsset.job_id,
+        original_path: (f as any).path || f.name,
+        original_name: f.name,
+        mime_type: f.type || 'image/jpeg',
+        file_extension: f.name.split('.').pop() || 'jpg',
+        file_size_bytes: f.size,
+        source_width: null,
+        source_height: null,
+        page_count: 1,
+        asset_type: 'image' as const,
+        import_status: 'ready' as const,
+        sort_order: assets.length + i,
+        created_at: new Date().toISOString(),
+        preview_url: dataUrl,
+      });
+    }
+
+    if (newAssets.length > 0) {
       addAssets(newAssets);
-    } catch (err) {
-      console.error('Failed to add more images:', err);
     }
   };
 
+  const handleAddMoreFiles = async () => {
+    if (window.electronAPI) {
+      try {
+        const files = await window.electronAPI.selectImages();
+        if (files && files.length > 0) {
+          const newAssets = await Promise.all(
+            files.map(async (f, idx) => {
+              const dataUrl = await window.electronAPI!.readFileAsDataUrl(f.path);
+              return {
+                id: crypto.randomUUID(),
+                job_id: activeAsset.job_id,
+                original_path: f.path,
+                original_name: f.name,
+                mime_type: 'image/jpeg',
+                file_extension: f.name.split('.').pop() || 'jpg',
+                file_size_bytes: f.size,
+                source_width: null,
+                source_height: null,
+                page_count: 1,
+                asset_type: 'image' as const,
+                import_status: 'ready' as const,
+                sort_order: assets.length + idx,
+                created_at: new Date().toISOString(),
+                preview_url: dataUrl,
+              };
+            })
+          );
+          addAssets(newAssets);
+        }
+        return;
+      } catch (err) {
+        console.warn('Electron image select failed, falling back to input:', err);
+      }
+    }
+
+    addFileInputRef.current?.click();
+  };
+
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          handleProcessAddFiles(e.dataTransfer.files);
+        }
+      }}
+      style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+    >
+      <input
+        ref={addFileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf"
+        style={{ display: 'none' }}
+        onChange={(e) => e.target.files && handleProcessAddFiles(e.target.files)}
+      />
       {/* 1. Left Thumbnail Sidebar */}
       <aside
         style={{
@@ -296,7 +374,8 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                       width: '44px',
                       height: '44px',
                       borderRadius: '4px',
-                      backgroundColor: '#000000',
+                      backgroundColor: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-subtle)',
                       overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',
@@ -320,7 +399,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                       style={{
                         fontSize: '12px',
                         fontWeight: 600,
-                        color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                        color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -477,10 +556,10 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               transform: `scale(${zoom})`,
               transformOrigin: 'center center',
               transition: 'transform 100ms ease-out',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              boxShadow: '0 8px 30px rgba(15, 23, 42, 0.12)',
               position: 'relative',
               borderRadius: '2px',
-              backgroundColor: '#111827',
+              backgroundColor: '#ffffff',
             }}
           >
             <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%', maxHeight: '72vh' }} />

@@ -92,7 +92,7 @@ export const PageLayoutPage: React.FC<PageLayoutPageProps> = ({ onNavigate }) =>
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
               Paper & Geometry
             </span>
             <span className="badge badge-cyan font-mono" style={{ fontSize: '10px' }}>
@@ -356,7 +356,7 @@ export const PageLayoutPage: React.FC<PageLayoutPageProps> = ({ onNavigate }) =>
               width: `${pagePxW}px`,
               height: `${pagePxH}px`,
               backgroundColor: currentPage.background_color || '#FFFFFF',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.65)',
+              boxShadow: '0 8px 30px rgba(15, 23, 42, 0.15)',
               position: 'relative',
               borderRadius: '2px',
               overflow: 'hidden',
@@ -464,7 +464,7 @@ export const PageLayoutPage: React.FC<PageLayoutPageProps> = ({ onNavigate }) =>
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div className="glass-panel" style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#ffffff', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
                     Physical Dimensions (mm)
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -498,7 +498,7 @@ export const PageLayoutPage: React.FC<PageLayoutPageProps> = ({ onNavigate }) =>
                 </div>
 
                 <div className="glass-panel" style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#ffffff', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
                     Fitting Mode
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>

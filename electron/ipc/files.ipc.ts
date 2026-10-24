@@ -4,53 +4,65 @@ import path from 'path';
 
 export function registerFileIpc(mainWindow: BrowserWindow): void {
   ipcMain.handle('files:select-images', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Import Images — PrintMate',
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
+    try {
+      const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const result = await dialog.showOpenDialog(win as any, {
+        title: 'Import Images — PrintMate',
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
 
-    if (result.canceled || result.filePaths.length === 0) {
+      if (result.canceled || result.filePaths.length === 0) {
+        return [];
+      }
+
+      const fileInfos = [];
+      for (const filePath of result.filePaths) {
+        try {
+          const stat = await fs.stat(filePath);
+          fileInfos.push({
+            path: filePath,
+            name: path.basename(filePath),
+            size: stat.size,
+          });
+        } catch (err) {
+          console.error('Error stating file:', filePath, err);
+        }
+      }
+      return fileInfos;
+    } catch (err) {
+      console.error('Error in files:select-images:', err);
       return [];
     }
-
-    const fileInfos = [];
-    for (const filePath of result.filePaths) {
-      try {
-        const stat = await fs.stat(filePath);
-        fileInfos.push({
-          path: filePath,
-          name: path.basename(filePath),
-          size: stat.size,
-        });
-      } catch (err) {
-        console.error('Error stating file:', filePath, err);
-      }
-    }
-    return fileInfos;
   });
 
   ipcMain.handle('files:select-pdf', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Import PDF Document — PrintMate',
-      properties: ['openFile'],
-      filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
-    });
+    try {
+      const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const result = await dialog.showOpenDialog(win as any, {
+        title: 'Import PDF Document — PrintMate',
+        properties: ['openFile'],
+        filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
+      });
 
-    if (result.canceled || result.filePaths.length === 0) {
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      const filePath = result.filePaths[0];
+      const stat = await fs.stat(filePath);
+      return {
+        path: filePath,
+        name: path.basename(filePath),
+        size: stat.size,
+      };
+    } catch (err) {
+      console.error('Error in files:select-pdf:', err);
       return null;
     }
-
-    const filePath = result.filePaths[0];
-    const stat = await fs.stat(filePath);
-    return {
-      path: filePath,
-      name: path.basename(filePath),
-      size: stat.size,
-    };
   });
 
   ipcMain.handle('files:read-data-url', async (_, filePath: string) => {

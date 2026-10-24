@@ -25,7 +25,7 @@ export const SettingsPage: React.FC = () => {
       }}
     >
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
           Application Settings
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -38,7 +38,7 @@ export const SettingsPage: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Printer size={18} color="var(--accent-cyan)" />
-            <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
               Default Paper & Sheet Dimensions
             </span>
           </div>
@@ -108,7 +108,7 @@ export const SettingsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Printer size={18} color="var(--accent-blue)" />
-              <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 Default Windows Printer
               </span>
             </div>
@@ -142,7 +142,7 @@ export const SettingsPage: React.FC = () => {
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <Database size={18} color="var(--accent-magenta)" />
-            <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
               Database & Offline Storage
             </span>
           </div>
@@ -150,7 +150,7 @@ export const SettingsPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Database Engine:</span>
-              <span className="font-mono" style={{ color: '#ffffff' }}>SQLite 3 (Local WebAssembly WAL)</span>
+              <span className="font-mono" style={{ color: 'var(--text-primary)' }}>SQLite 3 (Local WebAssembly WAL)</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Database File Path:</span>
@@ -174,7 +174,7 @@ export const SettingsPage: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <ShieldCheck size={20} color="var(--accent-emerald)" />
-            <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
               ₹0 Cost & Commercial Compliance Verification
             </span>
           </div>
