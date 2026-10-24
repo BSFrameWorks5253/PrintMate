@@ -18,10 +18,10 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['sql.js', 'electron', 'path', 'fs', 'os', 'child_process']
-            }
-          }
-        }
+              external: ['sql.js', 'electron', 'path', 'fs', 'os', 'child_process'],
+            },
+          },
+        },
       },
       {
         entry: 'electron/preload.ts',
@@ -43,14 +43,17 @@ export default defineConfig({
         },
       },
     ]),
-    renderer()
+    renderer(),
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
-    }
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   server: {
-    port: 5173
-  }
+    port: 5173,
+    watch: {
+      ignored: ['**/dist-electron/**', '**/dist/**', '**/.git/**', '**/data/**'],
+    },
+  },
 });

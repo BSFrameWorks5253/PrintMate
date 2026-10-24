@@ -1,9 +1,20 @@
 import { ipcMain, BrowserWindow } from 'electron';
 
-export function registerPrintIpc(mainWindow: BrowserWindow): void {
+function getTargetWindow(): BrowserWindow | undefined {
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && !focused.isDestroyed()) return focused;
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0 && !windows[0].isDestroyed()) return windows[0];
+  return undefined;
+}
+
+export function registerPrintIpc(): void {
+  ipcMain.removeHandler('printing:get-printers');
   ipcMain.handle('printing:get-printers', async () => {
     try {
-      const printers = await mainWindow.webContents.getPrintersAsync();
+      const win = getTargetWindow();
+      if (!win) return [];
+      const printers = await win.webContents.getPrintersAsync();
       return printers.map((p) => ({
         name: p.name,
         description: p.description || p.displayName || p.name,
@@ -16,14 +27,21 @@ export function registerPrintIpc(mainWindow: BrowserWindow): void {
     }
   });
 
+  ipcMain.removeHandler('printing:submit');
   ipcMain.handle('printing:submit', async (_, options: any) => {
     return new Promise((resolve) => {
       try {
+        const win = getTargetWindow();
+        if (!win) {
+          resolve({ success: false, error: 'No active window available for print dispatch' });
+          return;
+        }
+
         let duplex: 'simplex' | 'longEdge' | 'shortEdge' = 'simplex';
         if (options.duplexMode === 'long_edge') duplex = 'longEdge';
         else if (options.duplexMode === 'short_edge') duplex = 'shortEdge';
 
-        mainWindow.webContents.print(
+        win.webContents.print(
           {
             silent: options.silent ?? false,
             printBackground: true,

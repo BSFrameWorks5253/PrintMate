@@ -2,10 +2,19 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
 
-export function registerFileIpc(mainWindow: BrowserWindow): void {
+function getTargetWindow(): BrowserWindow | undefined {
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && !focused.isDestroyed()) return focused;
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0 && !windows[0].isDestroyed()) return windows[0];
+  return undefined;
+}
+
+export function registerFileIpc(): void {
+  ipcMain.removeHandler('files:select-images');
   ipcMain.handle('files:select-images', async () => {
     try {
-      const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const win = getTargetWindow();
       const result = await dialog.showOpenDialog(win as any, {
         title: 'Import Images — PrintMate',
         properties: ['openFile', 'multiSelections'],
@@ -39,9 +48,10 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     }
   });
 
+  ipcMain.removeHandler('files:select-pdf');
   ipcMain.handle('files:select-pdf', async () => {
     try {
-      const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const win = getTargetWindow();
       const result = await dialog.showOpenDialog(win as any, {
         title: 'Import PDF Document — PrintMate',
         properties: ['openFile'],
@@ -65,6 +75,7 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     }
   });
 
+  ipcMain.removeHandler('files:read-data-url');
   ipcMain.handle('files:read-data-url', async (_, filePath: string) => {
     try {
       const buffer = await fs.readFile(filePath);
@@ -82,10 +93,12 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     }
   });
 
+  ipcMain.removeHandler('files:save-dialog');
   ipcMain.handle(
     'files:save-dialog',
     async (_, { defaultName, extensions }: { defaultName: string; extensions: string[] }) => {
-      const result = await dialog.showSaveDialog(mainWindow, {
+      const win = getTargetWindow();
+      const result = await dialog.showSaveDialog(win as any, {
         title: 'Export Document — PrintMate',
         defaultPath: defaultName,
         filters: [{ name: 'Export Files', extensions }],
@@ -95,6 +108,7 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     }
   );
 
+  ipcMain.removeHandler('files:write-buffer');
   ipcMain.handle(
     'files:write-buffer',
     async (_, { outputPath, bufferBase64 }: { outputPath: string; bufferBase64: string }) => {

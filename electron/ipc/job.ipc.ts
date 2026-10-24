@@ -12,10 +12,12 @@ export function registerJobIpc(db: Database): void {
   const editRepo = new EditRepository(db);
   const pageRepo = new PageRepository(db);
 
+  ipcMain.removeHandler('jobs:create');
   ipcMain.handle('jobs:create', async (_, job: any) => {
     return jobRepo.create(job);
   });
 
+  ipcMain.removeHandler('jobs:load');
   ipcMain.handle('jobs:load', async (_, jobId: string) => {
     const job = jobRepo.getById(jobId);
     if (!job) return null;
@@ -45,6 +47,7 @@ export function registerJobIpc(db: Database): void {
     };
   });
 
+  ipcMain.removeHandler('jobs:save');
   ipcMain.handle('jobs:save', async (_, { jobId, payload }: { jobId: string; payload: any }) => {
     return withTransaction(db, () => {
       // 1. Update job timestamp & status
@@ -124,14 +127,17 @@ export function registerJobIpc(db: Database): void {
     });
   });
 
+  ipcMain.removeHandler('jobs:verify-assets');
   ipcMain.handle('jobs:verify-assets', async (_, jobId: string) => {
     return assetRepo.verifyJobAssets(jobId);
   });
 
+  ipcMain.removeHandler('jobs:list-recent');
   ipcMain.handle('jobs:list-recent', async (_, limit: number = 20) => {
     return jobRepo.listRecent(limit);
   });
 
+  ipcMain.removeHandler('jobs:delete');
   ipcMain.handle('jobs:delete', async (_, jobId: string) => {
     jobRepo.delete(jobId);
     return true;
