@@ -8,6 +8,7 @@ import {
   applyRotationAndFlip,
   detectDocumentSkew,
   detectDocumentCorners,
+  detectDocumentType,
   warpPerspective,
   // Tone Setter Module
   getLuminance,
@@ -15,6 +16,7 @@ import {
   adjustContrast,
   adjustSaturation,
   applyToneAdjustments,
+  autoDetectTone,
   // Document Enhancement Module
   applyTextDarkening,
   applySharpen,
@@ -123,8 +125,8 @@ describe('Modular Image Processing System', () => {
       const canvas = createMockCanvas(300, 300);
       const skew = detectDocumentSkew(canvas);
       expect(typeof skew).toBe('number');
-      expect(skew).toBeGreaterThanOrEqual(-15);
-      expect(skew).toBeLessThanOrEqual(15);
+      expect(skew).toBeGreaterThanOrEqual(-45);
+      expect(skew).toBeLessThanOrEqual(45);
     });
 
     it('detects document corners within canvas bounds', () => {
@@ -149,6 +151,15 @@ describe('Modular Image Processing System', () => {
       const result = warpPerspective(canvas, corners, 500, 500);
       expect(result.width).toBe(500);
       expect(result.height).toBe(500);
+    });
+
+    it('classifies document types accurately from dimensions', () => {
+      expect(detectDocumentType(2100, 2970)).toBe('A4 Document');
+      expect(detectDocumentType(856, 540)).toBe('ID Card / License');
+      expect(detectDocumentType(350, 450)).toBe('Passport Photo');
+      expect(detectDocumentType(200, 250)).toBe('Stamp Photo');
+      expect(detectDocumentType(1800, 1200)).toBe('4x6 Photo');
+      expect(detectDocumentType(500, 500)).toBe('Square 1:1');
     });
   });
 
@@ -196,6 +207,14 @@ describe('Modular Image Processing System', () => {
       expect(data[0]).toBe(data[1]);
       expect(data[1]).toBe(data[2]);
       expect(data[0]).toBe(Math.round(0.299 * 255));
+    });
+
+    it('calculates auto tone adjustments from canvas histogram', () => {
+      const canvas = createMockCanvas(200, 200);
+      const tone = autoDetectTone(canvas);
+      expect(typeof tone.brightness).toBe('number');
+      expect(typeof tone.contrast).toBe('number');
+      expect(tone.contrast).toBeGreaterThan(0);
     });
   });
 

@@ -37,6 +37,9 @@ import {
   renderProcessedCanvas,
   detectDocumentSkew,
   detectDocumentCorners,
+  detectDocumentBounds,
+  detectDocumentType,
+  autoDetectTone,
   createDefaultEdits,
   calculateAspectCrop,
 } from '../../utils/image-processing';
@@ -190,23 +193,120 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     }, 50);
   };
 
-  // Full Auto Correct
-  const handleAutoCorrect = () => {
+  // Auto Tone (Exposure & Contrast Balancing)
+  const handleAutoTone = () => {
     if (!canvasRef.current) return;
     setIsProcessing(true);
     setTimeout(() => {
       try {
-        const angle = detectDocumentSkew(canvasRef.current!);
+        const tone = autoDetectTone(canvasRef.current!);
         updateAssetEdits(activeAsset.id, {
-          straighten_degrees: Math.round(angle * 10) / 10,
-          text_darkening: 1.2,
-          contrast: 1.25,
-          sharpness: 1.5,
+          brightness: tone.brightness,
+          contrast: tone.contrast,
         });
       } finally {
         setIsProcessing(false);
       }
     }, 50);
+  };
+
+  // Auto Align & Crop (Detects page boundaries and deskew angle, applies clean frame)
+  const handleAutoAlignAndCrop = () => {
+    if (!canvasRef.current || !activeAsset) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      try {
+        const bounds = detectDocumentBounds(canvasRef.current!);
+        const angle = detectDocumentSkew(canvasRef.current!);
+
+        const updates: any = {
+          straighten_degrees: Math.round(angle * 10) / 10,
+        };
+
+        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+          updates.crop_x = bounds.normalizedBox.x;
+          updates.crop_y = bounds.normalizedBox.y;
+          updates.crop_width = bounds.normalizedBox.w;
+          updates.crop_height = bounds.normalizedBox.h;
+        }
+
+        updateAssetEdits(activeAsset.id, updates);
+        setIsCropping(false);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 50);
+  };
+
+  // Full Auto Correct (Alignment + Auto Tone + Text Darkener + Sharpening)
+  const handleAutoCorrect = () => {
+    if (!canvasRef.current || !activeAsset) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      try {
+        const bounds = detectDocumentBounds(canvasRef.current!);
+        const angle = detectDocumentSkew(canvasRef.current!);
+        const tone = autoDetectTone(canvasRef.current!);
+
+        const updates: any = {
+          straighten_degrees: Math.round(angle * 10) / 10,
+          brightness: tone.brightness,
+          contrast: tone.contrast,
+          text_darkening: 1.2,
+          sharpness: 1.5,
+        };
+
+        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+          updates.crop_x = bounds.normalizedBox.x;
+          updates.crop_y = bounds.normalizedBox.y;
+          updates.crop_width = bounds.normalizedBox.w;
+          updates.crop_height = bounds.normalizedBox.h;
+        }
+
+        updateAssetEdits(activeAsset.id, updates);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 50);
+  };
+
+  // Batch Auto Align All Imported Pages
+  const handleBatchAutoAlignAll = async () => {
+    if (assets.length === 0) return;
+    setIsProcessing(true);
+    try {
+      for (const asset of assets) {
+        const src = asset.preview_url || asset.original_path;
+        if (!src) continue;
+        try {
+          const img = await loadImage(src);
+          const currentEdits = edits[asset.id] || createDefaultEdits(asset.id);
+          const tempCanvas = await renderProcessedCanvas(img, currentEdits);
+          const bounds = detectDocumentBounds(tempCanvas);
+          const angle = detectDocumentSkew(tempCanvas);
+          const tone = autoDetectTone(tempCanvas);
+
+          const updates: any = {
+            straighten_degrees: Math.round(angle * 10) / 10,
+            brightness: tone.brightness,
+            contrast: tone.contrast,
+          };
+
+          if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+            updates.crop_x = bounds.normalizedBox.x;
+            updates.crop_y = bounds.normalizedBox.y;
+            updates.crop_width = bounds.normalizedBox.w;
+            updates.crop_height = bounds.normalizedBox.h;
+          }
+
+          updateAssetEdits(asset.id, updates);
+        } catch (e) {
+          console.warn('Auto align failed for asset:', asset.id, e);
+        }
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRotate = (delta: number) => {
@@ -256,20 +356,8 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     setIsProcessing(true);
     setTimeout(() => {
       try {
-        const corners = detectDocumentCorners(canvasRef.current!);
-        const w = canvasRef.current!.width;
-        const h = canvasRef.current!.height;
-        const minX = Math.min(corners.topLeft.x, corners.bottomLeft.x) / w;
-        const maxX = Math.max(corners.topRight.x, corners.bottomRight.x) / w;
-        const minY = Math.min(corners.topLeft.y, corners.topRight.y) / h;
-        const maxY = Math.max(corners.bottomLeft.y, corners.bottomRight.y) / h;
-
-        setCropBox({
-          x: Math.max(0, Math.min(1, minX)),
-          y: Math.max(0, Math.min(1, minY)),
-          w: Math.max(0.1, Math.min(1, maxX - minX)),
-          h: Math.max(0.1, Math.min(1, maxY - minY)),
-        });
+        const bounds = detectDocumentBounds(canvasRef.current!);
+        setCropBox(bounds.normalizedBox);
         setIsCropping(true);
       } finally {
         setIsProcessing(false);
@@ -485,10 +573,22 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
             Imported Items ({assets.length})
           </span>
-          <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={handleAddMoreFiles}>
-            <Plus size={13} />
-            Add
-          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '4px 8px', fontSize: '11px' }}
+              onClick={handleBatchAutoAlignAll}
+              disabled={isProcessing || assets.length === 0}
+              title="Auto align, deskew, and tone balance all pages in batch"
+            >
+              <Sparkles size={12} color="var(--accent-blue)" />
+              Align All
+            </button>
+            <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={handleAddMoreFiles}>
+              <Plus size={13} />
+              Add
+            </button>
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
@@ -581,7 +681,20 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                     >
                       {asset.original_name}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '2px' }}>
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          fontWeight: 600,
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          color: 'var(--accent-blue)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {detectDocumentType(asset.source_width || 1, asset.source_height || 1)}
+                      </span>
                       <span>{asset.asset_type === 'pdf_page' ? 'PDF' : 'Image'}</span>
                       {asset.source_width && asset.source_height && (
                         <span>• {asset.source_width}×{asset.source_height}</span>
@@ -706,13 +819,14 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
             zIndex: 10,
           }}
         >
-          {/* Quick Auto Correct Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Quick Auto Correct & Alignment Tools */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               className="btn btn-primary"
               style={{ padding: '6px 12px', fontSize: '12px' }}
               onClick={handleAutoCorrect}
               disabled={isProcessing}
+              title="One-click full auto correction: Straighten, detect bounds, tone balance & text sharpening"
             >
               <Sparkles size={14} />
               {isProcessing ? 'Analyzing...' : 'Auto Correct'}
@@ -720,7 +834,29 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
 
             <button
               className="btn btn-secondary"
-              style={{ padding: '6px 12px', fontSize: '12px' }}
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              onClick={handleAutoAlignAndCrop}
+              disabled={isProcessing}
+              title="Automatically detect document paper edges, crop and deskew"
+            >
+              <Crop size={13} />
+              Auto Align & Crop
+            </button>
+
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              onClick={handleAutoTone}
+              disabled={isProcessing}
+              title="Balance shadows and highlights with histogram auto-exposure"
+            >
+              <Sun size={13} />
+              Auto Tone
+            </button>
+
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
               onClick={handleAutoDeskew}
               disabled={isProcessing}
               title="Detect document skew angle and straighten automatically"
@@ -731,7 +867,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
 
             <button
               className="btn btn-secondary"
-              style={{ padding: '6px 12px', fontSize: '12px' }}
+              style={{ padding: '6px 10px', fontSize: '12px' }}
               onClick={handleAutoPerspectiveCorrection}
               disabled={isProcessing}
               title="Detect document paper boundary and correct perspective warp"
@@ -907,9 +1043,21 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Section: Orientation & Straighten */}
           <div className="glass-panel" style={{ padding: '14px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '10px' }}>
-              Orientation & Deskew
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Orientation & Deskew
+              </span>
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '3px 8px', fontSize: '11px' }}
+                onClick={handleAutoDeskew}
+                disabled={isProcessing}
+                title="Detect document skew angle and straighten automatically"
+              >
+                <RefreshCw size={11} />
+                Auto Deskew
+              </button>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '8px' }}>
               <button className="tool-btn" onClick={() => handleRotate(-90)} title="Rotate -90°">
@@ -1007,15 +1155,24 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                   </button>
                 </div>
 
-                <button
-                  className="tool-btn"
-                  style={{ width: '100%', marginTop: '4px' }}
-                  onClick={handleAutoBoundary}
-                  title="Detect document paper boundary and adjust crop box"
-                >
-                  <ScanLine size={13} />
-                  <span>Auto Detect Document Boundary</span>
-                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '4px' }}>
+                  <button
+                    className="tool-btn"
+                    onClick={handleAutoBoundary}
+                    title="Detect document paper boundary and adjust crop box"
+                  >
+                    <ScanLine size={13} />
+                    <span>Detect Bounds</span>
+                  </button>
+                  <button
+                    className="tool-btn"
+                    onClick={handleAutoAlignAndCrop}
+                    title="Auto detect document edges, align skew and crop"
+                  >
+                    <Sparkles size={13} color="var(--accent-blue)" />
+                    <span>Align & Crop</span>
+                  </button>
+                </div>
 
                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                   <button className="btn btn-accent" style={{ flex: 1, padding: '6px' }} onClick={handleApplyCrop}>
@@ -1086,9 +1243,21 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
 
           {/* Section: Brightness, Contrast, Grayscale */}
           <div className="glass-panel" style={{ padding: '14px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '10px' }}>
-              Color & Contrast
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Color & Contrast
+              </span>
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '3px 8px', fontSize: '11px' }}
+                onClick={handleAutoTone}
+                disabled={isProcessing}
+                title="Calculate optimal brightness and contrast from histogram"
+              >
+                <Sun size={11} />
+                Auto Tone
+              </button>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>

@@ -92,3 +92,99 @@ export function applyToneAdjustments(
     data[i + 2] = Math.min(255, Math.max(0, Math.round(b)));
   }
 }
+
+export interface AutoToneResult {
+  brightness: number;
+  contrast: number;
+  isUnderExposed: boolean;
+  isOverExposed: boolean;
+  isLowContrast: boolean;
+  meanLuminance: number;
+}
+
+/**
+ * Automatically analyzes image luminance histogram and calculates optimal brightness & contrast
+ */
+export function autoDetectTone(canvas: HTMLCanvasElement): AutoToneResult {
+  const thumbW = Math.min(200, canvas.width);
+  const scale = thumbW / canvas.width;
+  const thumbH = Math.max(1, Math.round(canvas.height * scale));
+
+  const thumb = document.createElement('canvas');
+  thumb.width = thumbW;
+  thumb.height = thumbH;
+  const ctx = thumb.getContext('2d');
+
+  if (!ctx) {
+    return {
+      brightness: 0,
+      contrast: 1.0,
+      isUnderExposed: false,
+      isOverExposed: false,
+      isLowContrast: false,
+      meanLuminance: 128,
+    };
+  }
+
+  ctx.drawImage(canvas, 0, 0, thumbW, thumbH);
+  const imgData = ctx.getImageData(0, 0, thumbW, thumbH);
+  const data = imgData.data;
+
+  // Build 256-bin histogram
+  const hist = new Uint32Array(256);
+  const totalPixels = thumbW * thumbH;
+  let totalLum = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const lum = Math.min(255, Math.max(0, Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])));
+    hist[lum]++;
+    totalLum += lum;
+  }
+
+  const meanLum = totalPixels > 0 ? totalLum / totalPixels : 128;
+
+  // Calculate 5th percentile (shadows) and 95th percentile (highlights)
+  let count = 0;
+  let p5 = 0;
+  let p95 = 255;
+  const threshold5 = totalPixels * 0.05;
+  const threshold95 = totalPixels * 0.95;
+
+  for (let i = 0; i < 256; i++) {
+    count += hist[i];
+    if (count >= threshold5 && p5 === 0) {
+      p5 = i;
+    }
+    if (count >= threshold95) {
+      p95 = i;
+      break;
+    }
+  }
+
+  const dynamicRange = p95 - p5;
+  let contrast = 1.0;
+  let brightness = 0.0;
+
+  const isLowContrast = dynamicRange < 140;
+  const isUnderExposed = meanLum < 115 || p95 < 190;
+  const isOverExposed = meanLum > 195 && p5 > 70;
+
+  if (isLowContrast) {
+    contrast = Math.min(1.5, Math.max(1.1, 190 / Math.max(60, dynamicRange)));
+  }
+
+  if (isUnderExposed) {
+    brightness = Math.min(0.35, Math.max(0.05, (135 - meanLum) / 255));
+  } else if (isOverExposed) {
+    brightness = Math.max(-0.25, Math.min(-0.05, (155 - meanLum) / 255));
+  }
+
+  return {
+    brightness: Math.round(brightness * 100) / 100,
+    contrast: Math.round(contrast * 100) / 100,
+    isUnderExposed,
+    isOverExposed,
+    isLowContrast,
+    meanLuminance: Math.round(meanLum),
+  };
+}

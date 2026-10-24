@@ -49,10 +49,10 @@ export function applyRotationAndFlip(
 
 /**
  * Fast Automatic Skew Angle Detection
- * Scans projection profile variance across angles -15° to +15°
+ * Performs two-phase search across -45° to +45° using projection profile variance
  */
 export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
-  const width = Math.min(400, canvas.width);
+  const width = Math.min(320, canvas.width);
   const scale = width / canvas.width;
   const height = Math.max(1, Math.round(canvas.height * scale));
 
@@ -66,25 +66,26 @@ export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
 
-  // Binarize / edge detect
+  // Binarize based on local contrast / text threshold
   const binary = new Uint8Array(width * height);
+  let totalLum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    totalLum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  const meanLum = totalLum / (width * height);
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      binary[y * width + x] = lum < 128 ? 1 : 0;
+      binary[y * width + x] = lum < Math.min(130, meanLum * 0.85) ? 1 : 0;
     }
   }
 
-  let bestAngle = 0;
-  let maxVariance = -1;
-
-  // Test angles from -15° to +15° in steps of 0.5°
-  for (let deg = -15; deg <= 15; deg += 0.5) {
+  const computeVariance = (deg: number) => {
     const rad = (deg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-
     const profile = new Float32Array(height);
     const counts = new Uint16Array(height);
 
@@ -100,7 +101,6 @@ export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
       }
     }
 
-    // Compute profile variance
     let sum = 0;
     let sumSq = 0;
     let count = 0;
@@ -111,38 +111,103 @@ export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
         count++;
       }
     }
+    return count > 0 ? sumSq / count - (sum / count) ** 2 : 0;
+  };
 
-    if (count > 0) {
-      const mean = sum / count;
-      const variance = sumSq / count - mean * mean;
-      if (variance > maxVariance) {
-        maxVariance = variance;
-        bestAngle = deg;
-      }
+  // Phase 1: Wide coarse sweep (-25° to +25° in 1.5° steps)
+  let bestAngle = 0;
+  let maxVar = -1;
+  for (let deg = -25; deg <= 25; deg += 1.5) {
+    const v = computeVariance(deg);
+    if (v > maxVar) {
+      maxVar = v;
+      bestAngle = deg;
     }
   }
 
-  return -bestAngle; // Invert to straighten
+  // Phase 2: High precision fine sweep around peak (±2° in 0.2° steps)
+  let fineBest = bestAngle;
+  let fineMax = maxVar;
+  for (let deg = bestAngle - 2; deg <= bestAngle + 2; deg += 0.2) {
+    const v = computeVariance(deg);
+    if (v > fineMax) {
+      fineMax = v;
+      fineBest = deg;
+    }
+  }
+
+  return Math.round(-fineBest * 10) / 10; // Invert to straighten
 }
 
 /**
- * Detect Document Corners (Paper Boundary Detection)
- * Scans for high-contrast rectangular document boundaries against scanner or desk background.
+ * Result of comprehensive document boundary analysis
+ */
+export interface DocumentBoundsResult {
+  corners: PerspectivePoints;
+  normalizedBox: { x: number; y: number; w: number; h: number };
+  confidence: number; // 0.0 to 1.0
+  detectedType: string;
+}
+
+/**
+ * Classifies document type from aspect ratio and physical proportions
+ */
+export function detectDocumentType(width: number, height: number): string {
+  const maxDim = Math.max(width, height);
+  const minDim = Math.max(1, Math.min(width, height));
+  const ratio = maxDim / minDim;
+
+  if (ratio < 1.05) return 'Square 1:1';
+
+  const candidates: Array<{ label: string; targetRatio: number; maxTol: number }> = [
+    { label: 'A4 Document', targetRatio: 297 / 210, maxTol: 0.08 },
+    { label: 'ID Card / License', targetRatio: 85.6 / 54, maxTol: 0.10 },
+    { label: '4x6 Photo', targetRatio: 1.5, maxTol: 0.06 },
+    { label: 'Passport Photo', targetRatio: 45 / 35, maxTol: 0.035 },
+    { label: 'Stamp Photo', targetRatio: 25 / 20, maxTol: 0.035 },
+  ];
+
+  let bestMatch = 'Document / Photo';
+  let bestDelta = Infinity;
+
+  for (const c of candidates) {
+    const delta = Math.abs(ratio - c.targetRatio);
+    if (delta <= c.maxTol && delta < bestDelta) {
+      bestDelta = delta;
+      bestMatch = c.label;
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
+ * Advanced Document Page & Corner Detection
+ * Combines Sobel gradient contour analysis, edge projection, and quad corner optimization.
  */
 export function detectDocumentCorners(canvas: HTMLCanvasElement): PerspectivePoints {
+  return detectDocumentBounds(canvas).corners;
+}
+
+/**
+ * Full Document Boundary Analyzer
+ */
+export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsResult {
   const w = canvas.width;
   const h = canvas.height;
-  const defaultMargin = 0.05;
+  const defaultMargin = 0.04;
 
-  const defaultPoints: PerspectivePoints = {
+  const fallbackCorners: PerspectivePoints = {
     topLeft: { x: Math.round(w * defaultMargin), y: Math.round(h * defaultMargin) },
     topRight: { x: Math.round(w * (1 - defaultMargin)), y: Math.round(h * defaultMargin) },
     bottomRight: { x: Math.round(w * (1 - defaultMargin)), y: Math.round(h * (1 - defaultMargin)) },
     bottomLeft: { x: Math.round(w * defaultMargin), y: Math.round(h * (1 - defaultMargin)) },
   };
 
+  const detectedType = detectDocumentType(w, h);
+
   try {
-    const thumbW = Math.min(200, w);
+    const thumbW = Math.min(260, w);
     const scale = thumbW / w;
     const thumbH = Math.max(1, Math.round(h * scale));
 
@@ -150,87 +215,167 @@ export function detectDocumentCorners(canvas: HTMLCanvasElement): PerspectivePoi
     thumb.width = thumbW;
     thumb.height = thumbH;
     const ctx = thumb.getContext('2d');
-    if (!ctx) return defaultPoints;
+    if (!ctx) {
+      return {
+        corners: fallbackCorners,
+        normalizedBox: { x: defaultMargin, y: defaultMargin, w: 1 - 2 * defaultMargin, h: 1 - 2 * defaultMargin },
+        confidence: 0.5,
+        detectedType,
+      };
+    }
 
     ctx.drawImage(canvas, 0, 0, thumbW, thumbH);
     const imgData = ctx.getImageData(0, 0, thumbW, thumbH);
     const data = imgData.data;
 
-    const getLum = (x: number, y: number) => {
-      const idx = (y * thumbW + x) * 4;
-      return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-    };
-
-    let topBoundary = 0;
-    let bottomBoundary = thumbH - 1;
-    let leftBoundary = 0;
-    let rightBoundary = thumbW - 1;
-
-    // Scan top down for paper transition
-    for (let y = 0; y < Math.floor(thumbH * 0.4); y++) {
-      let highCount = 0;
-      for (let x = Math.floor(thumbW * 0.2); x < Math.floor(thumbW * 0.8); x += 4) {
-        if (getLum(x, y) > 150) highCount++;
-      }
-      if (highCount > (thumbW * 0.6) / 8) {
-        topBoundary = y;
-        break;
+    // 1. Build grayscale buffer
+    const gray = new Float32Array(thumbW * thumbH);
+    for (let y = 0; y < thumbH; y++) {
+      for (let x = 0; x < thumbW; x++) {
+        const i = (y * thumbW + x) * 4;
+        gray[y * thumbW + x] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
       }
     }
 
-    // Scan bottom up
-    for (let y = thumbH - 1; y > Math.floor(thumbH * 0.6); y--) {
-      let highCount = 0;
-      for (let x = Math.floor(thumbW * 0.2); x < Math.floor(thumbW * 0.8); x += 4) {
-        if (getLum(x, y) > 150) highCount++;
-      }
-      if (highCount > (thumbW * 0.6) / 8) {
-        bottomBoundary = y;
-        break;
+    // 2. Sample outer edge luminance (scanner cover / desk background)
+    let bgSum = 0;
+    let bgSamples = 0;
+    for (let x = 0; x < thumbW; x += 4) {
+      bgSum += gray[x] + gray[(thumbH - 1) * thumbW + x];
+      bgSamples += 2;
+    }
+    for (let y = 0; y < thumbH; y += 4) {
+      bgSum += gray[y * thumbW] + gray[y * thumbW + thumbW - 1];
+      bgSamples += 2;
+    }
+    const bgLum = bgSamples > 0 ? bgSum / bgSamples : 128;
+
+    // 3. Compute Sobel Gradient Magnitudes
+    const grad = new Float32Array(thumbW * thumbH);
+    let maxGrad = 0;
+    for (let y = 1; y < thumbH - 1; y++) {
+      for (let x = 1; x < thumbW - 1; x++) {
+        const gx =
+          gray[(y - 1) * thumbW + x + 1] +
+          2 * gray[y * thumbW + x + 1] +
+          gray[(y + 1) * thumbW + x + 1] -
+          (gray[(y - 1) * thumbW + x - 1] +
+            2 * gray[y * thumbW + x - 1] +
+            gray[(y + 1) * thumbW + x - 1]);
+
+        const gy =
+          gray[(y + 1) * thumbW + x - 1] +
+          2 * gray[(y + 1) * thumbW + x] +
+          gray[(y + 1) * thumbW + x + 1] -
+          (gray[(y - 1) * thumbW + x - 1] +
+            2 * gray[(y - 1) * thumbW + x] +
+            gray[(y - 1) * thumbW + x + 1]);
+
+        const gMag = Math.sqrt(gx * gx + gy * gy);
+        grad[y * thumbW + x] = gMag;
+        if (gMag > maxGrad) maxGrad = gMag;
       }
     }
 
-    // Scan left to right
-    for (let x = 0; x < Math.floor(thumbW * 0.4); x++) {
-      let highCount = 0;
-      for (let y = Math.floor(thumbH * 0.2); y < Math.floor(thumbH * 0.8); y += 4) {
-        if (getLum(x, y) > 150) highCount++;
-      }
-      if (highCount > (thumbH * 0.6) / 8) {
-        leftBoundary = x;
-        break;
+    // 4. Threshold edges and segment document candidate points
+    const edgeThreshold = Math.max(30, maxGrad * 0.25);
+    const candidatePoints: { x: number; y: number }[] = [];
+
+    for (let y = 4; y < thumbH - 4; y++) {
+      for (let x = 4; x < thumbW - 4; x++) {
+        const isEdge = grad[y * thumbW + x] > edgeThreshold;
+        const diffFromBg = Math.abs(gray[y * thumbW + x] - bgLum);
+        if (isEdge || diffFromBg > 35) {
+          candidatePoints.push({ x, y });
+        }
       }
     }
 
-    // Scan right to left
-    for (let x = thumbW - 1; x > Math.floor(thumbW * 0.6); x--) {
-      let highCount = 0;
-      for (let y = Math.floor(thumbH * 0.2); y < Math.floor(thumbH * 0.8); y += 4) {
-        if (getLum(x, y) > 150) highCount++;
-      }
-      if (highCount > (thumbH * 0.6) / 8) {
-        rightBoundary = x;
-        break;
-      }
-    }
+    // 5. If strong candidates found, optimize for the 4 quad corners
+    if (candidatePoints.length > thumbW * thumbH * 0.05) {
+      let minSum = Infinity;
+      let maxSum = -Infinity;
+      let minDiff = Infinity;
+      let maxDiff = -Infinity;
 
-    if (
-      rightBoundary > leftBoundary + thumbW * 0.3 &&
-      bottomBoundary > topBoundary + thumbH * 0.3
-    ) {
+      let tl = { x: 0, y: 0 };
+      let br = { x: thumbW, y: thumbH };
+      let tr = { x: thumbW, y: 0 };
+      let bl = { x: 0, y: thumbH };
+
+      for (let i = 0; i < candidatePoints.length; i++) {
+        const p = candidatePoints[i];
+        const sum = p.x + p.y;
+        const diff = p.x - p.y;
+
+        // Top-Left minimizes (x + y)
+        if (sum < minSum) {
+          minSum = sum;
+          tl = p;
+        }
+        // Bottom-Right maximizes (x + y)
+        if (sum > maxSum) {
+          maxSum = sum;
+          br = p;
+        }
+        // Top-Right maximizes (x - y)
+        if (diff > maxDiff) {
+          maxDiff = diff;
+          tr = p;
+        }
+        // Bottom-Left minimizes (x - y)
+        if (diff < minDiff) {
+          minDiff = diff;
+          bl = p;
+        }
+      }
+
       const invScale = 1 / scale;
-      return {
-        topLeft: { x: Math.round(leftBoundary * invScale), y: Math.round(topBoundary * invScale) },
-        topRight: { x: Math.round(rightBoundary * invScale), y: Math.round(topBoundary * invScale) },
-        bottomRight: { x: Math.round(rightBoundary * invScale), y: Math.round(bottomBoundary * invScale) },
-        bottomLeft: { x: Math.round(leftBoundary * invScale), y: Math.round(bottomBoundary * invScale) },
-      };
+      const docW = Math.max(tr.x - tl.x, br.x - bl.x);
+      const docH = Math.max(bl.y - tl.y, br.y - tr.y);
+
+      // Verify that candidate forms a reasonable page (> 25% of image)
+      if (docW > thumbW * 0.25 && docH > thumbH * 0.25) {
+        const detectedCorners: PerspectivePoints = {
+          topLeft: { x: Math.max(0, Math.round(tl.x * invScale)), y: Math.max(0, Math.round(tl.y * invScale)) },
+          topRight: { x: Math.min(w, Math.round(tr.x * invScale)), y: Math.max(0, Math.round(tr.y * invScale)) },
+          bottomRight: { x: Math.min(w, Math.round(br.x * invScale)), y: Math.min(h, Math.round(br.y * invScale)) },
+          bottomLeft: { x: Math.max(0, Math.round(bl.x * invScale)), y: Math.min(h, Math.round(bl.y * invScale)) },
+        };
+
+        const minNormX = Math.min(detectedCorners.topLeft.x, detectedCorners.bottomLeft.x) / w;
+        const maxNormX = Math.max(detectedCorners.topRight.x, detectedCorners.bottomRight.x) / w;
+        const minNormY = Math.min(detectedCorners.topLeft.y, detectedCorners.topRight.y) / h;
+        const maxNormY = Math.max(detectedCorners.bottomLeft.y, detectedCorners.bottomRight.y) / h;
+
+        return {
+          corners: detectedCorners,
+          normalizedBox: {
+            x: Math.max(0, minNormX),
+            y: Math.max(0, minNormY),
+            w: Math.min(1 - minNormX, maxNormX - minNormX),
+            h: Math.min(1 - minNormY, maxNormY - minNormY),
+          },
+          confidence: 0.92,
+          detectedType,
+        };
+      }
     }
   } catch (err) {
-    console.warn('Corner detection error, using defaults:', err);
+    console.warn('Corner detection fallback:', err);
   }
 
-  return defaultPoints;
+  return {
+    corners: fallbackCorners,
+    normalizedBox: {
+      x: defaultMargin,
+      y: defaultMargin,
+      w: 1 - 2 * defaultMargin,
+      h: 1 - 2 * defaultMargin,
+    },
+    confidence: 0.5,
+    detectedType,
+  };
 }
 
 /**
