@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PrintMate Application Global Styles
+   PrintMate Application Global Styles & Design System (Light Theme)
    ========================================================================== */
 
 /* App Shell Layout */
@@ -7,27 +7,43 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
-/* Glassmorphism Card Panels */
+/* Light Theme Design System Tokens */
+:root {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-muted: #e2e8f0;
+  --border-color: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+}
+
+/* Glassmorphism & Surface Panels */
 .glass-panel {
-  background-color: #161b22;
-  border: 1px solid #30363d;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 1rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
 }
 
-/* Subtle Glow Accents */
+/* Subtle Glow Accents (Light-Optimized) */
 .glow-cyan {
-  box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.25);
+  box-shadow: 0 4px 14px -2px rgba(6, 182, 212, 0.25);
 }
 
 .glow-blue {
-  box-shadow: 0 0 20px -5px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 14px -2px rgba(37, 99, 235, 0.25);
 }
 
 .glow-purple {
-  box-shadow: 0 0 20px -5px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 14px -2px rgba(139, 92, 246, 0.25);
 }
 
 /* Interactive Button Active Scale */

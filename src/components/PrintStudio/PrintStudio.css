@@ -1,12 +1,12 @@
 /* ==========================================================================
-   Page-Wise Styling: Print Studio (Multi-Layout & Duplex Printing)
+   Page-Wise Styling: Print Studio (Light Mode)
    ========================================================================== */
 
 /* Physical Paper Sheet Canvas Preview */
 .print-sheet-paper {
   background-color: #ffffff;
   color: #000000;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.18), 0 0 1px rgba(15, 23, 42, 0.15);
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
@@ -21,11 +21,12 @@
   align-items: center;
   gap: 0.25rem;
   z-index: 20;
-  background-color: rgba(0, 0, 0, 0.85);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
   padding: 0.25rem;
   border-radius: 0.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1);
   transition: opacity 0.15s ease;
 }
 

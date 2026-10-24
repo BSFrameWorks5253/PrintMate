@@ -88,7 +88,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-[#e6edf3] flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -124,14 +124,14 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="no-print border-t border-[#30363d] py-4 bg-[#161b22] text-center text-xs text-slate-500">
+      <footer className="no-print border-t border-slate-200 py-4 bg-white text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
-            <span className="font-semibold text-slate-300">PrintMate</span>
+            <span className="font-semibold text-slate-800">PrintMate</span>
             <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
           </div>
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[11px] text-slate-400">
             A4 • A3 • Letter • Duplex • CR80 ID Standard Scale
           </div>
         </div>

@@ -572,20 +572,20 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       />
 
       {/* STUDIO HEADER BANNER */}
-      <div className="no-print bg-[#161b22] border border-[#30363d] rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="no-print bg-white border border-slate-200 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 rounded-xl bg-blue-500/10 text-cyan-400 border border-cyan-500/20">
+            <div className="p-2 rounded-xl bg-blue-500/10 text-cyan-600 border border-cyan-200">
               <CreditCard className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               Passport Size Photo Studio (35 × 45 mm • 300 DPI)
             </h2>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">
               4×6 Photo Paper (Image 2 Layout)
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-slate-500">
             Convert any portrait into a 300 DPI 35×45mm passport layout with studio borders, cutting grids, and automatic proportional shrinking when exceeding 8 photos.
           </p>
         </div>
@@ -595,15 +595,15 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
           {!photoUrl ? (
             <button
               onClick={loadDemoPhoto}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
+              <Sparkles className="w-4 h-4 text-amber-600" />
               <span>Use Demo Photo (Image 1)</span>
             </button>
           ) : (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-all"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Upload Different Photo</span>
@@ -626,15 +626,15 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-[#30363d] hover:border-cyan-500/60 bg-[#161b22]/70 rounded-2xl p-12 text-center transition-all cursor-pointer group shadow-xl"
+          className="border-2 border-dashed border-slate-200 hover:border-cyan-500/60 bg-white/70 rounded-2xl p-12 text-center transition-all cursor-pointer group shadow-xl"
         >
-          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 border border-cyan-500/20 transition-all">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-50 text-cyan-600 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 border border-cyan-200 transition-all">
             <Upload className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3 className="text-xl font-bold text-slate-900 mb-2">
             Upload Passport Portrait Photo
           </h3>
-          <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+          <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
             Drag & drop your portrait photo here, click to browse, or try the 1-click demo photo.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -649,9 +649,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); loadDemoPhoto(); }}
-              className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-semibold text-xs flex items-center gap-2"
+              className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 font-semibold text-xs flex items-center gap-2"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
+              <Sparkles className="w-4 h-4 text-amber-600" />
               <span>Load Image 1 (Sample Portrait)</span>
             </button>
           </div>
@@ -661,16 +661,16 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
           {/* LEFT COLUMN: CONTROLS & PHOTO ADJUSTMENTS (5 Cols) */}
           <div className="no-print lg:col-span-5 space-y-4">
             {/* 1. PHOTO COUNT & AUTO-SHRINK CONTROLLER */}
-            <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 space-y-3 shadow-md">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <Grid className="w-4 h-4 text-cyan-400" />
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Grid className="w-4 h-4 text-cyan-600" />
                   <span>Number of Photos on Page</span>
                 </h4>
                 <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
                   layout.isShrunk 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                    : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                    ? 'bg-amber-500/20 text-amber-700 border-amber-500/40' 
+                    : 'bg-cyan-100 text-cyan-700 border-cyan-300'
                 }`}>
                   {photoCount} Photos ({layout.cols} × {layout.rows})
                 </span>
@@ -680,7 +680,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPhotoCount((c) => Math.max(1, c - 1))}
-                  className="w-9 h-9 rounded-xl bg-[#21262d] hover:bg-[#30363d] text-white font-bold flex items-center justify-center border border-[#30363d] transition-all"
+                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-white font-bold flex items-center justify-center border border-slate-200 transition-all"
                 >
                   -
                 </button>
@@ -690,11 +690,11 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   max="32"
                   value={photoCount}
                   onChange={(e) => setPhotoCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 h-9 bg-[#0d1117] border border-[#30363d] rounded-xl text-center text-sm font-bold text-white focus:outline-none focus:border-cyan-500"
+                  className="w-16 h-9 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-bold text-slate-900 focus:outline-none focus:border-cyan-500"
                 />
                 <button
                   onClick={() => setPhotoCount((c) => c + 1)}
-                  className="w-9 h-9 rounded-xl bg-[#21262d] hover:bg-[#30363d] text-white font-bold flex items-center justify-center border border-[#30363d] transition-all"
+                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-white font-bold flex items-center justify-center border border-slate-200 transition-all"
                 >
                   +
                 </button>
@@ -707,7 +707,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
                         photoCount === num
                           ? 'bg-cyan-500 text-black shadow-md'
-                          : 'bg-[#21262d] text-slate-300 hover:bg-[#30363d]'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
                       {num}
@@ -719,8 +719,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               {/* Physical Dimension Banner (Showing Exact Size / Shrink Status) */}
               <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
                 layout.isShrunk 
-                  ? 'bg-amber-950/40 border-amber-500/40 text-amber-300' 
-                  : 'bg-[#0d1117] border-[#30363d] text-cyan-300'
+                  ? 'bg-amber-950/40 border-amber-500/40 text-amber-700' 
+                  : 'bg-slate-50 border-slate-200 text-cyan-700'
               }`}>
                 <div className="flex items-center gap-2">
                   <div className={`w-2.5 h-2.5 rounded-full ${layout.isShrunk ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
@@ -730,25 +730,25 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       : 'Standard Passport Size (ISO/ICAO):'}
                   </span>
                 </div>
-                <span className="font-mono font-bold text-white">
+                <span className="font-mono font-bold text-slate-900">
                   {layout.photoWidthMm.toFixed(1)} × {layout.photoHeightMm.toFixed(1)} mm
                 </span>
               </div>
             </div>
 
             {/* 2. BORDER STYLE CONTROLS (MATCHING IMAGE 1 & IMAGE 2) */}
-            <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 space-y-3 shadow-md">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                   <Scissors className="w-4 h-4 text-emerald-400" />
                   <span>Border & Cutting Layout</span>
                 </h4>
-                <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showCutDividers}
                     onChange={(e) => setShowCutDividers(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-blue-600 bg-[#0d1117] border-[#30363d] cursor-pointer"
+                    className="w-3.5 h-3.5 rounded text-blue-600 bg-slate-50 border-slate-200 cursor-pointer"
                   />
                   <span>Grid Cut Lines</span>
                 </label>
@@ -784,19 +784,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       borderStyle === b.id
                         ? 'bg-blue-600/20 border-cyan-400 text-white shadow-sm ring-1 ring-cyan-400/50'
-                        : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:border-slate-500'
+                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
                     }`}
                   >
                     <div className="text-xs font-semibold">{b.label}</div>
-                    <div className="text-[10px] text-slate-400 truncate">{b.desc}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{b.desc}</div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* 3. PAPER SIZE & BACKGROUND COLOR */}
-            <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
                 <span>Print Paper & Background</span>
               </h4>
@@ -809,7 +809,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     className={`p-2 rounded-xl border text-center transition-all ${
                       paperSize === pkey
                         ? 'bg-blue-600 text-white font-bold border-blue-400 shadow-md'
-                        : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'
+                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     <div className="text-xs">{pkey === '4x6' ? '4 × 6 in (4R)' : pkey === 'a4' ? 'A4 Sheet' : '5 × 7 in (5R)'}</div>
@@ -820,7 +820,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
               {/* Background Color Palette */}
               <div className="space-y-1.5 pt-1">
-                <label className="text-xs text-slate-400 flex items-center gap-1.5">
+                <label className="text-xs text-slate-500 flex items-center gap-1.5">
                   <Palette className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Background Color:</span>
                 </label>
@@ -838,7 +838,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       className={`p-1.5 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
                         backgroundColor === bg.id
                           ? 'bg-blue-600/20 border-cyan-400 text-white'
-                          : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:border-slate-500'
+                          : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
                       }`}
                     >
                       <div
@@ -853,13 +853,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
             </div>
 
             {/* 4. FACE FRAMING & ZOOM SLIDERS */}
-            <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <Move className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Move className="w-4 h-4 text-amber-600" />
                   <span>Face Framing & Zoom</span>
                 </h4>
-                <label className="flex items-center gap-1 text-xs text-cyan-400 cursor-pointer">
+                <label className="flex items-center gap-1 text-xs text-cyan-600 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showGuidelines}
@@ -872,9 +872,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
               {/* Zoom Slider */}
               <div className="space-y-1">
-                <div className="flex justify-between text-[11px] text-slate-400">
+                <div className="flex justify-between text-[11px] text-slate-500">
                   <span className="flex items-center gap-1"><ZoomIn className="w-3 h-3" /> Zoom Scale:</span>
-                  <span className="font-mono text-cyan-400">{Math.round(zoom * 100)}%</span>
+                  <span className="font-mono text-cyan-600">{Math.round(zoom * 100)}%</span>
                 </div>
                 <input
                   type="range"
@@ -883,16 +883,16 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   step="0.02"
                   value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-[#21262d] rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
 
               {/* Brightness & Contrast */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] text-slate-400">
+                  <div className="flex justify-between text-[11px] text-slate-500">
                     <span>Brightness:</span>
-                    <span className="font-mono text-cyan-400">{adjustments.brightness}</span>
+                    <span className="font-mono text-cyan-600">{adjustments.brightness}</span>
                   </div>
                   <input
                     type="range"
@@ -900,13 +900,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     max="50"
                     value={adjustments.brightness}
                     onChange={(e) => setAdjustments((a) => ({ ...a, brightness: parseInt(e.target.value) }))}
-                    className="w-full h-1.5 bg-[#21262d] rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] text-slate-400">
+                  <div className="flex justify-between text-[11px] text-slate-500">
                     <span>Contrast:</span>
-                    <span className="font-mono text-cyan-400">{adjustments.contrast}</span>
+                    <span className="font-mono text-cyan-600">{adjustments.contrast}</span>
                   </div>
                   <input
                     type="range"
@@ -914,7 +914,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     max="50"
                     value={adjustments.contrast}
                     onChange={(e) => setAdjustments((a) => ({ ...a, contrast: parseInt(e.target.value) }))}
-                    className="w-full h-1.5 bg-[#21262d] rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
               </div>
@@ -924,14 +924,14 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
           {/* RIGHT COLUMN: INTERACTIVE VIEWPORT & PRINT SHEET PREVIEW (7 Cols) */}
           <div className="lg:col-span-7 space-y-4">
             {/* View Switcher Tabs & Print Actions */}
-            <div className="no-print bg-[#161b22] border border-[#30363d] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="no-print bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-md">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setActiveTab('sheet')}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'sheet'
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-[#21262d] text-slate-300 hover:text-white'
+                      : 'bg-slate-100 text-slate-700 hover:text-white'
                   }`}
                 >
                   <Grid className="w-3.5 h-3.5" />
@@ -943,7 +943,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                     activeTab === 'editor'
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-[#21262d] text-slate-300 hover:text-white'
+                      : 'bg-slate-100 text-slate-700 hover:text-white'
                   }`}
                 >
                   <Move className="w-3.5 h-3.5" />
@@ -954,7 +954,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownloadSingle}
-                  className="px-3 py-2 rounded-xl bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all"
                   title="Download 1 single 35x45mm 300 DPI photo with border"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -964,7 +964,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
                 <button
                   onClick={handleDownloadSheet}
-                  className="px-3.5 py-2 rounded-xl bg-[#21262d] hover:bg-[#30363d] border border-cyan-500/40 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-cyan-300 text-cyan-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
                   title="Download whole 300 DPI photo print sheet"
                 >
                   <Download className="w-4 h-4" />
@@ -982,12 +982,12 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
             </div>
 
             {/* MAIN PREVIEW CONTAINER */}
-            <div className="bg-[#090d13] p-4 sm:p-6 rounded-2xl border border-[#30363d] flex flex-col items-center justify-center min-h-[560px] overflow-auto">
+            <div className="bg-slate-100 p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center min-h-[560px] overflow-auto">
               {activeTab === 'editor' ? (
                 /* TAB 1: CROP & FACE POSITIONING (Interactive Pan & Zoom) */
                 <div className="flex flex-col items-center justify-center space-y-3">
-                  <div className="text-xs text-slate-400 flex items-center gap-1.5 bg-[#161b22] px-3 py-1.5 rounded-xl border border-[#30363d]">
-                    <Move className="w-3.5 h-3.5 text-cyan-400" />
+                  <div className="text-xs text-slate-500 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                    <Move className="w-3.5 h-3.5 text-cyan-600" />
                     <span>Click and drag photo to align eyes & chin inside guidelines</span>
                   </div>
 
@@ -1008,7 +1008,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   <div className="flex items-center gap-3 pt-1">
                     <button
                       onClick={() => setPan({ x: 0, y: 0 })}
-                      className="text-xs px-3 py-1 bg-[#21262d] hover:bg-[#30363d] text-slate-300 rounded-lg border border-[#30363d]"
+                      className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200"
                     >
                       Reset Position
                     </button>
@@ -1024,10 +1024,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                 /* TAB 2: 4x6 INCH SHEET OUTPUT (MATCHING IMAGE 2 EXACTLY!) */
                 <div className="w-full flex flex-col items-center justify-center">
                   {/* Screen-only dimension info */}
-                  <div className="no-print pb-3 text-center text-xs text-slate-400 flex items-center gap-2">
-                    <span className="font-semibold text-white">4×6 in Photo Paper Sheet</span>
+                  <div className="no-print pb-3 text-center text-xs text-slate-500 flex items-center gap-2">
+                    <span className="font-semibold text-slate-900">4×6 in Photo Paper Sheet</span>
                     <span>•</span>
-                    <span className="text-cyan-400 font-mono font-bold">
+                    <span className="text-cyan-600 font-mono font-bold">
                       {photoCount} Photos ({layout.cols} × {layout.rows} Grid)
                     </span>
                     <span>•</span>
@@ -1094,14 +1094,14 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
             {/* Bottom Quick Action: Push to Print Studio Queue */}
             {onSendToPrint && (
-              <div className="no-print bg-[#161b22] border border-[#30363d] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+              <div className="no-print bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-cyan-400 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-cyan-600 flex items-center justify-center">
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white">Need multi-page duplex or custom document sizing?</div>
-                    <div className="text-[11px] text-slate-400">Push this passport photo into the multi-layout Print Studio queue</div>
+                    <div className="text-xs font-bold text-slate-900">Need multi-page duplex or custom document sizing?</div>
+                    <div className="text-[11px] text-slate-500">Push this passport photo into the multi-layout Print Studio queue</div>
                   </div>
                 </div>
                 <button

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Page-Wise Styling: Scanner & Document Straightener Studio
+   Page-Wise Styling: Scanner & Document Straightener Studio (Light Mode)
    ========================================================================== */
 
 /* Loupe 3x Magnifier Lens */
@@ -7,9 +7,9 @@
   position: absolute;
   pointer-events: none;
   border-radius: 9999px;
-  border: 2px solid #38bdf8;
-  background-color: #000000;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 15px rgba(56, 189, 248, 0.35);
+  border: 2px solid #2563eb;
+  background-color: #ffffff;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.2), 0 0 12px rgba(37, 99, 235, 0.25);
   overflow: hidden;
   z-index: 30;
   transition: opacity 0.15s ease;
@@ -35,13 +35,13 @@
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  background-color: #090d13;
+  background-color: #f1f5f9;
   border-radius: 0.75rem;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(48, 54, 61, 0.6);
+  border: 1px solid #e2e8f0;
   padding: 1rem;
 }
 
@@ -50,5 +50,5 @@
   background-color: #2563eb;
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }

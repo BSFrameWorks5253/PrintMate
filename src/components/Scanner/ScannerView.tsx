@@ -786,30 +786,30 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         <div 
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
-          className="border-2 border-dashed border-[#30363d] hover:border-cyan-500/60 bg-[#161b22]/70 rounded-2xl p-10 sm:p-14 text-center transition-all cursor-pointer group shadow-xl"
+          className="border-2 border-dashed border-slate-200 hover:border-cyan-500/60 bg-white/70 rounded-2xl p-10 sm:p-14 text-center transition-all cursor-pointer group shadow-xl"
           onClick={() => fileInputRef.current?.click()}
         >
-          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 border border-cyan-500/20 transition-all duration-300">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-50 text-cyan-600 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 border border-cyan-200 transition-all duration-300">
             <Upload className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3 className="text-xl font-bold text-slate-900 mb-2">
             Upload ID Card or Document Images
           </h3>
-          <p className="text-sm text-slate-400 max-w-md mx-auto mb-4">
-            Select 1 or both sides (Front & Back). Drag & drop here, click to browse, or paste with <kbd className="px-1.5 py-0.5 bg-[#21262d] border border-[#30363d] rounded text-xs text-slate-300">Ctrl+V</kbd>.
+          <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+            Select 1 or both sides (Front & Back). Drag & drop here, click to browse, or paste with <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-700">Ctrl+V</kbd>.
           </p>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 mb-6 transition-all">
             <Plus className="w-4 h-4" />
             <span>Select 1 or 2 Images (Front & Back)</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-400">
-            <span className="px-2.5 py-1 rounded-md bg-[#21262d] border border-[#30363d]">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
               Auto Rotated Border Detection
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-[#21262d] border border-[#30363d]">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
               Front & Back 2-Card Support
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-[#21262d] border border-[#30363d]">
+            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
               Uneven Floor Lighting Correction
             </span>
           </div>
@@ -817,10 +817,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       ) : (
         <div className="space-y-4">
           {/* MULTI-IMAGE TRAY & CARD SELECTOR */}
-          <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
-                <Layers className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
+                <Layers className="w-4 h-4 text-cyan-600" />
                 <span>Images ({cards.length}):</span>
               </span>
 
@@ -833,7 +833,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition-all flex-shrink-0 ${
                       isActive
                         ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-cyan-400 text-white shadow-md shadow-cyan-500/10'
-                        : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:border-slate-500'
+                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
                     }`}
                   >
                     <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'}`} />
@@ -844,7 +844,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         ? '🪪 Back Side' 
                         : `Image ${idx + 1}`}
                     </span>
-                    <span className="text-[10px] text-slate-400 max-w-[100px] truncate">
+                    <span className="text-[10px] text-slate-500 max-w-[100px] truncate">
                       {card.name}
                     </span>
                     {cards.length > 1 && (
@@ -853,7 +853,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           e.stopPropagation();
                           handleRemoveCard(idx);
                         }}
-                        className="p-0.5 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all"
+                        className="p-0.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-all"
                         title="Remove image"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -866,7 +866,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               {/* Add 1 More Image Button */}
               <button
                 onClick={() => addMoreFileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 transition-all text-xs font-semibold flex-shrink-0 shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 border border-cyan-300 text-cyan-700 hover:bg-cyan-500/25 transition-all text-xs font-semibold flex-shrink-0 shadow-sm"
                 title="Add second image (e.g. Back side of Aadhaar card)"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -898,9 +898,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
           {/* Active Card Configuration Bar */}
           {currentCard && (
-            <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">
                   ID Standard:
                 </span>
                 {DOCUMENT_TYPES.map((dt) => (
@@ -910,7 +910,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                       currentCard.docType === dt.id
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400'
-                        : 'bg-[#21262d] text-slate-300 hover:bg-[#30363d]'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                     title={dt.description}
                   >
@@ -919,8 +919,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 border-t md:border-t-0 md:border-l border-[#30363d] pt-3 md:pt-0 md:pl-4">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <div className="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Card Side:
                 </span>
                 {(['front', 'back', 'single'] as const).map((side) => (
@@ -930,7 +930,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
                       currentCard.cardSide === side
                         ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                        : 'bg-[#21262d] text-slate-400 hover:text-slate-200'
+                        : 'bg-slate-100 text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     {side}
@@ -938,7 +938,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 ))}
                 <button
                   onClick={() => addMoreFileInputRef.current?.click()}
-                  className="ml-auto md:ml-2 px-2.5 py-1 text-xs bg-[#21262d] hover:bg-[#30363d] text-cyan-300 rounded-lg border border-cyan-500/30 flex items-center gap-1.5"
+                  className="ml-auto md:ml-2 px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-cyan-700 rounded-lg border border-cyan-200 flex items-center gap-1.5"
                   title="Add another image"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -952,11 +952,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           {currentCard && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* LEFT: SOURCE IMAGE WITH CROP HANDLES */}
-              <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 flex flex-col space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#30363d]">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse" />
-                    <h4 className="text-sm font-semibold text-white">
+                    <h4 className="text-sm font-semibold text-slate-900">
                       Border Detection & Crop Pins ({currentCard.cardSide.toUpperCase()})
                     </h4>
                   </div>
@@ -964,7 +964,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => rotateSourceImage(-90)}
-                      className="p-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-slate-300 hover:text-white transition-all flex items-center gap-1 text-xs"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-white transition-all flex items-center gap-1 text-xs"
                       title="Rotate Source 90° CCW"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -973,7 +973,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                     <button
                       onClick={() => rotateSourceImage(90)}
-                      className="p-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-slate-300 hover:text-white transition-all flex items-center gap-1 text-xs"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-white transition-all flex items-center gap-1 text-xs"
                       title="Rotate Source 90° CW"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
@@ -982,25 +982,25 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                     <button
                       onClick={() => handleRotatePins('cw')}
-                      className="p-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-amber-300 hover:text-white transition-all flex items-center gap-1 text-xs"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-amber-700 hover:text-white transition-all flex items-center gap-1 text-xs"
                       title="Rotate Pins 90° CW (Shift which edge is Top)"
                     >
-                      <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                      <RotateCw className="w-3.5 h-3.5 text-amber-600" />
                       <span className="hidden sm:inline">Shift Pins</span>
                     </button>
 
                     <button
                       onClick={() => runAutoDetect('auto')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/25 transition-all shadow-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-300 hover:bg-cyan-500/25 transition-all shadow-sm"
                       title="Run auto border detection"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
                       <span>Auto-Detect</span>
                     </button>
 
                     <button
                       onClick={handleResetCorners}
-                      className="p-1.5 text-xs text-slate-400 hover:text-white rounded-lg hover:bg-[#21262d] transition-all"
+                      className="p-1.5 text-xs text-slate-500 hover:text-white rounded-lg hover:bg-slate-100 transition-all"
                       title="Reset to outer margins"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
@@ -1009,22 +1009,22 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Snap Quick Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0d1117] px-3 py-1.5 rounded-lg border border-[#30363d]/60 text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1.5 text-cyan-400 font-medium">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1.5 text-cyan-600 font-medium">
                     <Target className="w-3.5 h-3.5" />
                     <span>💡 Click anywhere on card to snap pins instantly</span>
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => runAutoDetect('inner_card')}
-                      className="px-2 py-0.5 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-300 hover:text-cyan-300 border border-[#30363d] transition-all"
+                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-cyan-700 border border-slate-200 transition-all"
                       title="Trim transparent lamination plastic and snap to card"
                     >
                       Snap to Card
                     </button>
                     <button
                       onClick={() => runAutoDetect('outer_border')}
-                      className="px-2 py-0.5 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-300 hover:text-cyan-300 border border-[#30363d] transition-all"
+                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-cyan-700 border border-slate-200 transition-all"
                       title="Expand to outer laminated plastic margin"
                     >
                       Include Border
@@ -1033,7 +1033,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Canvas Viewport */}
-                <div className="relative w-full aspect-[4/3] bg-[#0d1117] rounded-xl overflow-hidden flex items-center justify-center border border-[#30363d]/60 select-none">
+                <div className="relative w-full aspect-[4/3] bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 select-none">
                   <canvas
                     ref={editorCanvasRef}
                     onPointerDown={handlePointerDown}
@@ -1058,32 +1058,32 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                   <span>Drag corners • Drag edge midpoints to slide sides</span>
-                  <span className="font-mono text-cyan-400">
+                  <span className="font-mono text-cyan-600">
                     {currentCard.sourceImage.naturalWidth} × {currentCard.sourceImage.naturalHeight} px
                   </span>
                 </div>
               </div>
 
               {/* RIGHT: STRAIGHTENED RESULT & IMAGE ADJUSTMENTS */}
-              <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4 flex flex-col space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-[#30363d]">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <FileCheck className="w-4 h-4 text-emerald-400" />
-                    <h4 className="text-sm font-semibold text-white">
+                    <h4 className="text-sm font-semibold text-slate-900">
                       Deskewed Result & Filters
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
                     {isProcessing && (
-                      <span className="text-xs text-amber-400 flex items-center gap-1 animate-pulse">
+                      <span className="text-xs text-amber-600 flex items-center gap-1 animate-pulse">
                         <Sparkles className="w-3 h-3" /> Processing...
                       </span>
                     )}
                     <button
                       onClick={() => setFullPreviewOpen(true)}
-                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-[#21262d]"
+                      className="p-1 text-slate-500 hover:text-white rounded hover:bg-slate-100"
                       title="View Fullscreen"
                     >
                       <Maximize2 className="w-4 h-4" />
@@ -1092,7 +1092,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Preview Canvas */}
-                <div className="relative w-full aspect-[4/3] bg-[#090d13] rounded-xl overflow-hidden flex items-center justify-center border border-[#30363d]/60 p-4">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 p-4">
                   {currentCard.processedCanvas ? (
                     <img
                       src={currentCard.processedCanvas.toDataURL()}
@@ -1103,17 +1103,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     <div className="text-slate-500 text-xs">Generating preview...</div>
                   )}
 
-                  <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30">
+                  <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-700 border border-cyan-200">
                     {currentCard.cardSide.toUpperCase()} • {DOCUMENT_TYPES.find((d) => d.id === currentCard.docType)?.name}
                     {currentCard.processedCanvas && ` • ${currentCard.processedCanvas.width}×${currentCard.processedCanvas.height}px`}
                   </div>
                 </div>
 
                 {/* 1-Click Direct Rotation & Orientation Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[#0d1117] border border-[#30363d]/70 shadow-sm">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
                     <span>Card Orientation:</span>
-                    <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                    <span className="text-[10px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
                       {currentCard.processedCanvas && currentCard.processedCanvas.width >= currentCard.processedCanvas.height
                         ? 'Landscape (Horizontal)'
                         : 'Portrait (Vertical)'}
@@ -1124,10 +1124,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => handleRotateOutput(-90)}
-                      className="px-2 py-1.5 rounded-lg bg-[#21262d] hover:bg-[#30363d] text-slate-200 hover:text-white text-xs font-medium border border-[#30363d] flex items-center gap-1 transition-all"
+                      className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-white text-xs font-medium border border-slate-200 flex items-center gap-1 transition-all"
                       title="Rotate Deskewed Card 90° CCW"
                     >
-                      <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                      <RotateCcw className="w-3.5 h-3.5 text-cyan-600" />
                       <span>-90°</span>
                     </button>
 
@@ -1145,7 +1145,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                         currentCard.aspectMode === 'standard'
                           ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
-                          : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:text-white'
+                          : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-white'
                       }`}
                       title="Switch between Horizontal Landscape (Standard ID) and Vertical Portrait"
                     >
@@ -1155,8 +1155,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Aspect Ratio Lock Mode */}
-                <div className="flex items-center justify-between text-xs bg-[#0d1117] p-2 rounded-xl border border-[#30363d]/50">
-                  <span className="text-slate-400">Aspect Ratio:</span>
+                <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200">
+                  <span className="text-slate-500">Aspect Ratio:</span>
                   <div className="flex items-center gap-1">
                     {(['standard', 'portrait', 'free'] as const).map((mode) => (
                       <button
@@ -1165,7 +1165,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
                           currentCard.aspectMode === mode
                             ? 'bg-blue-600 text-white'
-                            : 'bg-[#21262d] text-slate-400 hover:text-white'
+                            : 'bg-slate-100 text-slate-500 hover:text-white'
                         }`}
                       >
                         {mode === 'standard' ? 'Standard Card' : mode === 'portrait' ? 'Portrait' : 'Free Quad'}
@@ -1176,8 +1176,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                 {/* Quick Filters */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                     <span>Scan Filters & Modes</span>
                   </label>
                   <div className="grid grid-cols-5 gap-1.5">
@@ -1197,7 +1197,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         className={`py-1.5 px-1 rounded-lg text-[11px] font-medium transition-all text-center truncate ${
                           currentCard.adjustments.filter === f.id
                             ? 'bg-blue-600 text-white font-semibold shadow'
-                            : 'bg-[#21262d] text-slate-300 hover:bg-[#30363d]'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
                         {f.label}
@@ -1207,13 +1207,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Brightness & Contrast Sliders */}
-                <div className="grid grid-cols-2 gap-3 bg-[#0d1117] p-3 rounded-xl border border-[#30363d]/50">
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400 flex items-center gap-1">
-                        <Sun className="w-3 h-3 text-amber-400" /> Brightness
+                      <span className="text-slate-500 flex items-center gap-1">
+                        <Sun className="w-3 h-3 text-amber-600" /> Brightness
                       </span>
-                      <span className="font-mono text-cyan-400">{currentCard.adjustments.brightness}</span>
+                      <span className="font-mono text-cyan-600">{currentCard.adjustments.brightness}</span>
                     </div>
                     <input
                       type="range"
@@ -1224,16 +1224,16 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         ...c,
                         adjustments: { ...c.adjustments, brightness: Number(e.target.value) }
                       }))}
-                      className="w-full h-1.5 bg-[#21262d] rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400 flex items-center gap-1">
-                        <Contrast className="w-3 h-3 text-cyan-400" /> Contrast
+                      <span className="text-slate-500 flex items-center gap-1">
+                        <Contrast className="w-3 h-3 text-cyan-600" /> Contrast
                       </span>
-                      <span className="font-mono text-cyan-400">{currentCard.adjustments.contrast}</span>
+                      <span className="font-mono text-cyan-600">{currentCard.adjustments.contrast}</span>
                     </div>
                     <input
                       type="range"
@@ -1244,7 +1244,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                         ...c,
                         adjustments: { ...c.adjustments, contrast: Number(e.target.value) }
                       }))}
-                      className="w-full h-1.5 bg-[#21262d] rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                   </div>
                 </div>
@@ -1282,7 +1282,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   <button
                     onClick={handleDownload}
-                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-[#21262d] hover:bg-[#30363d] text-slate-200 text-xs font-medium border border-[#30363d] flex items-center justify-center gap-1.5 transition-all"
+                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center justify-center gap-1.5 transition-all"
                     title="Download Single Image File"
                   >
                     <Download className="w-4 h-4" />
@@ -1298,27 +1298,27 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       {/* Fullscreen High-Resolution Preview Modal */}
       {fullPreviewOpen && currentCard?.processedCanvas && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative max-w-4xl w-full bg-[#161b22] border border-[#30363d] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-[#30363d] flex items-center justify-between">
+          <div className="relative max-w-4xl w-full bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white">Full Resolution Preview ({currentCard.name})</h3>
+                <Eye className="w-5 h-5 text-cyan-600" />
+                <h3 className="text-sm font-bold text-slate-900">Full Resolution Preview ({currentCard.name})</h3>
               </div>
               <button
                 onClick={() => setFullPreviewOpen(false)}
-                className="p-1.5 rounded-lg bg-[#21262d] text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 p-6 overflow-auto flex items-center justify-center bg-[#090d13]">
+            <div className="flex-1 p-6 overflow-auto flex items-center justify-center bg-slate-100">
               <img
                 src={currentCard.processedCanvas.toDataURL()}
                 alt="Full Preview"
                 className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
               />
             </div>
-            <div className="p-3 border-t border-[#30363d] flex items-center justify-between bg-[#161b22] text-xs text-slate-400">
+            <div className="p-3 border-t border-slate-200 flex items-center justify-between bg-white text-xs text-slate-500">
               <span>{currentCard.processedCanvas.width} × {currentCard.processedCanvas.height} px • High Resolution</span>
               <button
                 onClick={handleDownload}
