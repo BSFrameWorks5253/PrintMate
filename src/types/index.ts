@@ -60,6 +60,8 @@ export interface AssetEdits {
   asset_id: string;
   revision: number;
   rotation_degrees: number; // 0, 90, 180, 270
+  flip_horizontal: boolean;
+  flip_vertical: boolean;
   straighten_degrees: number; // deskew angle e.g. -45 to +45
   crop_x: number | null; // normalized 0 to 1
   crop_y: number | null;

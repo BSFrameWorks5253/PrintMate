@@ -8,6 +8,7 @@ interface JobState {
   assets: JobAsset[];
   activeAssetId: string | null;
   edits: Record<string, AssetEdits>;
+  editHistory: Record<string, { past: AssetEdits[]; future: AssetEdits[] }>;
   pages: JobPage[];
   activePageIndex: number;
   isDirty: boolean;
@@ -22,8 +23,12 @@ interface JobState {
   removeAsset: (assetId: string) => void;
   reorderAssets: (startIndex: number, endIndex: number) => void;
   setActiveAsset: (assetId: string | null) => void;
-  updateAssetEdits: (assetId: string, partial: Partial<AssetEdits>) => void;
+  updateAssetEdits: (assetId: string, partial: Partial<AssetEdits>, recordHistory?: boolean) => void;
   resetAssetEdits: (assetId: string) => void;
+  undoAssetEdits: (assetId: string) => void;
+  redoAssetEdits: (assetId: string) => void;
+  canUndoAsset: (assetId: string) => boolean;
+  canRedoAsset: (assetId: string) => boolean;
 
   // Layout Actions
   setActivePageIndex: (index: number) => void;
@@ -40,12 +45,14 @@ interface JobState {
 }
 
 let autosaveTimer: any = null;
+const getElectronAPI = () => (typeof window !== 'undefined' ? window.electronAPI : undefined);
 
 export const useJobStore = create<JobState>((set, get) => ({
   currentJob: null,
   assets: [],
   activeAssetId: null,
   edits: {},
+  editHistory: {},
   pages: [],
   activePageIndex: 0,
   isDirty: false,
@@ -91,28 +98,31 @@ export const useJobStore = create<JobState>((set, get) => ({
       assets: [],
       activeAssetId: null,
       edits: {},
+      editHistory: {},
       pages: [initialPage],
       activePageIndex: 0,
       isDirty: true,
     });
 
-    if (window.electronAPI) {
-      window.electronAPI.createJob(newJob).catch((e) => console.error('Failed to create job in SQLite:', e));
+    const electronAPI = getElectronAPI();
+    if (electronAPI) {
+      electronAPI.createJob(newJob).catch((e) => console.error('Failed to create job in SQLite:', e));
     }
   },
 
   loadJobFromDb: async (jobId: string) => {
-    if (!window.electronAPI) return false;
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return false;
     try {
-      const data = await window.electronAPI.loadJob(jobId);
+      const data = await electronAPI.loadJob(jobId);
       if (!data || !data.job) return false;
 
       // Ensure previews are loaded for assets
       const loadedAssets = await Promise.all(
         (data.assets || []).map(async (a: any) => {
-          if (!a.preview_url && window.electronAPI) {
+          if (!a.preview_url && electronAPI) {
             try {
-              const url = await window.electronAPI.readFileAsDataUrl(a.original_path);
+              const url = await electronAPI.readFileAsDataUrl(a.original_path);
               return { ...a, preview_url: url };
             } catch {
               return a;
@@ -127,6 +137,7 @@ export const useJobStore = create<JobState>((set, get) => ({
         assets: loadedAssets,
         activeAssetId: loadedAssets.length > 0 ? loadedAssets[0].id : null,
         edits: data.edits || {},
+        editHistory: {},
         pages: data.pages && data.pages.length > 0 ? data.pages : [
           {
             id: crypto.randomUUID(),
@@ -167,8 +178,9 @@ export const useJobStore = create<JobState>((set, get) => ({
 
     set({ isSaving: true });
     try {
-      if (window.electronAPI) {
-        await window.electronAPI.saveJob(currentJob.id, {
+      const electronAPI = getElectronAPI();
+      if (electronAPI) {
+        await electronAPI.saveJob(currentJob.id, {
           job: { ...currentJob, updated_at: new Date().toISOString() },
           assets,
           edits,
@@ -250,10 +262,11 @@ export const useJobStore = create<JobState>((set, get) => ({
 
   checkMissingSourceFiles: async () => {
     const { currentJob, assets } = get();
-    if (!currentJob || !window.electronAPI) return;
+    const electronAPI = getElectronAPI();
+    if (!currentJob || !electronAPI) return;
 
     try {
-      const results = await window.electronAPI.verifyJobAssets(currentJob.id);
+      const results = await electronAPI.verifyJobAssets(currentJob.id);
       if (results && results.length > 0) {
         const resultMap = new Map<string, boolean>();
         results.forEach((r) => resultMap.set(r.asset.id, r.exists));
@@ -273,8 +286,8 @@ export const useJobStore = create<JobState>((set, get) => ({
     }
   },
 
-  updateAssetEdits: (assetId: string, partial: Partial<AssetEdits>) => {
-    const { edits } = get();
+  updateAssetEdits: (assetId: string, partial: Partial<AssetEdits>, recordHistory = true) => {
+    const { edits, editHistory } = get();
     const current = edits[assetId] || createDefaultEdits(assetId);
     const updated: AssetEdits = {
       ...current,
@@ -283,11 +296,27 @@ export const useJobStore = create<JobState>((set, get) => ({
       created_at: new Date().toISOString(),
     };
 
+    let newHistory = editHistory;
+    if (recordHistory) {
+      const assetHistory = editHistory[assetId] || { past: [], future: [] };
+      const newPast = [...assetHistory.past, { ...current }];
+      // Limit history to 50 entries to conserve memory
+      if (newPast.length > 50) newPast.shift();
+      newHistory = {
+        ...editHistory,
+        [assetId]: {
+          past: newPast,
+          future: [],
+        },
+      };
+    }
+
     set({
       edits: {
         ...edits,
         [assetId]: updated,
       },
+      editHistory: newHistory,
       isDirty: true,
     });
 
@@ -300,13 +329,104 @@ export const useJobStore = create<JobState>((set, get) => ({
     }, 1000);
   },
 
+  undoAssetEdits: (assetId: string) => {
+    const { edits, editHistory } = get();
+    const assetHistory = editHistory[assetId];
+    if (!assetHistory || assetHistory.past.length === 0) return;
+
+    const current = edits[assetId] || createDefaultEdits(assetId);
+    const newPast = [...assetHistory.past];
+    const previous = newPast.pop()!;
+
+    set({
+      edits: {
+        ...edits,
+        [assetId]: {
+          ...previous,
+          revision: current.revision + 1,
+          created_at: new Date().toISOString(),
+        },
+      },
+      editHistory: {
+        ...editHistory,
+        [assetId]: {
+          past: newPast,
+          future: [{ ...current }, ...assetHistory.future],
+        },
+      },
+      isDirty: true,
+    });
+
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      get().saveCurrentJob();
+    }, 1000);
+  },
+
+  redoAssetEdits: (assetId: string) => {
+    const { edits, editHistory } = get();
+    const assetHistory = editHistory[assetId];
+    if (!assetHistory || assetHistory.future.length === 0) return;
+
+    const current = edits[assetId] || createDefaultEdits(assetId);
+    const newFuture = [...assetHistory.future];
+    const next = newFuture.shift()!;
+
+    set({
+      edits: {
+        ...edits,
+        [assetId]: {
+          ...next,
+          revision: current.revision + 1,
+          created_at: new Date().toISOString(),
+        },
+      },
+      editHistory: {
+        ...editHistory,
+        [assetId]: {
+          past: [...assetHistory.past, { ...current }],
+          future: newFuture,
+        },
+      },
+      isDirty: true,
+    });
+
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      get().saveCurrentJob();
+    }, 1000);
+  },
+
+  canUndoAsset: (assetId: string) => {
+    const hist = get().editHistory[assetId];
+    return !!hist && hist.past.length > 0;
+  },
+
+  canRedoAsset: (assetId: string) => {
+    const hist = get().editHistory[assetId];
+    return !!hist && hist.future.length > 0;
+  },
+
   resetAssetEdits: (assetId: string) => {
-    const { edits } = get();
+    const { edits, editHistory } = get();
+    const current = edits[assetId];
+    let newHistory = editHistory;
+    if (current) {
+      const assetHistory = editHistory[assetId] || { past: [], future: [] };
+      newHistory = {
+        ...editHistory,
+        [assetId]: {
+          past: [...assetHistory.past, { ...current }],
+          future: [],
+        },
+      };
+    }
     set({
       edits: {
         ...edits,
         [assetId]: createDefaultEdits(assetId),
       },
+      editHistory: newHistory,
       isDirty: true,
     });
     get().saveCurrentJob();

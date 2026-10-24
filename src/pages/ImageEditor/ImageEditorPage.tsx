@@ -23,6 +23,11 @@ import {
   ChevronUp,
   ChevronDown,
   AlertTriangle,
+  Undo,
+  Redo,
+  FlipHorizontal,
+  FlipVertical,
+  ScanLine,
 } from 'lucide-react';
 import { useJobStore } from '../../stores/jobStore';
 import { TabId } from '../../components/layout/Header';
@@ -31,6 +36,7 @@ import {
   loadImage,
   renderProcessedCanvas,
   detectDocumentSkew,
+  detectDocumentCorners,
   createDefaultEdits,
 } from '../../utils/image-processing';
 import { BackgroundMode } from '../../types';
@@ -47,6 +53,10 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     edits,
     updateAssetEdits,
     resetAssetEdits,
+    undoAssetEdits,
+    redoAssetEdits,
+    canUndoAsset,
+    canRedoAsset,
     removeAsset,
     reorderAssets,
     addAssets,
@@ -67,6 +77,36 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const activeAsset = assets.find((a) => a.id === activeAssetId) || assets[0];
   const activeEdits = activeAsset ? edits[activeAsset.id] || createDefaultEdits(activeAsset.id) : null;
+
+  // Keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Escape (Cancel crop)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeAsset) return;
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (canUndoAsset(activeAsset.id)) {
+          undoAssetEdits(activeAsset.id);
+        }
+      } else if (
+        (isCtrlOrCmd && e.key.toLowerCase() === 'y') ||
+        (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'z')
+      ) {
+        e.preventDefault();
+        if (canRedoAsset(activeAsset.id)) {
+          redoAssetEdits(activeAsset.id);
+        }
+      } else if (e.key === 'Escape') {
+        if (isCropping) {
+          setIsCropping(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeAsset, isCropping, canUndoAsset, canRedoAsset, undoAssetEdits, redoAssetEdits]);
 
   // Render current active asset onto the preview canvas
   useEffect(() => {
@@ -209,6 +249,59 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
       w,
       h,
     });
+  };
+
+  const handleToggleFlipHorizontal = () => {
+    updateAssetEdits(activeAsset.id, {
+      flip_horizontal: !activeEdits.flip_horizontal,
+    });
+  };
+
+  const handleToggleFlipVertical = () => {
+    updateAssetEdits(activeAsset.id, {
+      flip_vertical: !activeEdits.flip_vertical,
+    });
+  };
+
+  const handleAutoBoundary = () => {
+    if (!canvasRef.current || !activeAsset) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      try {
+        const corners = detectDocumentCorners(canvasRef.current!);
+        const w = canvasRef.current!.width;
+        const h = canvasRef.current!.height;
+        const minX = Math.min(corners.topLeft.x, corners.bottomLeft.x) / w;
+        const maxX = Math.max(corners.topRight.x, corners.bottomRight.x) / w;
+        const minY = Math.min(corners.topLeft.y, corners.topRight.y) / h;
+        const maxY = Math.max(corners.bottomLeft.y, corners.bottomRight.y) / h;
+
+        setCropBox({
+          x: Math.max(0, Math.min(1, minX)),
+          y: Math.max(0, Math.min(1, minY)),
+          w: Math.max(0.1, Math.min(1, maxX - minX)),
+          h: Math.max(0.1, Math.min(1, maxY - minY)),
+        });
+        setIsCropping(true);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 50);
+  };
+
+  const handleAutoPerspectiveCorrection = () => {
+    if (!canvasRef.current || !activeAsset) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      try {
+        const corners = detectDocumentCorners(canvasRef.current!);
+        updateAssetEdits(activeAsset.id, {
+          perspective_data_json: JSON.stringify(corners),
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 50);
   };
 
   const addFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -647,10 +740,50 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               <RefreshCw size={13} />
               Auto Deskew
             </button>
+
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '6px 12px', fontSize: '12px' }}
+              onClick={handleAutoPerspectiveCorrection}
+              disabled={isProcessing}
+              title="Detect document paper boundary and correct perspective warp"
+            >
+              <ScanLine size={13} />
+              Perspective Fix
+            </button>
           </div>
 
-          {/* Zoom & View Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Center: Undo / Redo / Reset & Hold Original */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '6px', opacity: canUndoAsset(activeAsset.id) ? 1 : 0.35 }}
+              onClick={() => undoAssetEdits(activeAsset.id)}
+              disabled={!canUndoAsset(activeAsset.id)}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo size={15} />
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '6px', opacity: canRedoAsset(activeAsset.id) ? 1 : 0.35 }}
+              onClick={() => redoAssetEdits(activeAsset.id)}
+              disabled={!canRedoAsset(activeAsset.id)}
+              title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+            >
+              <Redo size={15} />
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '6px' }}
+              onClick={() => resetAssetEdits(activeAsset.id)}
+              title="Reset All Edits to Original"
+            >
+              <RotateCcw size={15} />
+            </button>
+
+            <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
+
             <button
               className={`btn ${showOriginal ? 'btn-primary' : 'btn-ghost'}`}
               style={{ fontSize: '12px', padding: '5px 10px' }}
@@ -662,9 +795,10 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               <Eye size={14} />
               Hold: Original
             </button>
+          </div>
 
-            <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)' }} />
-
+          {/* Zoom & View Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               className="btn btn-ghost"
               style={{ padding: '6px' }}
@@ -692,10 +826,9 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
             >
               <Maximize2 size={15} />
             </button>
-          </div>
 
-          {/* Layout Next Button */}
-          <div>
+            <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
+
             <button
               className="btn btn-accent"
               style={{ padding: '7px 14px', fontSize: '13px' }}
@@ -790,14 +923,37 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               Orientation & Deskew
             </span>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <button className="tool-btn" style={{ flex: 1 }} onClick={() => handleRotate(-90)}>
-                <RotateCcw size={16} />
-                <span>Rotate -90°</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '8px' }}>
+              <button className="tool-btn" onClick={() => handleRotate(-90)} title="Rotate -90°">
+                <RotateCcw size={15} />
+                <span>-90°</span>
               </button>
-              <button className="tool-btn" style={{ flex: 1 }} onClick={() => handleRotate(90)}>
-                <RotateCw size={16} />
-                <span>Rotate +90°</span>
+              <button className="tool-btn" onClick={() => handleRotate(90)} title="Rotate +90°">
+                <RotateCw size={15} />
+                <span>+90°</span>
+              </button>
+              <button className="tool-btn" onClick={() => handleRotate(180)} title="Rotate 180°">
+                <RotateCw size={15} />
+                <span>180°</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '12px' }}>
+              <button
+                className={`tool-btn ${activeEdits.flip_horizontal ? 'active' : ''}`}
+                onClick={handleToggleFlipHorizontal}
+                title="Flip Horizontal (Mirror)"
+              >
+                <FlipHorizontal size={15} />
+                <span>Flip Horiz</span>
+              </button>
+              <button
+                className={`tool-btn ${activeEdits.flip_vertical ? 'active' : ''}`}
+                onClick={handleToggleFlipVertical}
+                title="Flip Vertical (Upside down)"
+              >
+                <FlipVertical size={15} />
+                <span>Flip Vert</span>
               </button>
             </div>
 
@@ -849,10 +1005,30 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                   <button className="tool-btn" onClick={() => handleSetAspectCrop(35 / 45)}>
                     Passport
                   </button>
+                  <button className="tool-btn" onClick={() => handleSetAspectCrop(20 / 25)}>
+                    Stamp
+                  </button>
                   <button className="tool-btn" onClick={() => handleSetAspectCrop(85.6 / 54)}>
                     ID Card
                   </button>
+                  <button className="tool-btn" onClick={() => handleSetAspectCrop(6 / 4)}>
+                    4x6 Photo
+                  </button>
+                  <button className="tool-btn" onClick={() => handleSetAspectCrop(210 / 297)}>
+                    A4 Doc
+                  </button>
                 </div>
+
+                <button
+                  className="tool-btn"
+                  style={{ width: '100%', marginTop: '4px' }}
+                  onClick={handleAutoBoundary}
+                  title="Detect document paper boundary and adjust crop box"
+                >
+                  <ScanLine size={13} />
+                  <span>Auto Detect Document Boundary</span>
+                </button>
+
                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                   <button className="btn btn-accent" style={{ flex: 1, padding: '6px' }} onClick={handleApplyCrop}>
                     <Check size={14} />
@@ -962,6 +1138,26 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                   onChange={(e) =>
                     updateAssetEdits(activeAsset.id, {
                       contrast: parseFloat(e.target.value),
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Saturation</span>
+                  <span className="font-mono">{Math.round((activeEdits.saturation ?? 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  className="slider-control"
+                  min="0"
+                  max="2.5"
+                  step="0.05"
+                  value={activeEdits.saturation ?? 1}
+                  onChange={(e) =>
+                    updateAssetEdits(activeAsset.id, {
+                      saturation: parseFloat(e.target.value),
                     })
                   }
                 />
