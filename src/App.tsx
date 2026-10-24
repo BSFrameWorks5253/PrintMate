@@ -127,7 +127,7 @@ export const App: React.FC = () => {
       <footer className="no-print border-t border-[#30363d] py-4 bg-[#161b22] text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <img src="/favicon.svg" alt="PrintMate Logo" className="w-4 h-4 object-contain" />
+            <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
             <span className="font-semibold text-slate-300">PrintMate</span>
             <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
           </div>

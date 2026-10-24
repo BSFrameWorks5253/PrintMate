@@ -27,15 +27,17 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#1c2128] border border-[#30363d] flex items-center justify-center p-1.5 shadow-lg shadow-purple-500/15 ring-1 ring-white/5">
-              <img src="/favicon.svg" alt="PrintMate Logo" className="w-7 h-7 object-contain drop-shadow" />
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('scanner')}>
+            <div className="w-10 h-10 rounded-xl bg-[#0f172a] border border-cyan-500/30 flex items-center justify-center p-1 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-500/20 hover:scale-105 transition-transform">
+              <img src="/logo.svg" alt="PrintMate Logo" className="w-8 h-8 object-contain drop-shadow" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xl tracking-tight text-white">PrintMate</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  PRO SCAN & PRINT
+                <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-300 bg-clip-text text-transparent">
+                  PrintMate
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 tracking-wide">
+                  PRO STUDIO
                 </span>
               </div>
               <p className="text-xs text-slate-400 hidden sm:block">
