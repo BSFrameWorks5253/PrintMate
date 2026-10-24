@@ -38,6 +38,7 @@ import {
   detectDocumentSkew,
   detectDocumentCorners,
   createDefaultEdits,
+  calculateAspectCrop,
 } from '../../utils/image-processing';
 import { BackgroundMode } from '../../types';
 
@@ -235,20 +236,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
   };
 
   const handleSetAspectCrop = (aspect: number) => {
-    // Center aspect box
-    let w = 0.8;
-    let h = 0.8;
-    if (aspect > 1) {
-      h = w / aspect;
-    } else {
-      w = h * aspect;
-    }
-    setCropBox({
-      x: (1 - w) / 2,
-      y: (1 - h) / 2,
-      w,
-      h,
-    });
+    setCropBox(calculateAspectCrop(aspect));
   };
 
   const handleToggleFlipHorizontal = () => {
