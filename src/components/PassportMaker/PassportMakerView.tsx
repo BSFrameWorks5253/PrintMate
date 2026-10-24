@@ -167,49 +167,43 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     let rows = 2;
 
     if (paperSize === '4x6') {
-      // 4x6 landscape is 152.4 x 101.6 mm
+      // 4x6 landscape photo paper is 152.4 x 101.6 mm (~1.50 landscape ratio).
+      // Since passport photos are 35x45mm portrait (~0.778 ratio),
+      // the columns-to-rows ratio MUST be approx 2:1 (cols/rows ≈ 1.93) to completely
+      // fill both width and height without leaving empty white space on the sides!
       if (count <= 2) {
-        cols = count;
+        cols = 2;
         rows = 1;
       } else if (count <= 4) {
-        cols = 2;
-        rows = 2;
-      } else if (count <= 6) {
-        cols = 3;
-        rows = 2;
+        cols = 4;
+        rows = 1; // 4 across in a row spans full paper width
       } else if (count <= 8) {
         cols = 4;
-        rows = 2; // 8 photos (Image 2 standard!)
-      } else if (count <= 10) {
-        cols = 5;
-        rows = 2;
-      } else if (count <= 12) {
-        cols = 4;
-        rows = 3;
-      } else if (count <= 16) {
-        cols = 4;
-        rows = 4;
+        rows = 2; // 4 cols × 2 rows = 8 photos (Standard studio layout)
+      } else if (count <= 18) {
+        cols = 6;
+        rows = 3; // 6 cols × 3 rows = 18 photos (Fills 100% width & height with ZERO side margin!)
       } else {
-        cols = Math.ceil(Math.sqrt(count * 1.5));
-        rows = Math.ceil(count / cols);
+        cols = 8;
+        rows = 4; // 8 cols × 4 rows = 32 photos (Fills 100% width & height)
       }
     } else {
-      // A4 portrait is 210 x 297 mm
+      // A4 portrait is 210 x 297 mm (0.707 portrait ratio)
       if (count <= 6) {
         cols = 2;
         rows = 3;
-      } else if (count <= 8) {
-        cols = 2;
-        rows = 4;
       } else if (count <= 12) {
         cols = 3;
         rows = 4;
-      } else if (count <= 16) {
+      } else if (count <= 20) {
         cols = 4;
-        rows = 4;
+        rows = 5;
+      } else if (count <= 30) {
+        cols = 5;
+        rows = 6;
       } else {
-        cols = Math.ceil(Math.sqrt(count * 0.7));
-        rows = Math.ceil(count / cols);
+        cols = 6;
+        rows = 7;
       }
     }
 
@@ -707,7 +701,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                 </button>
 
                 <div className="flex items-center gap-1 ml-auto">
-                  {[4, 6, 8, 10, 12, 16].map((num) => (
+                  {[4, 8, 12, 16, 18].map((num) => (
                     <button
                       key={num}
                       onClick={() => setPhotoCount(num)}
