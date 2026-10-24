@@ -20,9 +20,13 @@ import {
   Palette,
   Layers,
   FileText,
+  ChevronUp,
+  ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { useJobStore } from '../../stores/jobStore';
 import { TabId } from '../../components/layout/Header';
+import { renderPdfPages } from '../../utils/pdf-engine';
 import {
   loadImage,
   renderProcessedCanvas,
@@ -44,6 +48,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     updateAssetEdits,
     resetAssetEdits,
     removeAsset,
+    reorderAssets,
     addAssets,
   } = useJobStore();
 
@@ -51,6 +56,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
   const [showOriginal, setShowOriginal] = useState<boolean>(false);
   const [isCropping, setIsCropping] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [cropBox, setCropBox] = useState<{ x: number; y: number; w: number; h: number }>({
     x: 0.1,
     y: 0.1,
@@ -220,9 +226,18 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     if (!files || files.length === 0) return;
     const fileArr = Array.from(files);
     const newAssets: any[] = [];
+    const invalidFiles: File[] = [];
 
     for (let i = 0; i < fileArr.length; i++) {
       const f = fileArr[i];
+      const isImg = f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|tiff)$/i.test(f.name);
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+
+      if (!isImg && !isPdf) {
+        invalidFiles.push(f);
+        continue;
+      }
+
       let dataUrl = '';
       if (window.electronAPI && (f as any).path) {
         try {
@@ -234,23 +249,70 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
         dataUrl = await readFileAsDataUrl(f);
       }
 
-      newAssets.push({
-        id: crypto.randomUUID(),
-        job_id: activeAsset.job_id,
-        original_path: (f as any).path || f.name,
-        original_name: f.name,
-        mime_type: f.type || 'image/jpeg',
-        file_extension: f.name.split('.').pop() || 'jpg',
-        file_size_bytes: f.size,
-        source_width: null,
-        source_height: null,
-        page_count: 1,
-        asset_type: 'image' as const,
-        import_status: 'ready' as const,
-        sort_order: assets.length + i,
-        created_at: new Date().toISOString(),
-        preview_url: dataUrl,
-      });
+      if (isPdf) {
+        try {
+          const renderedPages = await renderPdfPages(dataUrl);
+          renderedPages.forEach((p) => {
+            newAssets.push({
+              id: crypto.randomUUID(),
+              job_id: activeAsset.job_id,
+              original_path: (f as any).path || f.name,
+              original_name: `${f.name} (P.${p.pageIndex})`,
+              mime_type: 'image/jpeg',
+              file_extension: 'pdf',
+              file_size_bytes: f.size,
+              source_width: p.width,
+              source_height: p.height,
+              page_count: 1,
+              asset_type: 'pdf_page' as const,
+              import_status: 'ready' as const,
+              sort_order: assets.length + newAssets.length,
+              created_at: new Date().toISOString(),
+              preview_url: p.dataUrl,
+            });
+          });
+        } catch (err) {
+          console.error('Failed to parse dropped PDF:', err);
+          invalidFiles.push(f);
+        }
+      } else {
+        // Measure source dimensions
+        let width: number | null = null;
+        let height: number | null = null;
+        try {
+          const img = new Image();
+          img.src = dataUrl;
+          await new Promise((res) => { img.onload = res; img.onerror = res; });
+          width = img.naturalWidth || null;
+          height = img.naturalHeight || null;
+        } catch {}
+
+        newAssets.push({
+          id: crypto.randomUUID(),
+          job_id: activeAsset.job_id,
+          original_path: (f as any).path || f.name,
+          original_name: f.name,
+          mime_type: f.type || 'image/jpeg',
+          file_extension: f.name.split('.').pop() || 'jpg',
+          file_size_bytes: f.size,
+          source_width: width,
+          source_height: height,
+          page_count: 1,
+          asset_type: 'image' as const,
+          import_status: 'ready' as const,
+          sort_order: assets.length + newAssets.length,
+          created_at: new Date().toISOString(),
+          preview_url: dataUrl,
+        });
+      }
+    }
+
+    if (invalidFiles.length > 0) {
+      setValidationError(
+        `Skipped ${invalidFiles.length} unsupported or unreadable file(s): "${invalidFiles.map((f) => f.name).slice(0, 3).join(', ')}". PrintMate accepts JPG, PNG, WebP, BMP, TIFF, and PDF files.`
+      );
+    } else {
+      setValidationError(null);
     }
 
     if (newAssets.length > 0) {
@@ -350,7 +412,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {assets.map((asset) => {
+            {assets.map((asset, idx) => {
               const isSelected = asset.id === activeAsset.id;
               return (
                 <div
@@ -359,7 +421,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    gap: '8px',
                     padding: '8px 10px',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: isSelected ? 'var(--bg-elevated)' : 'var(--bg-tertiary)',
@@ -369,10 +431,40 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                     transition: 'all var(--transition-fast)',
                   }}
                 >
+                  {/* Reordering Controls */}
+                  {assets.length > 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: '1px', opacity: idx === 0 ? 0.25 : 0.8 }}
+                        disabled={idx === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          reorderAssets(idx, idx - 1);
+                        }}
+                        title="Move Up"
+                      >
+                        <ChevronUp size={12} />
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: '1px', opacity: idx === assets.length - 1 ? 0.25 : 0.8 }}
+                        disabled={idx === assets.length - 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          reorderAssets(idx, idx + 1);
+                        }}
+                        title="Move Down"
+                      >
+                        <ChevronDown size={12} />
+                      </button>
+                    </div>
+                  )}
+
                   <div
                     style={{
-                      width: '44px',
-                      height: '44px',
+                      width: '42px',
+                      height: '42px',
                       borderRadius: '4px',
                       backgroundColor: 'var(--bg-elevated)',
                       border: '1px solid var(--border-subtle)',
@@ -390,7 +482,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                       />
                     ) : (
-                      <FileText size={20} color="var(--text-muted)" />
+                      <FileText size={18} color="var(--text-muted)" />
                     )}
                   </div>
 
@@ -408,9 +500,33 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                     >
                       {asset.original_name}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      {asset.asset_type === 'pdf_page' ? 'PDF Page' : 'Image'}
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span>{asset.asset_type === 'pdf_page' ? 'PDF' : 'Image'}</span>
+                      {asset.source_width && asset.source_height && (
+                        <span>• {asset.source_width}×{asset.source_height}</span>
+                      )}
+                      {asset.file_size_bytes && (
+                        <span>• {Math.round(asset.file_size_bytes / 1024)}KB</span>
+                      )}
                     </div>
+                    {asset.import_status === 'missing' && (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          fontSize: '9px',
+                          color: '#b45309',
+                          backgroundColor: '#fef3c7',
+                          padding: '1px 4px',
+                          borderRadius: '3px',
+                          marginTop: '2px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <AlertTriangle size={9} /> Missing
+                      </div>
+                    )}
                   </div>
 
                   {assets.length > 1 && (
@@ -444,6 +560,58 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
           overflow: 'hidden',
         }}
       >
+        {/* Validation Warning Alert */}
+        {validationError && (
+          <div
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#fef2f2',
+              borderBottom: '1px solid #fee2e2',
+              color: '#b91c1c',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              zIndex: 15,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={14} color="#ef4444" />
+              <span>{validationError}</span>
+            </div>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '2px 6px', fontSize: '11px' }}
+              onClick={() => setValidationError(null)}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Missing Source File Warning Banner */}
+        {activeAsset.import_status === 'missing' && (
+          <div
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#fffbeb',
+              borderBottom: '1px solid #fef3c7',
+              color: '#92400e',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 15,
+            }}
+          >
+            <AlertTriangle size={14} color="#d97706" />
+            <span>
+              <strong>Source file missing on disk:</strong> <code>{activeAsset.original_path}</code> could not be found. PrintMate is using the embedded image cache.
+            </span>
+          </div>
+        )}
+
         {/* Top Viewport Toolbar */}
         <div
           style={{

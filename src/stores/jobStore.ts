@@ -17,6 +17,7 @@ interface JobState {
   createNewJob: (name?: string) => void;
   loadJobFromDb: (jobId: string) => Promise<boolean>;
   saveCurrentJob: () => Promise<boolean>;
+  checkMissingSourceFiles: () => Promise<void>;
   addAssets: (newAssets: JobAsset[]) => void;
   removeAsset: (assetId: string) => void;
   reorderAssets: (startIndex: number, endIndex: number) => void;
@@ -37,6 +38,8 @@ interface JobState {
   removePageItem: (pageIndex: number, itemId: string) => void;
   clearPageItems: (pageIndex: number) => void;
 }
+
+let autosaveTimer: any = null;
 
 export const useJobStore = create<JobState>((set, get) => ({
   currentJob: null,
@@ -149,6 +152,8 @@ export const useJobStore = create<JobState>((set, get) => ({
         activePageIndex: 0,
         isDirty: false,
       });
+
+      get().checkMissingSourceFiles();
       return true;
     } catch (err) {
       console.error('Failed to load job from DB:', err);
@@ -243,6 +248,31 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ activeAssetId: assetId });
   },
 
+  checkMissingSourceFiles: async () => {
+    const { currentJob, assets } = get();
+    if (!currentJob || !window.electronAPI) return;
+
+    try {
+      const results = await window.electronAPI.verifyJobAssets(currentJob.id);
+      if (results && results.length > 0) {
+        const resultMap = new Map<string, boolean>();
+        results.forEach((r) => resultMap.set(r.asset.id, r.exists));
+
+        const updated = assets.map((a) => {
+          const exists = resultMap.get(a.id);
+          if (exists === false) {
+            return { ...a, import_status: 'missing' as const };
+          }
+          return a;
+        });
+
+        set({ assets: updated });
+      }
+    } catch (err) {
+      console.warn('Failed to verify source files on disk:', err);
+    }
+  },
+
   updateAssetEdits: (assetId: string, partial: Partial<AssetEdits>) => {
     const { edits } = get();
     const current = edits[assetId] || createDefaultEdits(assetId);
@@ -260,6 +290,14 @@ export const useJobStore = create<JobState>((set, get) => ({
       },
       isDirty: true,
     });
+
+    // Debounced autosave to SQLite (1 second of inactivity)
+    if (autosaveTimer) {
+      clearTimeout(autosaveTimer);
+    }
+    autosaveTimer = setTimeout(() => {
+      get().saveCurrentJob();
+    }, 1000);
   },
 
   resetAssetEdits: (assetId: string) => {
@@ -271,6 +309,7 @@ export const useJobStore = create<JobState>((set, get) => ({
       },
       isDirty: true,
     });
+    get().saveCurrentJob();
   },
 
   setActivePageIndex: (index: number) => {

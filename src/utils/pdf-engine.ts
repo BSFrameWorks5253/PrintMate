@@ -121,18 +121,33 @@ export async function generatePrintPdf(
 }
 
 /**
+ * Get total page count of a PDF document
+ */
+export async function getPdfPageCount(pdfDataUrlOrBuffer: string | ArrayBuffer): Promise<number> {
+  const loadingTask = pdfjsLib.getDocument(pdfDataUrlOrBuffer);
+  const pdfDoc = await loadingTask.promise;
+  return pdfDoc.numPages;
+}
+
+/**
  * Render imported PDF document pages into high-res images using PDF.js
+ * Supports rendering all pages or a targeted subset of page indices (1-indexed).
  */
 export async function renderPdfPages(
-  pdfDataUrlOrBuffer: string | ArrayBuffer
+  pdfDataUrlOrBuffer: string | ArrayBuffer,
+  pageIndices?: number[]
 ): Promise<{ pageIndex: number; dataUrl: string; width: number; height: number }[]> {
   const loadingTask = pdfjsLib.getDocument(pdfDataUrlOrBuffer);
   const pdfDoc = await loadingTask.promise;
   const numPages = pdfDoc.numPages;
   const results = [];
 
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdfDoc.getPage(i);
+  const pagesToRender = pageIndices && pageIndices.length > 0
+    ? pageIndices.filter((idx) => idx >= 1 && idx <= numPages)
+    : Array.from({ length: numPages }, (_, i) => i + 1);
+
+  for (const pageNum of pagesToRender) {
+    const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2.0 }); // 2x scale for crisp print preview
 
     const canvas = document.createElement('canvas');
@@ -143,7 +158,7 @@ export async function renderPdfPages(
     await page.render({ canvasContext: ctx, viewport }).promise;
 
     results.push({
-      pageIndex: i,
+      pageIndex: pageNum,
       dataUrl: canvas.toDataURL('image/jpeg', 0.92),
       width: Math.round(viewport.width / 2),
       height: Math.round(viewport.height / 2),

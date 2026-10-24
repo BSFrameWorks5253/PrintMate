@@ -12,6 +12,8 @@ import {
   Printer,
   Sparkles,
   CloudUpload,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { useJobStore } from '../../stores/jobStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -29,6 +31,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
@@ -81,9 +84,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       const imageFiles = fileArr.filter(
         (f) => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|tiff)$/i.test(f.name)
       );
+      const skippedFiles = fileArr.filter(
+        (f) =>
+          !f.type.startsWith('image/') &&
+          !/\.(jpg|jpeg|png|webp|bmp|tiff)$/i.test(f.name) &&
+          f.type !== 'application/pdf' &&
+          !f.name.toLowerCase().endsWith('.pdf')
+      );
+
+      if (skippedFiles.length > 0) {
+        setValidationWarning(
+          `Skipped ${skippedFiles.length} unsupported file(s): "${skippedFiles.map(f => f.name).slice(0, 3).join(', ')}". PrintMate supports JPG, PNG, WebP, BMP, TIFF, and PDF files.`
+        );
+      } else {
+        setValidationWarning(null);
+      }
 
       const allAssets: any[] = [];
-      createNewJob(`Job (${fileArr.length} files)`);
+      createNewJob(`Job (${fileArr.length - skippedFiles.length} files)`);
 
       // Process image files
       for (let i = 0; i < imageFiles.length; i++) {
@@ -99,6 +117,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           dataUrl = await readFileAsDataUrl(f);
         }
 
+        // Measure natural dimensions
+        let width: number | null = null;
+        let height: number | null = null;
+        try {
+          const img = new Image();
+          img.src = dataUrl;
+          await new Promise((res) => { img.onload = res; img.onerror = res; });
+          width = img.naturalWidth || null;
+          height = img.naturalHeight || null;
+        } catch {}
+
         allAssets.push({
           id: crypto.randomUUID(),
           job_id: 'pending',
@@ -107,8 +136,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           mime_type: f.type || 'image/jpeg',
           file_extension: f.name.split('.').pop() || 'jpg',
           file_size_bytes: f.size,
-          source_width: null,
-          source_height: null,
+          source_width: width,
+          source_height: height,
           page_count: 1,
           asset_type: 'image' as const,
           import_status: 'ready' as const,
@@ -356,6 +385,37 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               Release to instantly import into PrintMate Workspace
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Validation Warning Alert */}
+      {validationWarning && (
+        <div
+          style={{
+            padding: '12px 18px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 'var(--radius-md)',
+            color: '#b91c1c',
+            fontSize: '13px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} color="#ef4444" />
+            <span>{validationWarning}</span>
+          </div>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px', color: '#b91c1c' }}
+            onClick={() => setValidationWarning(null)}
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
