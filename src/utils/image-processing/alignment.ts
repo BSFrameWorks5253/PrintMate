@@ -49,22 +49,14 @@ export function applyRotationAndFlip(
   if (!rotCtx) throw new Error('Failed to get 2D canvas context');
 
   if (preservePageDimensions) {
-    // Fixed page boundaries: canvas NEVER gets wider when tilting
+    // Fixed page boundaries: canvas NEVER gets wider when tilting, no artificial zoom cutting content
     rotCanvas.width = baseW;
     rotCanvas.height = baseH;
 
     rotCtx.translate(baseW / 2, baseH / 2);
 
-    // Apply straighten angle within fixed canvas boundaries
-    const tiltRad = Math.abs((straightenDegrees * Math.PI) / 180);
-    const aspect = Math.min(baseW / baseH, baseH / baseW);
-    const zoomScale = Math.cos(tiltRad) + Math.sin(tiltRad) / Math.max(0.01, aspect);
-
-    rotCtx.rotate((straightenDegrees * Math.PI) / 180);
-    rotCtx.scale(zoomScale, zoomScale);
-
-    // 90/180/270 rotation & flip
-    rotCtx.rotate((rotationDegrees * Math.PI) / 180);
+    // Apply rotation & straighten without artificial magnification
+    rotCtx.rotate(((rotationDegrees + straightenDegrees) * Math.PI) / 180);
     rotCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
     rotCtx.drawImage(sourceImage, -srcW / 2, -srcH / 2, srcW, srcH);
   } else {
@@ -421,14 +413,39 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
       const angleDegLeft = (angleRadLeft * 180) / Math.PI - 90;
 
       const avgTilt = (angleDegTop + angleDegLeft) / 2;
+      const deskewAngle = Math.round(-avgTilt * 10) / 10;
+      const deskewRad = (deskewAngle * Math.PI) / 180;
+      const cosD = Math.cos(deskewRad);
+      const sinD = Math.sin(deskewRad);
 
-      // Safe margin padding (1.5% around detected card/document)
-      const padX = 0.015;
-      const padY = 0.015;
-      const normX = Math.max(0, best.minX / thumbW - padX);
-      const normY = Math.max(0, best.minY / thumbH - padY);
-      const normW = Math.min(1 - normX, (best.maxX - best.minX) / thumbW + 2 * padX);
-      const normH = Math.min(1 - normY, (best.maxY - best.minY) / thumbH + 2 * padY);
+      // Rotate corners around center to find the true upright crop box in deskewed space
+      const aspect = w / h;
+      const cornerList = [detectedCorners.topLeft, detectedCorners.topRight, detectedCorners.bottomRight, detectedCorners.bottomLeft];
+      let rotMinX = 1, rotMaxX = 0, rotMinY = 1, rotMaxY = 0;
+
+      for (const p of cornerList) {
+        const nx = p.x / w;
+        const ny = p.y / h;
+        const dx = (nx - 0.5) * aspect;
+        const dy = (ny - 0.5);
+        const rx = dx * cosD - dy * sinD;
+        const ry = dx * sinD + dy * cosD;
+        const finalX = rx / aspect + 0.5;
+        const finalY = ry + 0.5;
+
+        if (finalX < rotMinX) rotMinX = finalX;
+        if (finalX > rotMaxX) rotMaxX = finalX;
+        if (finalY < rotMinY) rotMinY = finalY;
+        if (finalY > rotMaxY) rotMaxY = finalY;
+      }
+
+      // Safe, generous margin padding (3.5% margin so emblem, logos, and laminate edges are NEVER cut)
+      const padX = 0.035;
+      const padY = 0.035;
+      const normX = Math.max(0, rotMinX - padX);
+      const normY = Math.max(0, rotMinY - padY);
+      const normW = Math.min(1 - normX, (rotMaxX - rotMinX) + 2 * padX);
+      const normH = Math.min(1 - normY, (rotMaxY - rotMinY) + 2 * padY);
 
       // Classify based on card/document dimensions
       const cardType = detectDocumentType(Math.round(normW * w), Math.round(normH * h));
@@ -438,7 +455,7 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
         normalizedBox: { x: normX, y: normY, w: normW, h: normH },
         confidence: 0.95,
         detectedType: cardType,
-        deskewDegrees: Math.round(-avgTilt * 10) / 10,
+        deskewDegrees: deskewAngle,
       };
     }
   } catch (err) {
