@@ -60,16 +60,30 @@ export function createDefaultEdits(assetId: string): AssetEdits {
 export async function renderProcessedCanvas(
   sourceImage: HTMLImageElement,
   edits: AssetEdits,
-  maxDimension?: number
+  maxDimension?: number,
+  options?: { lockToA4?: boolean; preservePageDimensions?: boolean }
 ): Promise<HTMLCanvasElement> {
-  // 1. Rotation, Flip & Straighten
+  let lockToA4 = !!options?.lockToA4;
+  let preservePageDimensions = options?.preservePageDimensions !== undefined ? options.preservePageDimensions : true;
+
+  if (edits.processing_options_json) {
+    try {
+      const parsed = JSON.parse(edits.processing_options_json);
+      if (parsed.lockToA4 !== undefined) lockToA4 = !!parsed.lockToA4;
+      if (parsed.preservePageDimensions !== undefined) preservePageDimensions = !!parsed.preservePageDimensions;
+    } catch {}
+  }
+
+  // 1. Rotation, Flip & Straighten (with fixed page boundaries & optional A4 lock)
   let currentCanvas = applyRotationAndFlip(
     sourceImage,
     edits.rotation_degrees,
     edits.flip_horizontal,
     edits.flip_vertical,
     edits.straighten_degrees || 0,
-    maxDimension
+    maxDimension,
+    preservePageDimensions,
+    lockToA4
   );
 
   // 2. Perspective Quad Correction (if corners are defined)

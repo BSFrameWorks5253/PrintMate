@@ -210,6 +210,28 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     }, 50);
   };
 
+  // Helper to check if current asset is locked to A4 page dimensions
+  const isA4Locked = (): boolean => {
+    if (!activeEdits.processing_options_json) return false;
+    try {
+      const opts = JSON.parse(activeEdits.processing_options_json);
+      return !!opts.lockToA4;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleToggleLockToA4 = () => {
+    const currentLocked = isA4Locked();
+    let opts: any = {};
+    if (activeEdits.processing_options_json) {
+      try { opts = JSON.parse(activeEdits.processing_options_json); } catch {}
+    }
+    updateAssetEdits(activeAsset.id, {
+      processing_options_json: JSON.stringify({ ...opts, lockToA4: !currentLocked }),
+    });
+  };
+
   // Auto Align & Crop (Detects page boundaries and deskew angle, applies clean frame)
   const handleAutoAlignAndCrop = () => {
     if (!canvasRef.current || !activeAsset) return;
@@ -217,13 +239,15 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     setTimeout(() => {
       try {
         const bounds = detectDocumentBounds(canvasRef.current!);
-        const angle = detectDocumentSkew(canvasRef.current!);
+        const angle = bounds.deskewDegrees !== undefined && Math.abs(bounds.deskewDegrees) > 0.3
+          ? bounds.deskewDegrees
+          : detectDocumentSkew(canvasRef.current!);
 
         const updates: any = {
           straighten_degrees: Math.round(angle * 10) / 10,
         };
 
-        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.98) {
           updates.crop_x = bounds.normalizedBox.x;
           updates.crop_y = bounds.normalizedBox.y;
           updates.crop_width = bounds.normalizedBox.w;
@@ -245,7 +269,9 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
     setTimeout(() => {
       try {
         const bounds = detectDocumentBounds(canvasRef.current!);
-        const angle = detectDocumentSkew(canvasRef.current!);
+        const angle = bounds.deskewDegrees !== undefined && Math.abs(bounds.deskewDegrees) > 0.3
+          ? bounds.deskewDegrees
+          : detectDocumentSkew(canvasRef.current!);
         const tone = autoDetectTone(canvasRef.current!);
 
         const updates: any = {
@@ -256,7 +282,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
           sharpness: 1.5,
         };
 
-        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+        if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.98) {
           updates.crop_x = bounds.normalizedBox.x;
           updates.crop_y = bounds.normalizedBox.y;
           updates.crop_width = bounds.normalizedBox.w;
@@ -283,7 +309,9 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
           const currentEdits = edits[asset.id] || createDefaultEdits(asset.id);
           const tempCanvas = await renderProcessedCanvas(img, currentEdits);
           const bounds = detectDocumentBounds(tempCanvas);
-          const angle = detectDocumentSkew(tempCanvas);
+          const angle = bounds.deskewDegrees !== undefined && Math.abs(bounds.deskewDegrees) > 0.3
+            ? bounds.deskewDegrees
+            : detectDocumentSkew(tempCanvas);
           const tone = autoDetectTone(tempCanvas);
 
           const updates: any = {
@@ -292,7 +320,7 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
             contrast: tone.contrast,
           };
 
-          if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.96) {
+          if (bounds.confidence > 0.6 && bounds.normalizedBox.w < 0.98) {
             updates.crop_x = bounds.normalizedBox.x;
             updates.crop_y = bounds.normalizedBox.y;
             updates.crop_width = bounds.normalizedBox.w;
@@ -875,6 +903,16 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               <ScanLine size={13} />
               Perspective Fix
             </button>
+
+            <button
+              className={`btn ${isA4Locked() ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              onClick={handleToggleLockToA4}
+              title="Lock sheet strictly to A4 page dimensions (210×297mm). Prevents page from getting wider when tilted."
+            >
+              <FileText size={13} />
+              {isA4Locked() ? 'A4 Locked' : 'Lock A4'}
+            </button>
           </div>
 
           {/* Center: Undo / Redo / Reset & Hold Original */}
@@ -987,6 +1025,29 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
               backgroundColor: '#ffffff',
             }}
           >
+            {isA4Locked() && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-26px',
+                  left: '0',
+                  backgroundColor: 'rgba(37, 99, 235, 0.9)',
+                  color: '#ffffff',
+                  padding: '2px 8px',
+                  borderRadius: '3px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <FileText size={11} />
+                <span>A4 Sheet (210 × 297 mm) Fixed</span>
+              </div>
+            )}
             <canvas ref={canvasRef} style={{ display: 'block', maxWidth: '100%', maxHeight: '72vh' }} />
 
             {/* Interactive Crop Frame Overlay */}
@@ -1113,6 +1174,18 @@ export const ImageEditorPage: React.FC<ImageEditorPageProps> = ({ onNavigate }) 
                   })
                 }
               />
+            </div>
+
+            <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+              <button
+                className={`btn ${isA4Locked() ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ width: '100%', padding: '6px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={handleToggleLockToA4}
+                title="Lock canvas strictly to standard A4 (210×297mm) sheet. Prevents page from getting wider when adjusting tilt angles."
+              >
+                <FileText size={13} />
+                <span>{isA4Locked() ? 'Locked to A4 Page (210×297mm)' : 'Lock to A4 Page (Fixed Size)'}</span>
+              </button>
             </div>
           </div>
 

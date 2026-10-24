@@ -7,6 +7,8 @@ import { PerspectivePoints } from '../../types';
 
 /**
  * Applies 90/180/270 rotation, arbitrary deskew angle, and horizontal/vertical flipping.
+ * When preservePageDimensions is true (default), the canvas maintains fixed page dimensions
+ * without expanding wider or distorting aspect ratio when tilting/straightening.
  */
 export function applyRotationAndFlip(
   sourceImage: HTMLImageElement,
@@ -14,7 +16,9 @@ export function applyRotationAndFlip(
   flipHorizontal: boolean,
   flipVertical: boolean,
   straightenDegrees: number = 0,
-  maxDimension?: number
+  maxDimension?: number,
+  preservePageDimensions: boolean = true,
+  lockToA4: boolean = false
 ): HTMLCanvasElement {
   let srcW = sourceImage.naturalWidth || sourceImage.width;
   let srcH = sourceImage.naturalHeight || sourceImage.height;
@@ -25,33 +29,80 @@ export function applyRotationAndFlip(
     srcH = Math.round(srcH * scale);
   }
 
-  const totalAngle = rotationDegrees + straightenDegrees;
-  const rad = (totalAngle * Math.PI) / 180;
-  const sin = Math.abs(Math.sin(rad));
-  const cos = Math.abs(Math.cos(rad));
+  // Base dimensions swap on 90 / 270 degrees
+  const isSwapped = (rotationDegrees % 180 !== 0);
+  let baseW = isSwapped ? srcH : srcW;
+  let baseH = isSwapped ? srcW : srcH;
 
-  const rotatedW = Math.max(1, Math.round(srcW * cos + srcH * sin));
-  const rotatedH = Math.max(1, Math.round(srcW * sin + srcH * cos));
+  if (lockToA4) {
+    // Standard ISO A4 aspect ratio 210 x 297 (1:1.4142)
+    const a4Ratio = 297 / 210;
+    if (baseW > baseH) {
+      baseH = Math.round(baseW / a4Ratio);
+    } else {
+      baseH = Math.round(baseW * a4Ratio);
+    }
+  }
 
   const rotCanvas = document.createElement('canvas');
-  rotCanvas.width = rotatedW;
-  rotCanvas.height = rotatedH;
   const rotCtx = rotCanvas.getContext('2d', { willReadFrequently: true });
   if (!rotCtx) throw new Error('Failed to get 2D canvas context');
 
-  rotCtx.translate(rotatedW / 2, rotatedH / 2);
-  rotCtx.rotate(rad);
-  rotCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
-  rotCtx.drawImage(sourceImage, -srcW / 2, -srcH / 2, srcW, srcH);
+  if (preservePageDimensions) {
+    // Fixed page boundaries: canvas NEVER gets wider when tilting
+    rotCanvas.width = baseW;
+    rotCanvas.height = baseH;
+
+    rotCtx.translate(baseW / 2, baseH / 2);
+
+    // Apply straighten angle within fixed canvas boundaries
+    const tiltRad = Math.abs((straightenDegrees * Math.PI) / 180);
+    const aspect = Math.min(baseW / baseH, baseH / baseW);
+    const zoomScale = Math.cos(tiltRad) + Math.sin(tiltRad) / Math.max(0.01, aspect);
+
+    rotCtx.rotate((straightenDegrees * Math.PI) / 180);
+    rotCtx.scale(zoomScale, zoomScale);
+
+    // 90/180/270 rotation & flip
+    rotCtx.rotate((rotationDegrees * Math.PI) / 180);
+    rotCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+    rotCtx.drawImage(sourceImage, -srcW / 2, -srcH / 2, srcW, srcH);
+  } else {
+    // Unconstrained expansion mode
+    const totalAngle = rotationDegrees + straightenDegrees;
+    const rad = (totalAngle * Math.PI) / 180;
+    const sin = Math.abs(Math.sin(rad));
+    const cos = Math.abs(Math.cos(rad));
+
+    const rotatedW = Math.max(1, Math.round(srcW * cos + srcH * sin));
+    const rotatedH = Math.max(1, Math.round(srcW * sin + srcH * cos));
+
+    rotCanvas.width = rotatedW;
+    rotCanvas.height = rotatedH;
+
+    rotCtx.translate(rotatedW / 2, rotatedH / 2);
+    rotCtx.rotate(rad);
+    rotCtx.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+    rotCtx.drawImage(sourceImage, -srcW / 2, -srcH / 2, srcW, srcH);
+  }
 
   return rotCanvas;
 }
 
 /**
  * Fast Automatic Skew Angle Detection
- * Performs two-phase search across -45° to +45° using projection profile variance
+ * Combines robust document/card contour analysis with projection profile variance fallback
  */
 export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
+  // 1. Check for distinct foreground document / card
+  try {
+    const bounds = detectDocumentBounds(canvas);
+    if (bounds.confidence >= 0.7 && bounds.deskewDegrees !== undefined && Math.abs(bounds.deskewDegrees) > 0.3) {
+      return bounds.deskewDegrees;
+    }
+  } catch {}
+
+  // 2. Projection profile variance method for edge-to-edge scans
   const width = Math.min(320, canvas.width);
   const scale = width / canvas.width;
   const height = Math.max(1, Math.round(canvas.height * scale));
@@ -114,10 +165,10 @@ export function detectDocumentSkew(canvas: HTMLCanvasElement): number {
     return count > 0 ? sumSq / count - (sum / count) ** 2 : 0;
   };
 
-  // Phase 1: Wide coarse sweep (-25° to +25° in 1.5° steps)
+  // Phase 1: Wide coarse sweep (-45° to +45° in 1.5° steps)
   let bestAngle = 0;
   let maxVar = -1;
-  for (let deg = -25; deg <= 25; deg += 1.5) {
+  for (let deg = -45; deg <= 45; deg += 1.5) {
     const v = computeVariance(deg);
     if (v > maxVar) {
       maxVar = v;
@@ -147,6 +198,7 @@ export interface DocumentBoundsResult {
   normalizedBox: { x: number; y: number; w: number; h: number };
   confidence: number; // 0.0 to 1.0
   detectedType: string;
+  deskewDegrees?: number;
 }
 
 /**
@@ -183,7 +235,6 @@ export function detectDocumentType(width: number, height: number): string {
 
 /**
  * Advanced Document Page & Corner Detection
- * Combines Sobel gradient contour analysis, edge projection, and quad corner optimization.
  */
 export function detectDocumentCorners(canvas: HTMLCanvasElement): PerspectivePoints {
   return detectDocumentBounds(canvas).corners;
@@ -191,6 +242,8 @@ export function detectDocumentCorners(canvas: HTMLCanvasElement): PerspectivePoi
 
 /**
  * Full Document Boundary Analyzer
+ * Uses Connected Component Analysis (CCL) with morphological dilation on Sobel gradients
+ * to isolate document pages and ID cards from floors, tables, and scanner beds.
  */
 export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsResult {
   const w = canvas.width;
@@ -207,7 +260,7 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
   const detectedType = detectDocumentType(w, h);
 
   try {
-    const thumbW = Math.min(260, w);
+    const thumbW = Math.min(320, w);
     const scale = thumbW / w;
     const thumbH = Math.max(1, Math.round(h * scale));
 
@@ -221,6 +274,7 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
         normalizedBox: { x: defaultMargin, y: defaultMargin, w: 1 - 2 * defaultMargin, h: 1 - 2 * defaultMargin },
         confidence: 0.5,
         detectedType,
+        deskewDegrees: 0,
       };
     }
 
@@ -228,141 +282,167 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
     const imgData = ctx.getImageData(0, 0, thumbW, thumbH);
     const data = imgData.data;
 
-    // 1. Build grayscale buffer
+    // 1. Grayscale
     const gray = new Float32Array(thumbW * thumbH);
-    for (let y = 0; y < thumbH; y++) {
-      for (let x = 0; x < thumbW; x++) {
-        const i = (y * thumbW + x) * 4;
-        gray[y * thumbW + x] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      }
+    for (let i = 0; i < thumbW * thumbH; i++) {
+      gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
     }
 
-    // 2. Sample outer edge luminance (scanner cover / desk background)
-    let bgSum = 0;
-    let bgSamples = 0;
-    for (let x = 0; x < thumbW; x += 4) {
-      bgSum += gray[x] + gray[(thumbH - 1) * thumbW + x];
-      bgSamples += 2;
-    }
-    for (let y = 0; y < thumbH; y += 4) {
-      bgSum += gray[y * thumbW] + gray[y * thumbW + thumbW - 1];
-      bgSamples += 2;
-    }
-    const bgLum = bgSamples > 0 ? bgSum / bgSamples : 128;
-
-    // 3. Compute Sobel Gradient Magnitudes
+    // 2. Sobel Gradient
     const grad = new Float32Array(thumbW * thumbH);
     let maxGrad = 0;
     for (let y = 1; y < thumbH - 1; y++) {
       for (let x = 1; x < thumbW - 1; x++) {
         const gx =
-          gray[(y - 1) * thumbW + x + 1] +
-          2 * gray[y * thumbW + x + 1] +
-          gray[(y + 1) * thumbW + x + 1] -
-          (gray[(y - 1) * thumbW + x - 1] +
-            2 * gray[y * thumbW + x - 1] +
-            gray[(y + 1) * thumbW + x - 1]);
-
+          gray[(y - 1) * thumbW + x + 1] + 2 * gray[y * thumbW + x + 1] + gray[(y + 1) * thumbW + x + 1] -
+          (gray[(y - 1) * thumbW + x - 1] + 2 * gray[y * thumbW + x - 1] + gray[(y + 1) * thumbW + x - 1]);
         const gy =
-          gray[(y + 1) * thumbW + x - 1] +
-          2 * gray[(y + 1) * thumbW + x] +
-          gray[(y + 1) * thumbW + x + 1] -
-          (gray[(y - 1) * thumbW + x - 1] +
-            2 * gray[(y - 1) * thumbW + x] +
-            gray[(y - 1) * thumbW + x + 1]);
-
-        const gMag = Math.sqrt(gx * gx + gy * gy);
-        grad[y * thumbW + x] = gMag;
-        if (gMag > maxGrad) maxGrad = gMag;
+          gray[(y + 1) * thumbW + x - 1] + 2 * gray[(y + 1) * thumbW + x] + gray[(y + 1) * thumbW + x + 1] -
+          (gray[(y - 1) * thumbW + x - 1] + 2 * gray[(y - 1) * thumbW + x] + gray[(y - 1) * thumbW + x + 1]);
+        const mag = Math.sqrt(gx * gx + gy * gy);
+        grad[y * thumbW + x] = mag;
+        if (mag > maxGrad) maxGrad = mag;
       }
     }
 
-    // 4. Threshold edges and segment document candidate points
-    const edgeThreshold = Math.max(30, maxGrad * 0.25);
-    const candidatePoints: { x: number; y: number }[] = [];
+    // 3. Threshold edges
+    const edgeThresh = Math.max(28, maxGrad * 0.16);
+    const binary = new Uint8Array(thumbW * thumbH);
+    for (let i = 0; i < thumbW * thumbH; i++) {
+      binary[i] = grad[i] >= edgeThresh ? 1 : 0;
+    }
 
-    for (let y = 4; y < thumbH - 4; y++) {
-      for (let x = 4; x < thumbW - 4; x++) {
-        const isEdge = grad[y * thumbW + x] > edgeThreshold;
-        const diffFromBg = Math.abs(gray[y * thumbW + x] - bgLum);
-        if (isEdge || diffFromBg > 35) {
-          candidatePoints.push({ x, y });
+    // 4. Morphological dilation to connect text lines, logos, and borders into solid document shape
+    const dilated = new Uint8Array(thumbW * thumbH);
+    const radius = 3;
+    for (let y = radius; y < thumbH - radius; y++) {
+      for (let x = radius; x < thumbW - radius; x++) {
+        if (binary[y * thumbW + x] === 1) {
+          for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+              dilated[(y + dy) * thumbW + (x + dx)] = 1;
+            }
+          }
         }
       }
     }
 
-    // 5. If strong candidates found, optimize for the 4 quad corners
-    if (candidatePoints.length > thumbW * thumbH * 0.05) {
-      let minSum = Infinity;
-      let maxSum = -Infinity;
-      let minDiff = Infinity;
-      let maxDiff = -Infinity;
+    // 5. Connected Component Analysis (CCL)
+    const labels = new Int32Array(thumbW * thumbH);
+    let currentLabel = 1;
+    const components: Array<{ label: number; size: number; minX: number; maxX: number; minY: number; maxY: number }> = [];
 
-      let tl = { x: 0, y: 0 };
-      let br = { x: thumbW, y: thumbH };
-      let tr = { x: thumbW, y: 0 };
-      let bl = { x: 0, y: thumbH };
+    for (let y = 2; y < thumbH - 2; y++) {
+      for (let x = 2; x < thumbW - 2; x++) {
+        if (dilated[y * thumbW + x] === 1 && labels[y * thumbW + x] === 0) {
+          const queue = [x, y];
+          labels[y * thumbW + x] = currentLabel;
+          let size = 0;
+          let head = 0;
+          let minX = x, maxX = x, minY = y, maxY = y;
 
-      for (let i = 0; i < candidatePoints.length; i++) {
-        const p = candidatePoints[i];
+          while (head < queue.length) {
+            const qx = queue[head++];
+            const qy = queue[head++];
+            size++;
+
+            if (qx < minX) minX = qx;
+            if (qx > maxX) maxX = qx;
+            if (qy < minY) minY = qy;
+            if (qy > maxY) maxY = qy;
+
+            const neighbors = [
+              [qx + 1, qy],
+              [qx - 1, qy],
+              [qx, qy + 1],
+              [qx, qy - 1],
+            ];
+
+            for (const [nx, ny] of neighbors) {
+              if (nx >= 0 && nx < thumbW && ny >= 0 && ny < thumbH) {
+                if (dilated[ny * thumbW + nx] === 1 && labels[ny * thumbW + nx] === 0) {
+                  labels[ny * thumbW + nx] = currentLabel;
+                  queue.push(nx, ny);
+                }
+              }
+            }
+          }
+
+          components.push({ label: currentLabel, size, minX, maxX, minY, maxY });
+          currentLabel++;
+        }
+      }
+    }
+
+    components.sort((a, b) => b.size - a.size);
+
+    // If a dominant component exists (> 3% of image area)
+    if (components.length > 0 && components[0].size > thumbW * thumbH * 0.03) {
+      const best = components[0];
+      const pts: Array<{ x: number; y: number }> = [];
+      for (let y = best.minY; y <= best.maxY; y++) {
+        for (let x = best.minX; x <= best.maxX; x++) {
+          if (labels[y * thumbW + x] === best.label) {
+            pts.push({ x, y });
+          }
+        }
+      }
+
+      // Corners
+      let minSum = Infinity, maxSum = -Infinity, minDiff = Infinity, maxDiff = -Infinity;
+      let tl = { x: best.minX, y: best.minY };
+      let br = { x: best.maxX, y: best.maxY };
+      let tr = { x: best.maxX, y: best.minY };
+      let bl = { x: best.minX, y: best.maxY };
+
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
         const sum = p.x + p.y;
         const diff = p.x - p.y;
-
-        // Top-Left minimizes (x + y)
-        if (sum < minSum) {
-          minSum = sum;
-          tl = p;
-        }
-        // Bottom-Right maximizes (x + y)
-        if (sum > maxSum) {
-          maxSum = sum;
-          br = p;
-        }
-        // Top-Right maximizes (x - y)
-        if (diff > maxDiff) {
-          maxDiff = diff;
-          tr = p;
-        }
-        // Bottom-Left minimizes (x - y)
-        if (diff < minDiff) {
-          minDiff = diff;
-          bl = p;
-        }
+        if (sum < minSum) { minSum = sum; tl = p; }
+        if (sum > maxSum) { maxSum = sum; br = p; }
+        if (diff > maxDiff) { maxDiff = diff; tr = p; }
+        if (diff < minDiff) { minDiff = diff; bl = p; }
       }
 
       const invScale = 1 / scale;
-      const docW = Math.max(tr.x - tl.x, br.x - bl.x);
-      const docH = Math.max(bl.y - tl.y, br.y - tr.y);
+      const detectedCorners: PerspectivePoints = {
+        topLeft: { x: Math.max(0, Math.round(tl.x * invScale)), y: Math.max(0, Math.round(tl.y * invScale)) },
+        topRight: { x: Math.min(w, Math.round(tr.x * invScale)), y: Math.max(0, Math.round(tr.y * invScale)) },
+        bottomRight: { x: Math.min(w, Math.round(br.x * invScale)), y: Math.min(h, Math.round(br.y * invScale)) },
+        bottomLeft: { x: Math.max(0, Math.round(bl.x * invScale)), y: Math.min(h, Math.round(bl.y * invScale)) },
+      };
 
-      // Verify that candidate forms a reasonable page (> 25% of image)
-      if (docW > thumbW * 0.25 && docH > thumbH * 0.25) {
-        const detectedCorners: PerspectivePoints = {
-          topLeft: { x: Math.max(0, Math.round(tl.x * invScale)), y: Math.max(0, Math.round(tl.y * invScale)) },
-          topRight: { x: Math.min(w, Math.round(tr.x * invScale)), y: Math.max(0, Math.round(tr.y * invScale)) },
-          bottomRight: { x: Math.min(w, Math.round(br.x * invScale)), y: Math.min(h, Math.round(br.y * invScale)) },
-          bottomLeft: { x: Math.max(0, Math.round(bl.x * invScale)), y: Math.min(h, Math.round(bl.y * invScale)) },
-        };
+      // Tilt angles (top and left edges)
+      const angleRadTop = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+      const angleDegTop = (angleRadTop * 180) / Math.PI;
 
-        const minNormX = Math.min(detectedCorners.topLeft.x, detectedCorners.bottomLeft.x) / w;
-        const maxNormX = Math.max(detectedCorners.topRight.x, detectedCorners.bottomRight.x) / w;
-        const minNormY = Math.min(detectedCorners.topLeft.y, detectedCorners.topRight.y) / h;
-        const maxNormY = Math.max(detectedCorners.bottomLeft.y, detectedCorners.bottomRight.y) / h;
+      const angleRadLeft = Math.atan2(bl.y - tl.y, bl.x - tl.x);
+      const angleDegLeft = (angleRadLeft * 180) / Math.PI - 90;
 
-        return {
-          corners: detectedCorners,
-          normalizedBox: {
-            x: Math.max(0, minNormX),
-            y: Math.max(0, minNormY),
-            w: Math.min(1 - minNormX, maxNormX - minNormX),
-            h: Math.min(1 - minNormY, maxNormY - minNormY),
-          },
-          confidence: 0.92,
-          detectedType,
-        };
-      }
+      const avgTilt = (angleDegTop + angleDegLeft) / 2;
+
+      // Safe margin padding (1.5% around detected card/document)
+      const padX = 0.015;
+      const padY = 0.015;
+      const normX = Math.max(0, best.minX / thumbW - padX);
+      const normY = Math.max(0, best.minY / thumbH - padY);
+      const normW = Math.min(1 - normX, (best.maxX - best.minX) / thumbW + 2 * padX);
+      const normH = Math.min(1 - normY, (best.maxY - best.minY) / thumbH + 2 * padY);
+
+      // Classify based on card/document dimensions
+      const cardType = detectDocumentType(Math.round(normW * w), Math.round(normH * h));
+
+      return {
+        corners: detectedCorners,
+        normalizedBox: { x: normX, y: normY, w: normW, h: normH },
+        confidence: 0.95,
+        detectedType: cardType,
+        deskewDegrees: Math.round(-avgTilt * 10) / 10,
+      };
     }
   } catch (err) {
-    console.warn('Corner detection fallback:', err);
+    console.warn('Document detection fallback:', err);
   }
 
   return {
@@ -375,6 +455,7 @@ export function detectDocumentBounds(canvas: HTMLCanvasElement): DocumentBoundsR
     },
     confidence: 0.5,
     detectedType,
+    deskewDegrees: 0,
   };
 }
 

@@ -161,6 +161,43 @@ describe('Modular Image Processing System', () => {
       expect(detectDocumentType(1800, 1200)).toBe('4x6 Photo');
       expect(detectDocumentType(500, 500)).toBe('Square 1:1');
     });
+
+    it('preserves fixed page dimensions when angle changes without widening canvas', () => {
+      const mockImg = {
+        naturalWidth: 2100,
+        naturalHeight: 2970,
+        width: 2100,
+        height: 2970,
+      } as unknown as HTMLImageElement;
+
+      // 0 deg
+      const canvas0 = applyRotationAndFlip(mockImg, 0, false, false, 0, undefined, true);
+      expect(canvas0.width).toBe(2100);
+      expect(canvas0.height).toBe(2970);
+
+      // +15 deg tilt: canvas dimensions DO NOT expand
+      const canvas15 = applyRotationAndFlip(mockImg, 0, false, false, 15, undefined, true);
+      expect(canvas15.width).toBe(2100);
+      expect(canvas15.height).toBe(2970);
+
+      // -25 deg tilt
+      const canvasMinus25 = applyRotationAndFlip(mockImg, 0, false, false, -25, undefined, true);
+      expect(canvasMinus25.width).toBe(2100);
+      expect(canvasMinus25.height).toBe(2970);
+    });
+
+    it('locks page strictly to A4 aspect ratio when lockToA4 is enabled', () => {
+      const mockImg = {
+        naturalWidth: 1000,
+        naturalHeight: 1200,
+        width: 1000,
+        height: 1200,
+      } as unknown as HTMLImageElement;
+
+      const a4Canvas = applyRotationAndFlip(mockImg, 0, false, false, 10, undefined, true, true);
+      expect(a4Canvas.width).toBe(1000);
+      expect(a4Canvas.height).toBe(Math.round(1000 * (297 / 210)));
+    });
   });
 
   describe('3. Tone Setter Module (tone-setter.ts)', () => {
