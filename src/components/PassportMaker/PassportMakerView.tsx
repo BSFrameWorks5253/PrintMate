@@ -21,7 +21,7 @@ interface PassportMakerViewProps {
 }
 
 export type BorderStyleType = 'studio_classic' | 'black_border' | 'white_margin' | 'borderless';
-export type PaperSizeKey = '4x6' | 'a4' | '5x7';
+export type PaperSizeKey = '5x7' | 'a4' | '4x6';
 
 interface PaperDef {
   id: PaperSizeKey;
@@ -33,13 +33,13 @@ interface PaperDef {
 }
 
 const PAPERS: Record<PaperSizeKey, PaperDef> = {
-  '4x6': {
-    id: '4x6',
-    name: '4 × 6 in Photo Paper (Standard 4R)',
-    widthMm: 152.4,
-    heightMm: 101.6,
-    widthPx300Dpi: 1800,
-    heightPx300Dpi: 1200,
+  '5x7': {
+    id: '5x7',
+    name: '5 × 7 in Photo Paper (5R)',
+    widthMm: 177.8,
+    heightMm: 127.0,
+    widthPx300Dpi: 2100,
+    heightPx300Dpi: 1500,
   },
   'a4': {
     id: 'a4',
@@ -49,13 +49,13 @@ const PAPERS: Record<PaperSizeKey, PaperDef> = {
     widthPx300Dpi: 2480,
     heightPx300Dpi: 3508,
   },
-  '5x7': {
-    id: '5x7',
-    name: '5 × 7 in Photo Paper (5R)',
-    widthMm: 177.8,
-    heightMm: 127.0,
-    widthPx300Dpi: 2100,
-    heightPx300Dpi: 1500,
+  '4x6': {
+    id: '4x6',
+    name: '4 × 6 in Photo Paper (Standard 4R)',
+    widthMm: 152.4,
+    heightMm: 101.6,
+    widthPx300Dpi: 1800,
+    heightPx300Dpi: 1200,
   },
 };
 
@@ -78,6 +78,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const [borderStyle, setBorderStyle] = useState<BorderStyleType>('studio_classic');
   const [backgroundColor, setBackgroundColor] = useState<string>('original');
   const [showCutDividers, setShowCutDividers] = useState<boolean>(true);
+  const [cleanSinglePhotoUrl, setCleanSinglePhotoUrl] = useState<string>('');
 
   // Adjustments
   const [adjustments, setAdjustments] = useState({
@@ -167,25 +168,43 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     let rows = 2;
 
     if (paperSize === '4x6') {
-      // 4x6 landscape photo paper is 152.4 x 101.6 mm (~1.50 landscape ratio).
-      // Since passport photos are 35x45mm portrait (~0.778 ratio),
-      // the columns-to-rows ratio MUST be approx 2:1 (cols/rows ≈ 1.93) to completely
-      // fill both width and height without leaving empty white space on the sides!
+      // 4x6 landscape photo paper is 152.4 x 101.6 mm (~1.50 landscape ratio)
       if (count <= 2) {
         cols = 2;
         rows = 1;
       } else if (count <= 4) {
         cols = 4;
-        rows = 1; // 4 across in a row spans full paper width
+        rows = 1;
       } else if (count <= 8) {
         cols = 4;
         rows = 2; // 4 cols × 2 rows = 8 photos (Standard studio layout)
       } else if (count <= 18) {
         cols = 6;
-        rows = 3; // 6 cols × 3 rows = 18 photos (Fills 100% width & height with ZERO side margin!)
+        rows = 3;
       } else {
         cols = 8;
-        rows = 4; // 8 cols × 4 rows = 32 photos (Fills 100% width & height)
+        rows = 4;
+      }
+    } else if (paperSize === '5x7') {
+      // 5x7 landscape photo paper is 177.8 x 127.0 mm (5R)
+      if (count <= 2) {
+        cols = 2;
+        rows = 1;
+      } else if (count <= 4) {
+        cols = 4;
+        rows = 1;
+      } else if (count <= 8) {
+        cols = 4;
+        rows = 2; // 4 cols × 2 rows = 8 photos at standard 35x45mm
+      } else if (count <= 10) {
+        cols = 5;
+        rows = 2;
+      } else if (count <= 15) {
+        cols = 5;
+        rows = 3;
+      } else {
+        cols = 6;
+        rows = 4;
       }
     } else {
       // A4 portrait is 210 x 297 mm (0.707 portrait ratio)
@@ -207,8 +226,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       }
     }
 
-    const marginMm = count > 8 ? 3 : 5;
-    const gapMm = count > 8 ? 0 : 0.5; // Divider lines between cells like Image 1 & 2
+    const marginMm = count <= 8 ? 2.5 : 2.0;
+    const gapMm = count <= 8 ? 2.0 : 1.2; // 2mm physical separation between photos so borders stay completely intact
 
     const availW = paperW - (marginMm * 2) - ((cols - 1) * gapMm);
     const availH = paperH - (marginMm * 2) - ((rows - 1) * gapMm);
@@ -340,12 +359,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     // Draw borders over photo if requested
     if (includeBorders) {
       if (borderStyle === 'studio_classic') {
-        // 1. Draw thin black rectangular border around the photo
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = borderWidth;
-        ctx.strokeRect(insetX, insetY, photoAreaW, photoAreaH);
-
-        // 2. Clear outer margins to pure white (Image 1 style)
+        // 1. Clear outer margins to pure white FIRST so photo overflow is cut clean
         ctx.fillStyle = '#ffffff';
         // Top margin
         ctx.fillRect(0, 0, wPx, insetY);
@@ -356,14 +370,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         // Right margin
         ctx.fillRect(wPx - insetX, 0, insetX, hPx);
 
-        // Outer thin bounding stroke
-        ctx.strokeStyle = '#2b2b2b';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0, 0, wPx, hPx);
-      } else if (borderStyle === 'black_border') {
-        ctx.strokeStyle = '#1a1a1a';
+        // 2. Draw crisp black rectangular border around the photo portrait area
+        ctx.strokeStyle = '#000000';
         ctx.lineWidth = borderWidth;
-        ctx.strokeRect(0, 0, wPx, hPx);
+        ctx.strokeRect(insetX, insetY, photoAreaW, photoAreaH);
+
+        // 3. Outer crisp bounding stroke around entire passport card
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, wPx - 1, hPx - 1);
+      } else if (borderStyle === 'black_border') {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = borderWidth;
+        ctx.strokeRect(0.5, 0.5, wPx - 1, hPx - 1);
       }
     }
 
@@ -439,6 +458,16 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     }
   }, [imageObj, zoom, pan, showGuidelines, borderStyle, backgroundColor, adjustments]);
 
+  // Update clean single photo preview data URL whenever editing state changes
+  useEffect(() => {
+    if (!imageObj) {
+      setCleanSinglePhotoUrl('');
+      return;
+    }
+    const canvas = renderSinglePassportCanvas(413, 531, true);
+    setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
+  }, [imageObj, zoom, pan, borderStyle, backgroundColor, adjustments]);
+
   // Pointer panning handler for face positioning
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setIsPanning(true);
@@ -503,13 +532,46 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       const y = startY + (r * (photoPxH + gapPx));
 
       ctx.drawImage(singlePhoto, x, y, photoPxW, photoPxH);
+    }
 
-      // Draw thin cutting divider lines on sheet (Image 1 & 2 style)
-      if (showCutDividers) {
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, photoPxW, photoPxH);
+    // Draw full-page light grey dashed cutting guidelines across entire sheet
+    if (showCutDividers) {
+      ctx.save();
+      ctx.strokeStyle = '#cbd5e1'; // Light grey
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 6]); // Dash-dash like for cutting
+
+      // Vertical full-page cutting lines
+      const vCutPositions = [startX - gapPx / 2];
+      for (let c = 1; c < cols; c++) {
+        vCutPositions.push(startX + (c * (photoPxW + gapPx)) - gapPx / 2);
       }
+      vCutPositions.push(startX + (cols * (photoPxW + gapPx)) - gapPx / 2);
+
+      vCutPositions.forEach((vx) => {
+        const xPos = Math.round(vx) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(xPos, 0);
+        ctx.lineTo(xPos, sheetCanvas.height);
+        ctx.stroke();
+      });
+
+      // Horizontal full-page cutting lines
+      const hCutPositions = [startY - gapPx / 2];
+      for (let r = 1; r < rows; r++) {
+        hCutPositions.push(startY + (r * (photoPxH + gapPx)) - gapPx / 2);
+      }
+      hCutPositions.push(startY + (rows * (photoPxH + gapPx)) - gapPx / 2);
+
+      hCutPositions.forEach((hy) => {
+        const yPos = Math.round(hy) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, yPos);
+        ctx.lineTo(sheetCanvas.width, yPos);
+        ctx.stroke();
+      });
+
+      ctx.restore();
     }
 
     return sheetCanvas;
@@ -558,8 +620,6 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     setTimeout(() => setToastNotice(''), 2500);
   };
 
-  // Single photo data URL for sheet preview
-  const previewPhotoDataUrl = cropCanvasRef.current?.toDataURL() || photoUrl;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -751,7 +811,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     onChange={(e) => setShowCutDividers(e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-blue-600 bg-slate-50 border-slate-200 cursor-pointer"
                   />
-                  <span>Grid Cut Lines</span>
+                  <span>Full-Page Cutting Guides (Dashed)</span>
                 </label>
               </div>
 
@@ -803,7 +863,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               </h4>
 
               <div className="grid grid-cols-3 gap-2">
-                {(['4x6', 'a4', '5x7'] as PaperSizeKey[]).map((pkey) => (
+                {(['5x7', 'a4', '4x6'] as PaperSizeKey[]).map((pkey) => (
                   <button
                     key={pkey}
                     onClick={() => setPaperSize(pkey)}
@@ -813,7 +873,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                         : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    <div className="text-xs">{pkey === '4x6' ? '4 × 6 in (4R)' : pkey === 'a4' ? 'A4 Sheet' : '5 × 7 in (5R)'}</div>
+                    <div className="text-xs">{pkey === '5x7' ? '5 × 7 in (5R)' : pkey === 'a4' ? 'A4 Sheet' : '4 × 6 in (4R)'}</div>
                     <div className="text-[9px] opacity-80">{PAPERS[pkey].widthMm}×{PAPERS[pkey].heightMm}mm</div>
                   </button>
                 ))}
@@ -1026,7 +1086,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                 <div className="w-full flex flex-col items-center justify-center">
                   {/* Screen-only dimension info */}
                   <div className="no-print pb-3 text-center text-xs text-slate-500 flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">4×6 in Photo Paper Sheet</span>
+                    <span className="font-semibold text-slate-900">{selectedPaper.name.split('(')[0]} Sheet</span>
                     <span>•</span>
                     <span className="text-cyan-600 font-mono font-bold">
                       {photoCount} Photos ({layout.cols} × {layout.rows} Grid)
@@ -1035,10 +1095,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     <span>300 DPI High Resolution</span>
                   </div>
 
-                  {/* PRINT-AREA DIV (Rendered on paper via @media print with locked 4x6 / A4 aspect ratio) */}
+                  {/* PRINT-AREA DIV */}
                   {(() => {
-                    // Preview Sheet Fixed Dimensions (guarantees sheet NEVER stretches or changes ratio)
-                    const previewSheetW = selectedPaper.id === '4x6' ? 640 : 520;
+                    // Preview Sheet Fixed Dimensions
+                    const previewSheetW = selectedPaper.id === 'a4' ? 520 : (selectedPaper.id === '5x7' ? 680 : 640);
                     const previewSheetH = Math.round(previewSheetW * (selectedPaper.heightMm / selectedPaper.widthMm));
                     const pxPerMm = previewSheetW / selectedPaper.widthMm;
 
@@ -1046,11 +1106,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     const previewPhotoH = Math.floor(layout.photoHeightMm * pxPerMm);
                     const previewGapPx = Math.round(layout.gapMm * pxPerMm);
 
+                    const totalGridW = (layout.cols * previewPhotoW) + ((layout.cols - 1) * previewGapPx);
+                    const totalGridH = (layout.rows * previewPhotoH) + ((layout.rows - 1) * previewGapPx);
+                    const previewStartX = Math.round((previewSheetW - totalGridW) / 2);
+                    const previewStartY = Math.round((previewSheetH - totalGridH) / 2);
+
                     return (
                       <div
                         ref={printSheetRef}
-                        className="print-area bg-white text-black shadow-2xl relative transition-all"
+                        className="passport-print-sheet bg-white text-black shadow-2xl relative transition-all"
                         style={{
+                          '--passport-sheet-width': `${selectedPaper.widthMm}mm`,
+                          '--passport-sheet-height': `${selectedPaper.heightMm}mm`,
+                          '--passport-sheet-ratio': `${selectedPaper.widthMm} / ${selectedPaper.heightMm}`,
                           width: `${previewSheetW}px`,
                           height: `${previewSheetH}px`,
                           maxWidth: '100%',
@@ -1061,7 +1129,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                        }}
+                        } as React.CSSProperties}
                       >
                         {/* The Centered Grid of Passport Photos */}
                         <div
@@ -1072,40 +1140,81 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                             gap: `${previewGapPx}px`,
                             justifyContent: 'center',
                             alignContent: 'center',
+                            position: 'relative',
+                            zIndex: 1,
                           }}
                         >
                           {Array.from({ length: Math.min(layout.cols * layout.rows, photoCount) }).map((_, idx) => (
                             <div
                               key={idx}
-                              className="relative flex items-center justify-center overflow-hidden"
+                              className="relative flex items-center justify-center overflow-hidden bg-white shadow-sm"
                               style={{
                                 width: `${previewPhotoW}px`,
                                 height: `${previewPhotoH}px`,
-                                border: showCutDividers ? '0.75px solid #000000' : 'none',
                                 boxSizing: 'border-box',
-                                padding: borderStyle === 'studio_classic' ? '2.5px' : '0px',
                               }}
                             >
-                              {/* Inner photo container with Studio Border (Image 1 & 2) */}
-                              <div
-                                className="w-full h-full relative overflow-hidden flex items-center justify-center bg-white"
-                                style={{
-                                  border: borderStyle === 'studio_classic' || borderStyle === 'black_border' ? '1.5px solid #000000' : 'none',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
-                                <img
-                                  src={previewPhotoDataUrl || ''}
-                                  alt={`Passport ${idx + 1}`}
-                                  className="w-full h-full object-cover block"
-                                  style={{
-                                    transform: 'scale(1.01)', // prevent subpixel gaps
-                                  }}
-                                />
-                              </div>
+                              <img
+                                src={cleanSinglePhotoUrl || photoUrl || ''}
+                                alt={`Passport ${idx + 1}`}
+                                className="w-full h-full object-contain block"
+                              />
                             </div>
                           ))}
                         </div>
+
+                        {/* Full-Page Light Grey Dashed Cutting Guides Overlay */}
+                        {showCutDividers && (
+                          <svg
+                            className="absolute inset-0 pointer-events-none w-full h-full z-10"
+                            viewBox={`0 0 ${previewSheetW} ${previewSheetH}`}
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                          >
+                            {/* Vertical full-page cutting lines */}
+                            {(() => {
+                              const vLines = [previewStartX - previewGapPx / 2];
+                              for (let c = 1; c < layout.cols; c++) {
+                                vLines.push(previewStartX + (c * (previewPhotoW + previewGapPx)) - previewGapPx / 2);
+                              }
+                              vLines.push(previewStartX + (layout.cols * (previewPhotoW + previewGapPx)) - previewGapPx / 2);
+
+                              return vLines.map((xVal, i) => (
+                                <line
+                                  key={`v-${i}`}
+                                  x1={Math.round(xVal) + 0.5}
+                                  y1={0}
+                                  x2={Math.round(xVal) + 0.5}
+                                  y2={previewSheetH}
+                                  stroke="#cbd5e1"
+                                  strokeWidth="1.2"
+                                  strokeDasharray="6 4"
+                                />
+                              ));
+                            })()}
+
+                            {/* Horizontal full-page cutting lines */}
+                            {(() => {
+                              const hLines = [previewStartY - previewGapPx / 2];
+                              for (let r = 1; r < layout.rows; r++) {
+                                hLines.push(previewStartY + (r * (previewPhotoH + previewGapPx)) - previewGapPx / 2);
+                              }
+                              hLines.push(previewStartY + (layout.rows * (previewPhotoH + previewGapPx)) - previewGapPx / 2);
+
+                              return hLines.map((yVal, i) => (
+                                <line
+                                  key={`h-${i}`}
+                                  x1={0}
+                                  y1={Math.round(yVal) + 0.5}
+                                  x2={previewSheetW}
+                                  y2={Math.round(yVal) + 0.5}
+                                  stroke="#cbd5e1"
+                                  strokeWidth="1.2"
+                                  strokeDasharray="6 4"
+                                />
+                              ));
+                            })()}
+                          </svg>
+                        )}
                       </div>
                     );
                   })()}

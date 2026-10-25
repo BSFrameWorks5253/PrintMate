@@ -101,6 +101,12 @@ export function findMinimumBoundingBox(points: Point[]): { corners: Point[]; ang
  * uneven lighting, shadows, floor reflections, and glare, plus Otsu Thresholding,
  * 3x3 Morphological Erosion, Connected Component Labeling, and Minimum Area Rotated Bounding Boxes.
  */
+/**
+ * High-Precision Document & ID Card Boundary Detector
+ * Combines Multi-Radius Adaptive Local Contrast (via Integral Image Box Filtering) to overcome
+ * uneven lighting, shadows, floor reflections, and glare. Features automatic background edge rejection
+ * so light cards on light/marble floors and desks are detected reliably.
+ */
 export function autoDetectDocumentCorners(
   img: HTMLImageElement | HTMLCanvasElement,
   detectMode: 'auto' | 'inner_card' | 'outer_border' = 'auto'
@@ -154,29 +160,72 @@ export function autoDetectDocumentCorners(
     return sum / count;
   };
 
-  // 4. Compute Otsu threshold as an additional high-contrast baseline
-  const hist = new Int32Array(256);
-  for (let i = 0; i < rawGray.length; i++) hist[rawGray[i]]++;
-  const totalPixels = w * h;
-  let sum = 0;
-  for (let t = 0; t < 256; t++) sum += t * hist[t];
-  let sumB = 0, wB = 0, varMax = 0, otsuT = 128;
-  for (let t = 0; t < 256; t++) {
-    wB += hist[t];
-    if (wB === 0) continue;
-    const wF = totalPixels - wB;
-    if (wF === 0) break;
-    sumB += t * hist[t];
-    const mB = sumB / wB;
-    const mF = (sum - sumB) / wF;
-    const varBetween = wB * wF * (mB - mF) * (mB - mF);
-    if (varBetween > varMax) {
-      varMax = varBetween;
-      otsuT = t;
+  // 4. Sobel Edge Gradient Magnitude
+  const edges = new Float32Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const gx =
+        -rawGray[(y - 1) * w + (x - 1)] + rawGray[(y - 1) * w + (x + 1)]
+        - 2 * rawGray[y * w + (x - 1)] + 2 * rawGray[y * w + (x + 1)]
+        - rawGray[(y + 1) * w + (x - 1)] + rawGray[(y + 1) * w + (x + 1)];
+      const gy =
+        -rawGray[(y - 1) * w + (x - 1)] - 2 * rawGray[(y - 1) * w + x] - rawGray[(y - 1) * w + (x + 1)]
+        + rawGray[(y + 1) * w + (x - 1)] + 2 * rawGray[(y + 1) * w + x] + rawGray[(y + 1) * w + (x + 1)];
+      edges[y * w + x] = Math.hypot(gx, gy);
     }
   }
 
-  // 5. Generate Candidate Binary Masks
+  // 5. Generate Multi-Strategy Candidate Binary Masks
+  const masks: { name: string; mask: Uint8Array }[] = [];
+
+  // Strategy A: Adaptive Local Contrast with 6% window (tight card contours)
+  const rad1 = Math.max(10, Math.round(w * 0.06));
+  const m1 = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (rawGray[idx] > getLocalMean(x, y, rad1) + 4) m1[idx] = 1;
+    }
+  }
+  masks.push({ name: 'Adaptive-6%', mask: m1 });
+
+  // Strategy B: Adaptive Local Contrast with 12% window (broad card interior on floor)
+  const rad2 = Math.max(16, Math.round(w * 0.12));
+  const m2 = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (rawGray[idx] > getLocalMean(x, y, rad2) + 6) m2[idx] = 1;
+    }
+  }
+  masks.push({ name: 'Adaptive-12%', mask: m2 });
+
+  // Strategy C: Inverted Local Contrast (for darker cards on lighter desk or dark background)
+  const m3 = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (rawGray[idx] < getLocalMean(x, y, rad2) - 6) m3[idx] = 1;
+    }
+  }
+  masks.push({ name: 'Adaptive-Inv', mask: m3 });
+
+  // Strategy D: Sobel Edge dilated mask (captures plastic lamination perimeter)
+  const edgeDilated = new Uint8Array(w * h);
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      if (edges[y * w + x] > 35) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            edgeDilated[(y + dy) * w + (x + dx)] = 1;
+          }
+        }
+      }
+    }
+  }
+  masks.push({ name: 'EdgeDilated', mask: edgeDilated });
+
+  // 6. Evaluate Components across masks with background border-touch rejection
   const candidates: {
     bbox: { corners: Point[]; angle: number };
     score: number;
@@ -184,46 +233,17 @@ export function autoDetectDocumentCorners(
     aspectRatio: number;
   }[] = [];
 
-  const masks: Uint8Array[] = [];
-
-  // Candidate A: Adaptive Local Contrast
-  const rad = Math.max(12, Math.round(w * 0.08));
-  const maskAdaptive = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
-      const mean = getLocalMean(x, y, rad);
-      if (rawGray[idx] > mean + 5) maskAdaptive[idx] = 1;
-    }
-  }
-  masks.push(maskAdaptive);
-
-  // Candidate B: Otsu Light-Foreground
-  const maskOtsuLight = new Uint8Array(w * h);
-  for (let i = 0; i < rawGray.length; i++) {
-    if (rawGray[i] >= otsuT) maskOtsuLight[i] = 1;
-  }
-  masks.push(maskOtsuLight);
-
-  // Candidate C: Otsu Dark-Foreground
-  const maskOtsuDark = new Uint8Array(w * h);
-  for (let i = 0; i < rawGray.length; i++) {
-    if (rawGray[i] < otsuT) maskOtsuDark[i] = 1;
-  }
-  masks.push(maskOtsuDark);
-
-  // 6. Evaluate Components across masks
-  for (const rawMask of masks) {
-    // 3x3 Morphological Erosion
+  for (const { mask } of masks) {
+    // 3x3 Morphological cleanup
     const cleanMask = new Uint8Array(w * h);
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
         if (
-          rawMask[y * w + x] &&
-          rawMask[(y - 1) * w + x] &&
-          rawMask[(y + 1) * w + x] &&
-          rawMask[y * w + (x - 1)] &&
-          rawMask[y * w + (x + 1)]
+          mask[y * w + x] &&
+          mask[(y - 1) * w + x] &&
+          mask[(y + 1) * w + x] &&
+          mask[y * w + (x - 1)] &&
+          mask[y * w + (x + 1)]
         ) {
           cleanMask[y * w + x] = 1;
         }
@@ -232,8 +252,8 @@ export function autoDetectDocumentCorners(
 
     // Connected Component Analysis (BFS)
     const visited = new Uint8Array(w * h);
-    const minPixels = Math.round(w * h * 0.04);
-    const maxPixels = Math.round(w * h * 0.92);
+    const minPixels = Math.round(w * h * 0.025); // At least 2.5% of photo
+    const maxPixels = Math.round(w * h * 0.70);  // Cards never exceed 70% of frame
 
     for (let y = 3; y < h - 3; y += 2) {
       for (let x = 3; x < w - 3; x += 2) {
@@ -246,6 +266,7 @@ export function autoDetectDocumentCorners(
 
         let qHead = 0;
         let compMinX = x, compMaxX = x, compMinY = y, compMaxY = y;
+        let touchesBorder = 0;
 
         while (qHead < queue.length) {
           const curr = queue[qHead++];
@@ -258,6 +279,11 @@ export function autoDetectDocumentCorners(
           if (cy < compMinY) compMinY = cy;
           if (cy > compMaxY) compMaxY = cy;
 
+          // Check if touches outer frame boundaries
+          if (cx <= 2 || cx >= w - 3 || cy <= 2 || cy >= h - 3) {
+            touchesBorder++;
+          }
+
           const neighbors = [curr - 1, curr + 1, curr - w, curr + w];
           for (let n = 0; n < 4; n++) {
             const nb = neighbors[n];
@@ -267,6 +293,9 @@ export function autoDetectDocumentCorners(
             }
           }
         }
+
+        // CRITICAL: Reject components touching outer frame borders (floor / table background)
+        if (touchesBorder > 10) continue;
 
         if (compPoints.length >= minPixels && compPoints.length <= maxPixels) {
           const bbox = findMinimumBoundingBox(compPoints);
@@ -280,16 +309,30 @@ export function autoDetectDocumentCorners(
             const area = side1 * side2;
             const areaFraction = area / (w * h);
 
-            if (areaFraction >= 0.05 && areaFraction <= 0.92) {
-              const idRatioScore = 1.0 - Math.min(1.0, Math.abs(ratio - 1.586) / 0.7);
-              const paperRatioScore = 1.0 - Math.min(1.0, Math.abs(ratio - 1.414) / 0.7);
+            if (areaFraction >= 0.03 && areaFraction <= 0.70) {
+              // Standard ID card ratio (CR80: 85.6mm / 53.98mm = 1.586) or A4 ratio (1.414)
+              const idRatioScore = 1.0 - Math.min(1.0, Math.abs(ratio - 1.586) / 0.5);
+              const paperRatioScore = 1.0 - Math.min(1.0, Math.abs(ratio - 1.414) / 0.5);
               const aspectScore = Math.max(idRatioScore, paperRatioScore);
 
-              const centerDistX = Math.abs((compMinX + compMaxX) / 2 - w / 2) / (w / 2);
-              const centerDistY = Math.abs((compMinY + compMaxY) / 2 - h / 2) / (h / 2);
-              const centerScore = 1.0 - (centerDistX + centerDistY) / 2;
+              // Ideal card size in photo: ~15% - 30% of total image area
+              const idealArea = 0.20;
+              const areaScore = 1.0 - Math.min(1.0, Math.abs(areaFraction - idealArea) / 0.35);
 
-              const totalScore = aspectScore * 0.45 + areaFraction * 0.35 + centerScore * 0.20;
+              // Distance from image center
+              const compCx = (compMinX + compMaxX) / 2;
+              const compCy = (compMinY + compMaxY) / 2;
+              const distFromCenter = Math.hypot(compCx - w / 2, compCy - h / 2) / Math.hypot(w / 2, h / 2);
+              const centerScore = Math.max(0, 1.0 - distFromCenter);
+
+              // Component solidity
+              const solidity = Math.min(1.0, compPoints.length / (area + 1));
+
+              const totalScore =
+                aspectScore * 0.40 +
+                areaScore * 0.25 +
+                centerScore * 0.20 +
+                solidity * 0.15;
 
               candidates.push({
                 bbox,
@@ -321,13 +364,13 @@ export function autoDetectDocumentCorners(
     // Handle modes: outer border expands slightly for clear lamination pouches
     if (detectMode === 'outer_border') {
       finalCorners = finalCorners.map((p) => ({
-        x: Math.round(cx + (p.x - cx) * 1.08),
-        y: Math.round(cy + (p.y - cy) * 1.08),
+        x: Math.round(Math.max(0, Math.min(origW, cx + (p.x - cx) * 1.08))),
+        y: Math.round(Math.max(0, Math.min(origH, cy + (p.y - cy) * 1.08))),
       })) as [Point, Point, Point, Point];
     } else if (detectMode === 'inner_card') {
       finalCorners = finalCorners.map((p) => ({
-        x: Math.round(cx + (p.x - cx) * 0.98),
-        y: Math.round(cy + (p.y - cy) * 0.98),
+        x: Math.round(Math.max(0, Math.min(origW, cx + (p.x - cx) * 0.98))),
+        y: Math.round(Math.max(0, Math.min(origH, cy + (p.y - cy) * 0.98))),
       })) as [Point, Point, Point, Point];
     }
 
@@ -366,7 +409,7 @@ export function defaultInsetCorners(w: number, h: number): [Point, Point, Point,
 
 /**
  * Interactive "Tap on Card to Snap" Feature
- * When user taps/clicks on their card, expands with Sobel edge barriers
+ * When user taps/clicks on their card, expands with adaptive edge barriers
  * and fits 4 corners directly to the tapped card in milliseconds!
  */
 export function snapCornersToClickPoint(
@@ -398,6 +441,7 @@ export function snapCornersToClickPoint(
   }
 
   // Compute Sobel gradients to form hard barriers at card boundaries
+  // Use adaptive gradient threshold (35) suitable for low contrast cards on light floors
   const edges = new Uint8Array(w * h);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
@@ -408,7 +452,7 @@ export function snapCornersToClickPoint(
       const gy =
         -gray[(y - 1) * w + (x - 1)] - 2 * gray[(y - 1) * w + x] - gray[(y - 1) * w + (x + 1)]
         + gray[(y + 1) * w + (x - 1)] + 2 * gray[(y + 1) * w + x] + gray[(y + 1) * w + (x + 1)];
-      if (Math.hypot(gx, gy) > 90) {
+      if (Math.hypot(gx, gy) > 35) {
         edges[y * w + x] = 1;
       }
     }
@@ -453,7 +497,7 @@ export function snapCornersToClickPoint(
     }
   }
 
-  if (points.length >= (w * h * 0.02) && points.length <= (w * h * 0.85)) {
+  if (points.length >= (w * h * 0.02) && points.length <= (w * h * 0.75)) {
     const bbox = findMinimumBoundingBox(points);
     if (bbox.corners.length === 4) {
       const invScale = 1.0 / scale;

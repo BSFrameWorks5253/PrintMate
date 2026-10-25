@@ -5,9 +5,11 @@ import {
   Sparkles, 
   FileText, 
   CreditCard, 
-  Layers
+  Layers,
+  LogIn
 } from 'lucide-react';
 import type { PrintQueueItem } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
   activeTab: 'scanner' | 'print' | 'passport';
@@ -22,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   queue,
   onLoadSample,
 }) => {
+  const { user, openAuthModal, logout } = useAuth();
   return (
     <header className="no-print bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Sample Loader Quick Menu */}
+          {/* Sample Loader & User Auth Quick Menu */}
           <div className="flex items-center gap-2">
             <div className="relative group">
               <button 
@@ -138,6 +141,51 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Auth Login / User Profile Menu */}
+            {user ? (
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all text-xs text-slate-800"
+                >
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-6 h-6 rounded-full object-cover border border-white"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="font-medium max-w-[100px] truncate hidden sm:inline">{user.name}</span>
+                </button>
+
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-2 hidden group-hover:block hover:block z-50">
+                  <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
+                    <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                  </div>
+                  <button
+                    onClick={() => logout()}
+                    className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 font-medium flex items-center gap-2"
+                  >
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openAuthModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs transition-all"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

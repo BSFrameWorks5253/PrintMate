@@ -14,7 +14,6 @@ import {
   Upload,
   RotateCw
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import type { 
   PrintQueueItem, 
   PrintSettings, 
@@ -70,16 +69,9 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const pageWidthMm = isLandscape ? selectedPageDef.heightMm : selectedPageDef.widthMm;
   const pageHeightMm = isLandscape ? selectedPageDef.widthMm : selectedPageDef.heightMm;
 
-  // Handle printing
+  // Handle printing (Clean paper print without confetti interference)
   const handlePrint = () => {
-    confetti({
-      particleCount: 40,
-      spread: 55,
-      origin: { y: 0.8 },
-    });
-    setTimeout(() => {
-      window.print();
-    }, 200);
+    window.print();
   };
 
   // Direct file upload into print queue
@@ -136,6 +128,37 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
   const slotCount = getSlotCount(settings.layout);
 
+  // Helper to get grid dimensions (cols and rows) adapting to page orientation
+  const getGridDimensions = (layout: PrintLayoutType, landscape: boolean): { cols: number; rows: number } => {
+    switch (layout) {
+      case '1_fit':
+      case '1_real_size':
+      case 'front_back_duplex':
+        return { cols: 1, rows: 1 };
+      case '2_vertical':
+        return { cols: 1, rows: 2 };
+      case '2_horizontal':
+      case 'front_back_fold':
+        return { cols: 2, rows: 1 };
+      case '3_vertical':
+        return { cols: 1, rows: 3 };
+      case '3_triad':
+        return { cols: 2, rows: 2 };
+      case '4_grid':
+        return { cols: 2, rows: 2 };
+      case '6_grid':
+        return landscape ? { cols: 3, rows: 2 } : { cols: 2, rows: 3 };
+      case '8_grid':
+        return landscape ? { cols: 4, rows: 2 } : { cols: 2, rows: 4 };
+      case '9_grid':
+        return { cols: 3, rows: 3 };
+      case 'custom_grid':
+        return { cols: Math.max(1, settings.customCols), rows: Math.max(1, settings.customRows) };
+      default:
+        return { cols: 2, rows: 2 };
+    }
+  };
+
   // Generate expanded list of items based on copies setting
   const getExpandedQueue = (): PrintQueueItem[] => {
     if (queue.length === 0) return [];
@@ -148,7 +171,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
   const expandedQueue = getExpandedQueue();
 
-  // Helper to get image for a slot
+  // Helper to get image for a slot (Does NOT automatically duplicate images unless user specifies copies)
   const getImageForSlot = (slotIdx: number): PrintQueueItem | undefined => {
     // Check manual override first
     if (slotOverrides[slotIdx]) {
@@ -156,8 +179,10 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
       if (found) return found;
     }
 
-    if (expandedQueue.length === 0) return undefined;
-    return expandedQueue[slotIdx % expandedQueue.length];
+    if (slotIdx < expandedQueue.length) {
+      return expandedQueue[slotIdx];
+    }
+    return undefined;
   };
 
   // Download high-resolution sheet with ONLY the pure edited images
@@ -222,8 +247,9 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           currX += w;
         });
       } else {
-        const cols = settings.layout === 'custom_grid' ? settings.customCols : (slotCount <= 2 ? 1 : (slotCount <= 4 ? 2 : (slotCount <= 6 ? 2 : (slotCount <= 8 ? 2 : 3))));
-        const rows = settings.layout === 'custom_grid' ? settings.customRows : Math.ceil(slotCount / cols);
+        const gridDim = getGridDimensions(settings.layout, isLandscape);
+        const cols = gridDim.cols;
+        const rows = gridDim.rows;
         const marginPx = settings.marginMm * pxPerMm;
         const spacingPx = settings.spacingMm * pxPerMm;
 
@@ -724,19 +750,22 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
             </div>
 
             {/* PHYSICAL PAPER SHEET PREVIEW (Zoomable / Scaled to fit container) */}
-            <div className="bg-slate-100 p-4 sm:p-8 rounded-2xl border border-slate-200 flex justify-center items-center overflow-auto min-h-[580px]">
+            <div className="print-page-wrapper bg-slate-100 p-4 sm:p-8 rounded-2xl border border-slate-200 flex justify-center items-center overflow-auto min-h-[580px]">
               {/* This DIV is what gets printed directly via @media print!
                   CRITICAL: All UI labels, slot badges, scissors icons, and guides HAVE 'no-print'
                   so ONLY the pure images appear on the paper! */}
               <div
                 ref={printSheetRef}
-                className="print-area bg-white text-black shadow-2xl relative transition-all duration-300"
+                className="print-studio-sheet bg-white text-black shadow-2xl relative transition-all duration-300"
                 style={{
-                  width: `${(isLandscape ? 680 : 480) * (previewZoom / 100)}px`,
+                  '--print-sheet-width': `${pageWidthMm}mm`,
+                  '--print-sheet-height': `${pageHeightMm}mm`,
+                  width: `${pageWidthMm}mm`,
+                  maxWidth: `${(isLandscape ? 680 : 480) * (previewZoom / 100)}px`,
                   aspectRatio: `${pageWidthMm} / ${pageHeightMm}`,
-                  padding: `${settings.marginMm * 1.5}px`,
+                  padding: `${settings.marginMm}mm`,
                   boxSizing: 'border-box',
-                }}
+                } as React.CSSProperties}
               >
                 {/* 1. LAYOUT: FRONT & BACK DUPLEX (2-Sided Printing) */}
                 {settings.layout === 'front_back_duplex' ? (
@@ -1006,80 +1035,69 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   </div>
                 ) : (
                   /* 6. LAYOUT: MULTI-GRID (3, 4, 6, 8, 9 OR CUSTOM) */
-                  <div
-                    className="h-full grid"
-                    style={{
-                      gap: `${settings.spacingMm * 1.2}px`,
-                      gridTemplateColumns:
-                        settings.layout === 'custom_grid'
-                          ? `repeat(${settings.customCols}, 1fr)`
-                          : slotCount === 3
-                          ? '1fr'
-                          : slotCount === 4
-                          ? 'repeat(2, 1fr)'
-                          : slotCount === 9
-                          ? 'repeat(3, 1fr)'
-                          : 'repeat(2, 1fr)',
-                      gridTemplateRows:
-                        settings.layout === 'custom_grid'
-                          ? `repeat(${settings.customRows}, 1fr)`
-                          : slotCount === 3
-                          ? 'repeat(3, 1fr)'
-                          : slotCount === 4
-                          ? 'repeat(2, 1fr)'
-                          : slotCount === 6
-                          ? 'repeat(3, 1fr)'
-                          : slotCount === 9
-                          ? 'repeat(3, 1fr)'
-                          : 'repeat(4, 1fr)',
-                      justifyItems: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {Array.from({ length: slotCount }).map((_, slotIdx) => {
-                      const item = getImageForSlot(slotIdx);
-                      return (
-                        <div
-                          key={slotIdx}
-                          onClick={() => setActiveSlotModal(slotIdx)}
-                          className="relative cursor-pointer group flex items-center justify-center w-full h-full"
-                        >
-                          {item ? (
-                            <img
-                              src={item.dataUrl}
-                              alt={`Card ${slotIdx + 1}`}
-                              className="max-w-full max-h-full object-contain block rounded-none"
-                              style={{
-                                width: settings.scaleMode === 'exact_id' ? (item.aspectRatio < 1 ? '110px' : '180px') : '95%',
-                                aspectRatio: item.aspectRatio || 85.6 / 53.98,
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full border border-dashed border-slate-300 flex items-center justify-center text-slate-500 text-[10px] no-print">
-                              Empty Slot
-                            </div>
-                          )}
-
-                          {/* Screen-only hover actions */}
-                          {item && onRotateItem && (
-                            <div 
-                              className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
-                              onClick={(e) => e.stopPropagation()}
+                  (() => {
+                    const gridDim = getGridDimensions(settings.layout, isLandscape);
+                    return (
+                      <div
+                        className="h-full w-full grid"
+                        style={{
+                          gap: `${settings.spacingMm}mm`,
+                          gridTemplateColumns: `repeat(${gridDim.cols}, 1fr)`,
+                          gridTemplateRows: `repeat(${gridDim.rows}, 1fr)`,
+                          justifyItems: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {Array.from({ length: slotCount }).map((_, slotIdx) => {
+                          const item = getImageForSlot(slotIdx);
+                          const isItemPortrait = item && item.aspectRatio < 1;
+                          return (
+                            <div
+                              key={slotIdx}
+                              onClick={() => setActiveSlotModal(slotIdx)}
+                              className="relative cursor-pointer group flex items-center justify-center w-full h-full p-1"
+                              style={{ boxSizing: 'border-box' }}
                             >
-                              <button
-                                onClick={() => onRotateItem(item.id)}
-                                className="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 shadow"
-                                title="Rotate 90° CW"
-                              >
-                                <RotateCw className="w-3 h-3" />
-                                <span>Rotate</span>
-                              </button>
+                              {item ? (
+                                <img
+                                  src={item.dataUrl}
+                                  alt={`Card ${slotIdx + 1}`}
+                                  className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
+                                  style={{
+                                    width: settings.scaleMode === 'exact_id'
+                                      ? (isItemPortrait ? '53.98mm' : '85.6mm')
+                                      : '95%',
+                                    aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs no-print min-h-[60px]">
+                                  Empty Slot {slotIdx + 1}
+                                </div>
+                              )}
+
+                              {/* Screen-only hover actions */}
+                              {item && onRotateItem && (
+                                <div 
+                                  className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => onRotateItem(item.id)}
+                                    className="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 shadow"
+                                    title="Rotate 90° CW"
+                                  >
+                                    <RotateCw className="w-3 h-3" />
+                                    <span>Rotate</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             </div>

@@ -124,8 +124,8 @@ export function warpPerspectiveCrop(
   // If the photo was clicked vertically (avgW < avgH), cyclically shift corners so long side becomes width!
   if (aspectMode === 'standard') {
     if (avgW < avgH) {
-      // Rotate 90 deg clockwise: bl becomes tl, tl becomes tr, tr becomes br, br becomes bl
-      const rotated: [Point, Point, Point, Point] = [bl, tl, tr, br];
+      // Shift corners so long side becomes width, preserving upright top orientation: tr becomes tl, br becomes tr, bl becomes br, tl becomes bl
+      const rotated: [Point, Point, Point, Point] = [tr, br, bl, tl];
       tl = rotated[0];
       tr = rotated[1];
       br = rotated[2];

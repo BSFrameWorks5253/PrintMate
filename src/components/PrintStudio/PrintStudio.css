@@ -43,12 +43,19 @@
    Strict Print Isolation: Pure Clean Images On Physical Paper Only
    ========================================================================== */
 @media print {
+  @page {
+    margin: 0 !important;
+    size: auto;
+  }
+
   /* Hide all UI elements, toolbars, guides, and background containers */
   body, html {
     background-color: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -58,22 +65,41 @@
   .fold-guide-line span,
   header,
   footer,
-  nav {
+  nav,
+  aside,
+  canvas {
     display: none !important;
   }
 
-  .print-area {
-    display: block !important;
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
+  /* Strip card styling and backgrounds from preview container wrapper */
+  .print-page-wrapper {
+    background: transparent !important;
+    border: none !important;
     box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    display: block !important;
   }
 
-  @page {
-    margin: 0;
-    size: auto;
+  /* Physical paper sheet */
+  .print-studio-sheet {
+    display: block !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: var(--print-sheet-width, 100%) !important;
+    height: var(--print-sheet-height, 100%) !important;
+    max-width: none !important;
+  }
+
+  .card-exact-id {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    box-shadow: none !important;
   }
 }

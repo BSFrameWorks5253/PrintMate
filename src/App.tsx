@@ -6,6 +6,8 @@ import { PassportMakerView } from './components/PassportMaker/PassportMakerView'
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
+import { AuthProvider } from './context/AuthContext';
+import { AuthModal } from './components/Auth/AuthModal';
 import './App.css';
 
 export const App: React.FC = () => {
@@ -88,55 +90,60 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        queue={queue}
-        onLoadSample={handleLoadSample}
-      />
+    <AuthProvider>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+        <Header
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          queue={queue}
+          onLoadSample={handleLoadSample}
+        />
 
-      <main className="flex-1">
-        {activeTab === 'scanner' && (
-          <ScannerView
-            onSendToPrint={handleSendToPrint}
-            onSendMultipleToPrint={handleSendMultipleToPrint}
-            externalImage={externalImage}
-            onClearExternalImage={() => setExternalImage(null)}
-          />
-        )}
+        <main className="flex-1">
+          {activeTab === 'scanner' && (
+            <ScannerView
+              onSendToPrint={handleSendToPrint}
+              onSendMultipleToPrint={handleSendMultipleToPrint}
+              externalImage={externalImage}
+              onClearExternalImage={() => setExternalImage(null)}
+            />
+          )}
 
-        {activeTab === 'print' && (
-          <PrintStudioView
-            queue={queue}
-            onAddItem={handleSendToPrint}
-            onRemoveItem={handleRemoveItem}
-            onClearQueue={handleClearQueue}
-            onDuplicateItem={handleDuplicateItem}
-            onRotateItem={handleRotateItem}
-            onNavigateToScanner={() => setActiveTab('scanner')}
-          />
-        )}
+          {activeTab === 'print' && (
+            <PrintStudioView
+              queue={queue}
+              onAddItem={handleSendToPrint}
+              onRemoveItem={handleRemoveItem}
+              onClearQueue={handleClearQueue}
+              onDuplicateItem={handleDuplicateItem}
+              onRotateItem={handleRotateItem}
+              onNavigateToScanner={() => setActiveTab('scanner')}
+            />
+          )}
 
-        {activeTab === 'passport' && (
-          <PassportMakerView onSendToPrint={handleSendToPrint} />
-        )}
-      </main>
+          {activeTab === 'passport' && (
+            <PassportMakerView onSendToPrint={handleSendToPrint} />
+          )}
+        </main>
 
-      {/* Footer */}
-      <footer className="no-print border-t border-slate-200 py-4 bg-white text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
-            <span className="font-semibold text-slate-800">PrintMate</span>
-            <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
+        {/* Footer */}
+        <footer className="no-print border-t border-slate-200 py-4 bg-white text-center text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
+              <span className="font-semibold text-slate-800">PrintMate</span>
+              <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              A4 • A3 • Letter • Duplex • CR80 ID Standard Scale
+            </div>
           </div>
-          <div className="text-[11px] text-slate-400">
-            A4 • A3 • Letter • Duplex • CR80 ID Standard Scale
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+
+        {/* Real Authentication Modal (Google OAuth & Email/Password) */}
+        <AuthModal />
+      </div>
+    </AuthProvider>
   );
 };
 

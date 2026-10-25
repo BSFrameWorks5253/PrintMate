@@ -55,7 +55,7 @@
     display: none !important;
   }
 
-  .print-area {
+  .passport-print-sheet {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -63,11 +63,11 @@
     padding: 0 !important;
     background: #ffffff !important;
     box-shadow: none !important;
-    width: 152.4mm !important;
-    height: 101.6mm !important;
-    max-width: 152.4mm !important;
-    max-height: 101.6mm !important;
-    aspect-ratio: 152.4 / 101.6 !important;
+    width: var(--passport-sheet-width, 152.4mm) !important;
+    height: var(--passport-sheet-height, 101.6mm) !important;
+    max-width: var(--passport-sheet-width, 152.4mm) !important;
+    max-height: var(--passport-sheet-height, 101.6mm) !important;
+    aspect-ratio: var(--passport-sheet-ratio, 152.4 / 101.6) !important;
     overflow: hidden !important;
   }
 

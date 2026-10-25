@@ -263,7 +263,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     if (!currentCard) return;
     const detected = autoDetectDocumentCorners(currentCard.sourceImage, mode);
     updateCurrentCard((c) => ({ ...c, corners: detected }));
-    const label = mode === 'inner_card' ? 'Snapped to inner card edge' : 'Card borders auto-aligned';
+    const label =
+      mode === 'inner_card'
+        ? 'Snapped tightly to card edge'
+        : mode === 'outer_border'
+        ? 'Expanded to clear lamination border'
+        : 'Card borders auto-detected & straightened';
     setAutoDetectNotice(label);
     setTimeout(() => setAutoDetectNotice(''), 2500);
   };
@@ -294,19 +299,19 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     newImg.src = rotated.toDataURL('image/jpeg', 0.98);
   };
 
-  // Cyclically rotate corner pins 90°
-  const handleRotatePins = (direction: 'cw' | 'ccw') => {
+  // Cyclically rotate corner pins 90° or 180°
+  const handleRotatePins = (direction: 'cw' | 'ccw' | '180') => {
     if (!currentCard) return;
     const newCorners = rotateCornersCyclic(currentCard.corners, direction);
     updateCurrentCard((c) => ({
       ...c,
       corners: newCorners,
     }));
-    setAutoDetectNotice(`Pins rotated 90° ${direction.toUpperCase()}`);
+    setAutoDetectNotice(direction === '180' ? 'Pins flipped 180°' : `Pins shifted 90° ${direction.toUpperCase()}`);
     setTimeout(() => setAutoDetectNotice(''), 2000);
   };
 
-  // Rotate the deskewed card output 90° CW / CCW
+  // Rotate the deskewed card output 90° CW / CCW or 180°
   const handleRotateOutput = (deg: number) => {
     if (!currentCard) return;
     const nextRot = (((currentCard.adjustments.rotation || 0) + deg) % 360 + 360) % 360;
@@ -317,7 +322,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         rotation: nextRot,
       },
     }));
-    setAutoDetectNotice(`Card rotated ${deg > 0 ? '+90°' : '-90°'} (${nextRot}°)`);
+    setAutoDetectNotice(deg === 180 ? `Card flipped 180° (${nextRot}°)` : `Card rotated ${deg > 0 ? '+90°' : '-90°'} (${nextRot}°)`);
     setTimeout(() => setAutoDetectNotice(''), 2000);
   };
 
@@ -376,20 +381,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     // Draw base image
     ctx.drawImage(sourceImage, 0, 0, dispW, dispH);
 
-    // Dim outside region
+    // Dim ONLY the region OUTSIDE the quad (leaving the inside image 100% visible and crystal-clear)
     ctx.save();
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.72)';
-    ctx.fillRect(0, 0, dispW, dispH);
-
-    // Cut out quad
-    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.60)';
     ctx.beginPath();
+    // Outer rect covers entire canvas
+    ctx.rect(0, 0, dispW, dispH);
+    // Inner quad path
     ctx.moveTo(corners[0].x * displayScale, corners[0].y * displayScale);
     ctx.lineTo(corners[1].x * displayScale, corners[1].y * displayScale);
     ctx.lineTo(corners[2].x * displayScale, corners[2].y * displayScale);
     ctx.lineTo(corners[3].x * displayScale, corners[3].y * displayScale);
     ctx.closePath();
-    ctx.fill();
+    // 'evenodd' rule: fills outside the quad and leaves inside completely untouched
+    ctx.fill('evenodd');
     ctx.restore();
 
     // Quad borders
@@ -983,10 +988,19 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     <button
                       onClick={() => handleRotatePins('cw')}
                       className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-amber-700 hover:text-white transition-all flex items-center gap-1 text-xs"
-                      title="Rotate Pins 90° CW (Shift which edge is Top)"
+                      title="Shift Pin Top-Edge 90° CW"
                     >
                       <RotateCw className="w-3.5 h-3.5 text-amber-600" />
                       <span className="hidden sm:inline">Shift Pins</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleRotatePins('180')}
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-amber-700 hover:text-white transition-all flex items-center gap-1 text-xs"
+                      title="Flip Pins 180°"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+                      <span className="hidden sm:inline">Flip 180°</span>
                     </button>
 
                     <button
@@ -1133,11 +1147,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                     <button
                       onClick={() => handleRotateOutput(90)}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
+                      className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
                       title="Rotate Deskewed Card 90° CW"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
-                      <span>Rotate 90°</span>
+                      <span>+90°</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleRotateOutput(180)}
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
+                      title="Flip Deskewed Card 180° (Upright)"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Flip 180°</span>
                     </button>
 
                     <button

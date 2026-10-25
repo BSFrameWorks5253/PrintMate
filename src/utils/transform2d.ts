@@ -47,9 +47,12 @@ export function rotatePoint(p: Point, srcW: number, srcH: number, angleDeg: numb
  */
 export function rotateCornersCyclic(
   corners: [Point, Point, Point, Point],
-  direction: 'cw' | 'ccw'
+  direction: 'cw' | 'ccw' | '180'
 ): [Point, Point, Point, Point] {
   const [c0, c1, c2, c3] = corners;
+  if (direction === '180') {
+    return [c2, c3, c0, c1]; // 180 degree flip
+  }
   return direction === 'cw'
     ? [c3, c0, c1, c2] // [bl, tl, tr, br] -> rotated 90 CW
     : [c1, c2, c3, c0]; // [tr, br, bl, tl] -> rotated 90 CCW
