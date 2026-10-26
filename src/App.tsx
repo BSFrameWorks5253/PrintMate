@@ -62,31 +62,35 @@ const MainAppContent: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Standardize URL to clean named paths (/home, /scanner, etc.) and strip ugly OAuth token hashes
+  // Standardize URL to clean named paths (/home, /scanner, etc.) without wiping out active OAuth callbacks
   useEffect(() => {
-    const cleanAndNormalizeUrl = () => {
+    const hash = window.location.hash;
+    const isOAuthCallback =
+      hash &&
+      (hash.includes('access_token') ||
+        hash.includes('refresh_token') ||
+        hash.includes('token_type') ||
+        hash.includes('type=recovery') ||
+        hash.includes('type=signup'));
+
+    // If an OAuth callback is in progress, DO NOT overwrite the URL hash until the user is authenticated!
+    if (isOAuthCallback && !user) {
+      return;
+    }
+
+    // Clean hash once user is authenticated
+    if (isOAuthCallback && user) {
       const currentTab = getTabFromPath(window.location.pathname);
       const targetPath = getPathFromTab(currentTab);
-      const hash = window.location.hash;
+      window.history.replaceState({ tab: currentTab }, '', targetPath);
+      return;
+    }
 
-      const hasOAuthHash =
-        hash &&
-        (hash.includes('access_token') ||
-          hash.includes('refresh_token') ||
-          hash.includes('token_type') ||
-          hash.includes('type=recovery') ||
-          hash.includes('type=signup') ||
-          hash.includes('error_description'));
-
-      if (window.location.pathname === '/' || window.location.pathname === '' || hasOAuthHash) {
-        window.history.replaceState({ tab: currentTab }, '', targetPath);
-      }
-    };
-
-    cleanAndNormalizeUrl();
-    const timer = setTimeout(cleanAndNormalizeUrl, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    // If on root "/" or empty, standardize cleanly to "/home"
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+      window.history.replaceState({ tab: 'home' }, '', '/home');
+    }
+  }, [user]);
 
   // Automatically track page views and user sessions
   useEffect(() => {

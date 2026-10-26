@@ -59,7 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Helper to immediately remove unsightly Supabase OAuth token fragments (#access_token=...) from the browser address bar
+  // Helper to remove unsightly Supabase OAuth token fragments (#access_token=...) from the address bar
+  // Only called AFTER session has been established and persisted by Supabase
   const sanitizeAuthHashFromUrl = () => {
     if (typeof window === 'undefined') return;
     const hash = window.location.hash;
@@ -96,7 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
-      sanitizeAuthHashFromUrl();
+      if (session) {
+        setIsAuthModalOpen(false);
+        sanitizeAuthHashFromUrl();
+      }
     });
 
     // Realtime auth listener (OAuth redirects, tokens, signouts)
@@ -106,7 +110,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
-      sanitizeAuthHashFromUrl();
+      if (session) {
+        setIsAuthModalOpen(false);
+        sanitizeAuthHashFromUrl();
+      }
     });
 
     return () => {
@@ -124,13 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const rawPath = window.location.pathname;
-      const currentPath = !rawPath || rawPath === '/' ? '/home' : rawPath;
-      const redirectTo = `${window.location.origin}${currentPath}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
+          redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
