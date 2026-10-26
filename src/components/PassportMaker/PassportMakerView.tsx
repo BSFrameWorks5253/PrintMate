@@ -11,7 +11,11 @@ import {
   FileText, 
   Grid, 
   Scissors,
-  Lock
+  Lock,
+  RotateCw,
+  RotateCcw,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { analytics } from '../../services/analyticsService';
@@ -26,6 +30,56 @@ interface PassportMakerViewProps {
 
 export type BorderStyleType = 'studio_classic' | 'black_border' | 'white_margin' | 'borderless';
 export type PaperSizeKey = '5x7' | 'a4' | '4x6';
+export type PassportStandardKey = '35x45' | '51x51' | '30x40' | '33x48';
+
+export interface PassportStandardDef {
+  id: PassportStandardKey;
+  name: string;
+  widthMm: number;
+  heightMm: number;
+  country: string;
+  widthPx300Dpi: number;
+  heightPx300Dpi: number;
+}
+
+export const PASSPORT_STANDARDS: Record<PassportStandardKey, PassportStandardDef> = {
+  '35x45': {
+    id: '35x45',
+    name: '35 × 45 mm (Standard)',
+    widthMm: 35,
+    heightMm: 45,
+    country: 'India, UK, Europe, Schengen, Australia, Canada Visa',
+    widthPx300Dpi: 413,
+    heightPx300Dpi: 531,
+  },
+  '51x51': {
+    id: '51x51',
+    name: '2 × 2 in (51 × 51 mm)',
+    widthMm: 50.8,
+    heightMm: 50.8,
+    country: 'US Passport / Visa, OCI Card, India Visa',
+    widthPx300Dpi: 600,
+    heightPx300Dpi: 600,
+  },
+  '30x40': {
+    id: '30x40',
+    name: '30 × 40 mm (Mini ID)',
+    widthMm: 30,
+    heightMm: 40,
+    country: 'College ID, Employee Badge, Library Card',
+    widthPx300Dpi: 354,
+    heightPx300Dpi: 472,
+  },
+  '33x48': {
+    id: '33x48',
+    name: '33 × 48 mm (Visa)',
+    widthMm: 33,
+    heightMm: 48,
+    country: 'China Visa, East Asian Embassies',
+    widthPx300Dpi: 390,
+    heightPx300Dpi: 567,
+  },
+};
 
 interface PaperDef {
   id: PaperSizeKey;
@@ -71,6 +125,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const [photoName, setPhotoName] = useState<string>('Passport_Photo');
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
 
+  // Passport Standard Preset & Rotation
+  const [presetStandard, setPresetStandard] = useState<PassportStandardKey>('35x45');
+  const [rotation, setRotation] = useState<number>(0);
+
   // Framing & Crop state
   const [zoom, setZoom] = useState<number>(1.15);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -104,6 +162,23 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
   const selectedPaper = PAPERS[paperSize];
 
+  // Helper to auto-rotate image upright if it's uploaded in landscape orientation
+  const applyImageWithAutoOrientation = (img: HTMLImageElement) => {
+    setImageObj(img);
+    setPan({ x: 0, y: 0 });
+    setZoom(1.15);
+
+    // Auto-rotate: passport photos must be vertical portrait.
+    // If uploaded photo is wider than it is tall, automatically rotate 90°!
+    if (img.naturalWidth > img.naturalHeight) {
+      setRotation(90);
+      setToastNotice('Landscape image detected: auto-rotated 90° upright to portrait');
+      setTimeout(() => setToastNotice(''), 3000);
+    } else {
+      setRotation(0);
+    }
+  };
+
   // Load image object when photoUrl changes
   useEffect(() => {
     if (!photoUrl) {
@@ -113,12 +188,25 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      setImageObj(img);
-      setPan({ x: 0, y: 0 });
-      setZoom(1.15);
+      applyImageWithAutoOrientation(img);
     };
     img.src = photoUrl;
   }, [photoUrl]);
+
+  // Save to Recents on unmount if a photo was active
+  useEffect(() => {
+    return () => {
+      if (cleanSinglePhotoUrl || photoUrl) {
+        userStorageService.addRecent(user?.id, {
+          name: `${photoName} (${PASSPORT_STANDARDS[presetStandard].name})`,
+          dataUrl: cleanSinglePhotoUrl || photoUrl || '',
+          docType: 'id_standard',
+          source: 'passport',
+          aspectRatio: PASSPORT_STANDARDS[presetStandard].widthMm / PASSPORT_STANDARDS[presetStandard].heightMm,
+        });
+      }
+    };
+  }, [cleanSinglePhotoUrl, photoUrl, photoName, presetStandard, user]);
 
   // Load default demo image on click
   const loadDemoPhoto = () => {
@@ -137,12 +225,45 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       if (event.target?.result) {
         setPhotoUrl(event.target.result as string);
         setPhotoName(file.name.replace(/\.[^/.]+$/, ''));
-        setToastNotice('Photo loaded • Ready to format into 35×45mm passport sheet');
+        setToastNotice('Photo loaded • Ready to crop & format into passport sheet');
         setTimeout(() => setToastNotice(''), 2500);
       }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+  // Clean / Cancel Photo (archives to Recents and clears canvas)
+  const handleClearPhoto = () => {
+    if (photoUrl || cleanSinglePhotoUrl) {
+      userStorageService.addRecent(user?.id, {
+        name: `${photoName} (${PASSPORT_STANDARDS[presetStandard].name})`,
+        dataUrl: cleanSinglePhotoUrl || photoUrl || '',
+        docType: 'id_standard',
+        source: 'passport',
+        aspectRatio: PASSPORT_STANDARDS[presetStandard].widthMm / PASSPORT_STANDARDS[presetStandard].heightMm,
+      });
+      setPhotoUrl(null);
+      setImageObj(null);
+      setCleanSinglePhotoUrl('');
+      setRotation(0);
+      setToastNotice('Photo cleared from canvas • Preserved in Recent Documents');
+      setTimeout(() => setToastNotice(''), 3000);
+    }
+  };
+
+  // Rotation controls
+  const rotateCw = () => setRotation((r) => ((r + 90) % 360));
+  const rotateCcw = () => setRotation((r) => ((r - 90 + 360) % 360));
+  const autoRotate = () => {
+    if (!imageObj) return;
+    if (imageObj.naturalWidth > imageObj.naturalHeight) {
+      setRotation(90);
+      setToastNotice('Rotated upright to portrait');
+    } else {
+      setRotation(0);
+      setToastNotice('Restored original portrait angle');
+    }
+    setTimeout(() => setToastNotice(''), 2500);
   };
 
   // Drag and drop photo
@@ -155,6 +276,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         if (event.target?.result) {
           setPhotoUrl(event.target.result as string);
           setPhotoName(file.name.replace(/\.[^/.]+$/, ''));
+          setToastNotice('Photo loaded • Ready to crop & format into passport sheet');
+          setTimeout(() => setToastNotice(''), 2500);
         }
       };
       reader.readAsDataURL(file);
@@ -162,9 +285,6 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   };
 
   // MATHEMATICS OF DYNAMIC SHRINKING & TILING
-  // Standard Passport Dimensions: 35mm x 45mm
-  // When count <= 8 on 4x6: 35mm x 45mm full size
-  // When count > 8: automatically shrink proportionally to fit 4x6 sheet
   const computeGridLayout = () => {
     const count = Math.max(1, photoCount);
     const paperW = selectedPaper.widthMm;
@@ -201,7 +321,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         rows = 1;
       } else if (count <= 8) {
         cols = 4;
-        rows = 2; // 4 cols × 2 rows = 8 photos at standard 35x45mm
+        rows = 2;
       } else if (count <= 10) {
         cols = 5;
         rows = 2;
@@ -213,7 +333,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         rows = 4;
       }
     } else {
-      // A4 portrait is 210 x 297 mm (0.707 portrait ratio)
+      // A4 portrait is 210 x 297 mm
       if (count <= 6) {
         cols = 2;
         rows = 3;
@@ -233,7 +353,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     }
 
     const marginMm = count <= 8 ? 2.5 : 2.0;
-    const gapMm = count <= 8 ? 2.0 : 1.2; // 2mm physical separation between photos so borders stay completely intact
+    const gapMm = count <= 8 ? 2.0 : 1.2;
 
     const availW = paperW - (marginMm * 2) - ((cols - 1) * gapMm);
     const availH = paperH - (marginMm * 2) - ((rows - 1) * gapMm);
@@ -241,11 +361,12 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const maxCellW = availW / cols;
     const maxCellH = availH / rows;
 
-    const standardW = 35; // 35mm
-    const standardH = 45; // 45mm
-    const passportRatio = standardW / standardH; // 35 / 45 = 0.77778
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const standardW = std.widthMm;
+    const standardH = std.heightMm;
+    const passportRatio = standardW / standardH;
 
-    // Fit strictly inside available cell bounds preserving 35:45 ratio
+    // Fit strictly inside available cell bounds preserving standard ratio
     const fitW = Math.min(maxCellW, maxCellH * passportRatio);
     const fitH = fitW / passportRatio;
 
@@ -253,7 +374,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     let finalPhotoH = standardH;
     let isShrunk = false;
 
-    // Check if standard 35x45mm fits on sheet without expanding page
+    // Check if standard fits on sheet without expanding page
     if (count <= 8 && maxCellW >= standardW && maxCellH >= standardH) {
       finalPhotoW = standardW;
       finalPhotoH = standardH;
@@ -278,15 +399,17 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const layout = computeGridLayout();
 
   // Draw the cropped/framed passport photo onto a canvas
-  // Standard 35 x 45 mm at 300 DPI = 413 x 531 pixels
   const renderSinglePassportCanvas = (
-    wPx: number = 413, 
-    hPx: number = 531, 
+    wPx?: number, 
+    hPx?: number, 
     includeBorders: boolean = true
   ): HTMLCanvasElement => {
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = document.createElement('canvas');
-    canvas.width = wPx;
-    canvas.height = hPx;
+    const width = wPx || std.widthPx300Dpi;
+    const height = hPx || std.heightPx300Dpi;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return canvas;
 
@@ -302,46 +425,50 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       : '#ffffff';
 
     ctx.fillStyle = bgFill;
-    ctx.fillRect(0, 0, wPx, hPx);
+    ctx.fillRect(0, 0, width, height);
 
-    // Border and margin calculation matching Image 1 & Image 2
-    // Outer white margin: ~2mm (approx 5% of width)
-    // Thin black border: ~1.5px
     let insetX = 0;
     let insetY = 0;
     let borderWidth = 0;
 
     if (includeBorders) {
       if (borderStyle === 'studio_classic') {
-        // Classic Studio Border (Image 1 & Image 2):
-        // White margin around photo + thin black border
-        insetX = Math.round(wPx * 0.05); // ~20px at 413px
-        insetY = Math.round(hPx * 0.05); // ~26px at 531px
-        borderWidth = Math.max(1, Math.round(wPx * 0.005)); // ~2px
+        insetX = Math.round(width * 0.05);
+        insetY = Math.round(height * 0.05);
+        borderWidth = Math.max(1, Math.round(width * 0.005));
       } else if (borderStyle === 'black_border') {
-        borderWidth = Math.max(1, Math.round(wPx * 0.005));
+        borderWidth = Math.max(1, Math.round(width * 0.005));
       } else if (borderStyle === 'white_margin') {
-        insetX = Math.round(wPx * 0.05);
-        insetY = Math.round(hPx * 0.05);
+        insetX = Math.round(width * 0.05);
+        insetY = Math.round(height * 0.05);
       }
     }
 
-    const photoAreaW = wPx - insetX * 2;
-    const photoAreaH = hPx - insetY * 2;
+    const photoAreaW = width - insetX * 2;
+    const photoAreaH = height - insetY * 2;
 
-    // Draw photo inside photoArea
+    // Draw photo inside photoArea with rotation and pan/zoom
     if (imageObj) {
       ctx.save();
-      // Clip to inner photo area
       ctx.beginPath();
       ctx.rect(insetX, insetY, photoAreaW, photoAreaH);
       ctx.clip();
 
-      // Apply brightness & contrast filters
       ctx.filter = `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`;
 
-      // Draw image with pan and zoom centered
-      const imgAspect = imageObj.width / imageObj.height;
+      const centerX = insetX + photoAreaW / 2 + (pan.x * photoAreaW);
+      const centerY = insetY + photoAreaH / 2 + (pan.y * photoAreaH);
+
+      ctx.translate(centerX, centerY);
+      if (rotation !== 0) {
+        ctx.rotate((rotation * Math.PI) / 180);
+      }
+
+      // Calculate effective aspect ratio after rotation
+      const isRotated90 = rotation === 90 || rotation === 270;
+      const effectiveW = isRotated90 ? imageObj.height : imageObj.width;
+      const effectiveH = isRotated90 ? imageObj.width : imageObj.height;
+      const imgAspect = effectiveW / effectiveH;
       const targetAspect = photoAreaW / photoAreaH;
 
       let drawW: number;
@@ -349,16 +476,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
       if (imgAspect > targetAspect) {
         drawH = photoAreaH * zoom;
-        drawW = drawH * imgAspect;
+        drawW = drawH * (imageObj.width / imageObj.height);
       } else {
         drawW = photoAreaW * zoom;
-        drawH = drawW / imgAspect;
+        drawH = drawW / (imageObj.width / imageObj.height);
       }
 
-      const drawX = insetX + (photoAreaW - drawW) / 2 + (pan.x * photoAreaW);
-      const drawY = insetY + (photoAreaH - drawH) / 2 + (pan.y * photoAreaH);
-
-      ctx.drawImage(imageObj, drawX, drawY, drawW, drawH);
+      ctx.drawImage(imageObj, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
     }
 
@@ -368,13 +492,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         // 1. Clear outer margins to pure white FIRST so photo overflow is cut clean
         ctx.fillStyle = '#ffffff';
         // Top margin
-        ctx.fillRect(0, 0, wPx, insetY);
+        ctx.fillRect(0, 0, width, insetY);
         // Bottom margin
-        ctx.fillRect(0, hPx - insetY, wPx, insetY);
+        ctx.fillRect(0, height - insetY, width, insetY);
         // Left margin
-        ctx.fillRect(0, 0, insetX, hPx);
+        ctx.fillRect(0, 0, insetX, height);
         // Right margin
-        ctx.fillRect(wPx - insetX, 0, insetX, hPx);
+        ctx.fillRect(width - insetX, 0, insetX, height);
 
         // 2. Draw crisp black rectangular border around the photo portrait area
         ctx.strokeStyle = '#000000';
@@ -384,11 +508,11 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         // 3. Outer crisp bounding stroke around entire passport card
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, wPx - 1, hPx - 1);
+        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
       } else if (borderStyle === 'black_border') {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = borderWidth;
-        ctx.strokeRect(0.5, 0.5, wPx - 1, hPx - 1);
+        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
       }
     }
 
@@ -402,8 +526,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = 413;
-    const h = 531;
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const w = std.widthPx300Dpi;
+    const h = std.heightPx300Dpi;
     canvas.width = w;
     canvas.height = h;
 
@@ -462,7 +587,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
       ctx.restore();
     }
-  }, [imageObj, zoom, pan, showGuidelines, borderStyle, backgroundColor, adjustments]);
+  }, [imageObj, zoom, pan, rotation, presetStandard, showGuidelines, borderStyle, backgroundColor, adjustments]);
 
   // Update clean single photo preview data URL whenever editing state changes
   useEffect(() => {
@@ -470,9 +595,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       setCleanSinglePhotoUrl('');
       return;
     }
-    const canvas = renderSinglePassportCanvas(413, 531, true);
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const canvas = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
     setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
-  }, [imageObj, zoom, pan, borderStyle, backgroundColor, adjustments]);
+  }, [imageObj, zoom, pan, rotation, presetStandard, borderStyle, backgroundColor, adjustments]);
 
   // Pointer panning handler for face positioning
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -601,20 +727,20 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     });
   };
 
-  // 2. Download Single 35x45mm Passport Photo
+  // 2. Download Single Passport Photo (Current Standard Preset)
   const handleDownloadSingle = () => {
     if (!isAuthenticated) {
       openAuthModal('download passport photo');
       return;
     }
-    // 35mm x 45mm at 300 DPI is exactly 413 x 531 px
-    const single = renderSinglePassportCanvas(413, 531, true);
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
     const link = document.createElement('a');
-    link.download = `${photoName}_35x45mm_300DPI.jpg`;
+    link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_300DPI.jpg`;
     link.href = single.toDataURL('image/jpeg', 0.98);
     link.click();
     analytics.trackDownload({
-      type: 'Single 35x45mm Passport Photo',
+      type: `Single ${std.name} Passport Photo`,
       fileName: photoName,
       page: 'passport',
     });
@@ -641,21 +767,23 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // 4. Send to Main Print Studio Queue
   const handleSendToPrintStudio = () => {
     if (!onSendToPrint) return;
-    const single = renderSinglePassportCanvas(413, 531, true);
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
     const singleDataUrl = single.toDataURL('image/jpeg', 0.98);
+    const ratio = std.widthMm / std.heightMm;
     onSendToPrint({
       dataUrl: singleDataUrl,
-      name: `${photoName} (Passport 35×45mm)`,
+      name: `${photoName} (${std.name})`,
       docType: 'id_standard',
       cardSide: 'single',
-      aspectRatio: 35 / 45,
+      aspectRatio: ratio,
     });
     userStorageService.addRecent(user?.id, {
-      name: `${photoName} (Passport 35×45mm)`,
+      name: `${photoName} (${std.name})`,
       dataUrl: singleDataUrl,
       docType: 'id_standard',
       source: 'passport',
-      aspectRatio: 35 / 45,
+      aspectRatio: ratio,
     });
     setToastNotice('Passport photo dispatched to Print Studio queue!');
     setTimeout(() => setToastNotice(''), 2500);
@@ -693,24 +821,34 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
           </p>
         </div>
 
-        {/* Quick Demo & Upload Buttons */}
+        {/* Quick Demo, Upload & Cancel/Clear Buttons */}
         <div className="flex items-center gap-2">
           {!photoUrl ? (
             <button
               onClick={loadDemoPhoto}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-amber-600" />
               <span>Use Demo Photo (Image 1)</span>
             </button>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Upload Different Photo</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload New</span>
+              </button>
+              <button
+                onClick={handleClearPhoto}
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                title="Remove photo from canvas and archive to Recent Documents"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Cancel / Clear</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -763,7 +901,85 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT COLUMN: CONTROLS & PHOTO ADJUSTMENTS (5 Cols) */}
           <div className="no-print lg:col-span-5 space-y-4">
-            {/* 1. PHOTO COUNT & AUTO-SHRINK CONTROLLER */}
+            {/* 1. PASSPORT STANDARD PRESET (35x45, 51x51, 30x40, 33x48) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-blue-600" />
+                  <span>Passport & Visa Standard</span>
+                </h4>
+                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                  {PASSPORT_STANDARDS[presetStandard].name}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(PASSPORT_STANDARDS) as PassportStandardKey[]).map((key) => {
+                  const std = PASSPORT_STANDARDS[key];
+                  const isSelected = presetStandard === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPresetStandard(key)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-400/40'
+                          : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{std.name}</div>
+                      <div className={`text-[10px] truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {std.country}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. PHOTO ROTATION & ORIENTATION CONTROLS */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <RotateCw className="w-4 h-4 text-indigo-600" />
+                  <span>Photo Orientation & Rotation</span>
+                </h4>
+                <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                  {rotation}°
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={rotateCcw}
+                  className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Rotate 90 degrees counter-clockwise"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
+                  <span>↺ 90° Left</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={rotateCw}
+                  className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Rotate 90 degrees clockwise"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-slate-600" />
+                  <span>↻ 90° Right</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={autoRotate}
+                  className="py-2.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Auto-detect portrait upright orientation"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Auto-Upright</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. PHOTO COUNT & AUTO-SHRINK CONTROLLER */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
@@ -1100,39 +1316,84 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
             {/* MAIN PREVIEW CONTAINER */}
             <div className="passport-preview-wrapper bg-slate-100 p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center min-h-[560px] overflow-auto">
               {activeTab === 'editor' ? (
-                /* TAB 1: CROP & FACE POSITIONING (Interactive Pan & Zoom) */
+                /* TAB 1: CROP & FACE POSITIONING (Interactive Pan & Zoom & Rotate) */
                 <div className="flex flex-col items-center justify-center space-y-3">
-                  <div className="text-xs text-slate-500 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-                    <Move className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Click and drag photo to align eyes & chin inside guidelines</span>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                      <Move className="w-3.5 h-3.5 text-cyan-600" />
+                      <span>Drag to pan • Preset: <strong className="text-slate-800">{PASSPORT_STANDARDS[presetStandard]?.name}</strong></span>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                      <button
+                        onClick={rotateCcw}
+                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 text-xs font-semibold flex items-center gap-1 transition-all"
+                        title="Rotate 90° Left"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="hidden sm:inline">↺ 90°</span>
+                      </button>
+                      <button
+                        onClick={rotateCw}
+                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 text-xs font-semibold flex items-center gap-1 transition-all"
+                        title="Rotate 90° Right"
+                      >
+                        <RotateCw className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="hidden sm:inline">↻ 90°</span>
+                      </button>
+                      <button
+                        onClick={autoRotate}
+                        className="px-2 py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                        title="Auto-orient to vertical portrait"
+                      >
+                        <span>Auto-Upright</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="relative shadow-2xl rounded-lg overflow-hidden border-2 border-cyan-500/50">
-                    <canvas
-                      ref={cropCanvasRef}
-                      onPointerDown={handlePointerDown}
-                      onPointerMove={handlePointerMove}
-                      onPointerUp={handlePointerUp}
-                      className="cursor-move touch-none block"
-                      style={{
-                        width: '280px',
-                        height: `${Math.round(280 * (45 / 35))}px`,
-                      }}
-                    />
+                  <div className="relative shadow-2xl rounded-lg overflow-hidden border-2 border-cyan-500/50 bg-white">
+                    {(() => {
+                      const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+                      const canvasW = 280;
+                      const canvasH = Math.round(canvasW * (std.heightMm / std.widthMm));
+                      return (
+                        <canvas
+                          ref={cropCanvasRef}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
+                          className="cursor-move touch-none block"
+                          style={{
+                            width: `${canvasW}px`,
+                            height: `${canvasH}px`,
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-3 pt-1">
                     <button
                       onClick={() => setPan({ x: 0, y: 0 })}
-                      className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200"
+                      className="text-xs px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm"
                     >
-                      Reset Position
+                      Reset Pan
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPan({ x: 0, y: 0 });
+                        setZoom(1.0);
+                        setRotation(0);
+                      }}
+                      className="text-xs px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm"
+                    >
+                      Reset All
                     </button>
                     <button
                       onClick={() => setActiveTab('sheet')}
-                      className="text-xs px-4 py-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg shadow"
+                      className="text-xs px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg shadow"
                     >
-                      View 4×6 Sheet Output →
+                      View Print Sheet Output →
                     </button>
                   </div>
                 </div>

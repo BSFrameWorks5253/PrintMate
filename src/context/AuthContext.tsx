@@ -20,6 +20,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<{ error: Error | null }>;
   loginWithEmail: (email: string, password?: string) => Promise<{ error: Error | null; message?: string }>;
   signUpWithEmail: (email: string, password: string, name?: string) => Promise<{ error: Error | null; message?: string }>;
+  loginAsDemo: (name?: string, email?: string) => void;
   logout: () => Promise<void>;
   isAuthModalOpen: boolean;
   authPromptReason: string | null;
@@ -94,12 +95,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ? mapUser(session.user) : null);
-      setIsLoading(false);
-      if (session) {
+      if (session?.user) {
+        setSession(session);
+        setUser(mapUser(session.user));
+        setIsLoading(false);
         setIsAuthModalOpen(false);
         sanitizeAuthHashFromUrl();
+      } else {
+        // Fallback: check for locally persisted user session
+        try {
+          const localUser = localStorage.getItem('printmate_local_user');
+          if (localUser) {
+            setUser(JSON.parse(localUser));
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
+        setSession(null);
+        setIsLoading(false);
       }
     });
 
@@ -107,10 +122,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ? mapUser(session.user) : null);
-      setIsLoading(false);
-      if (session) {
+      if (session?.user) {
+        setSession(session);
+        setUser(mapUser(session.user));
+        setIsLoading(false);
         setIsAuthModalOpen(false);
         sanitizeAuthHashFromUrl();
       }
@@ -220,9 +235,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthModalOpen(false);
         return { error: null, message: 'Account created and signed in successfully!' };
       } else {
+        if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+          return {
+            error: new Error('An account with this email already exists. Please switch to Sign In.'),
+          };
+        }
         return {
           error: null,
-          message: 'Account created! Please check your email to verify your address.',
+          message: 'Account created! Please check your email inbox to verify your address.',
         };
       }
     } catch (err: any) {
@@ -230,10 +250,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Instant Demo / Guest User Login
+  const loginAsDemo = (demoName?: string, demoEmail?: string) => {
+    const localUser: UserProfile = {
+      id: `user_${Date.now()}`,
+      name: demoName?.trim() || 'Verified User',
+      email: demoEmail?.trim() || 'user@printmate.studio',
+      provider: 'demo',
+      createdAt: Date.now(),
+    };
+    try {
+      localStorage.setItem('printmate_local_user', JSON.stringify(localUser));
+    } catch {
+      // ignore
+    }
+    setUser(localUser);
+    setIsAuthModalOpen(false);
+  };
+
   const logout = async () => {
     const supabase = getSupabase();
     if (supabase) {
       await supabase.auth.signOut();
+    }
+    try {
+      localStorage.removeItem('printmate_local_user');
+    } catch {
+      // ignore
     }
     setUser(null);
     setSession(null);
@@ -266,6 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithGoogle,
         loginWithEmail,
         signUpWithEmail,
+        loginAsDemo,
         logout,
         isAuthModalOpen,
         authPromptReason,

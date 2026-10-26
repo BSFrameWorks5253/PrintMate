@@ -40,8 +40,12 @@ const MainAppContent: React.FC = () => {
   const [externalImage, setExternalImage] = useState<string | null>(null);
   const [isRecentsOpen, setIsRecentsOpen] = useState<boolean>(false);
 
-  // Sync tab with browser URL history
+  // Sync tab with browser URL history and clear transient editor images when navigating between pages
   const setActiveTab = (tab: AppTab) => {
+    if (tab !== activeTab) {
+      setExternalImage(null);
+      userStorageService.clearDraft();
+    }
     setActiveTabState(tab);
     const targetPath = getPathFromTab(tab);
     if (window.location.pathname !== targetPath) {
@@ -109,21 +113,9 @@ const MainAppContent: React.FC = () => {
   // "users data shouldn't go to other users"
   const previousUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    // Initial mount check
+    // Initial mount check: do not resurrect old images on fresh visits (accessible via Recents)
     if (previousUserIdRef.current === undefined) {
       previousUserIdRef.current = user?.id || null;
-      const draft = userStorageService.getDraft();
-      if (draft) {
-        if (draft.queue && draft.queue.length > 0 && queue.length === 0) {
-          setQueue(draft.queue);
-        }
-        if (draft.scannerImage && !externalImage) {
-          setExternalImage(draft.scannerImage);
-        }
-        if (draft.activeTab) {
-          setActiveTab(draft.activeTab);
-        }
-      }
       return;
     }
 
