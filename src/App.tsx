@@ -30,7 +30,6 @@ const getTabFromPath = (pathname: string): AppTab => {
 };
 
 const getPathFromTab = (tab: AppTab): string => {
-  if (tab === 'home') return '/';
   return `/${tab}`;
 };
 
@@ -53,10 +52,40 @@ const MainAppContent: React.FC = () => {
   // Browser Back & Forward buttons navigation support
   useEffect(() => {
     const handlePopState = () => {
-      setActiveTabState(getTabFromPath(window.location.pathname));
+      const tab = getTabFromPath(window.location.pathname);
+      setActiveTabState(tab);
+      if (window.location.pathname === '/' || window.location.pathname === '') {
+        window.history.replaceState({ tab: 'home' }, '', '/home');
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Standardize URL to clean named paths (/home, /scanner, etc.) and strip ugly OAuth token hashes
+  useEffect(() => {
+    const cleanAndNormalizeUrl = () => {
+      const currentTab = getTabFromPath(window.location.pathname);
+      const targetPath = getPathFromTab(currentTab);
+      const hash = window.location.hash;
+
+      const hasOAuthHash =
+        hash &&
+        (hash.includes('access_token') ||
+          hash.includes('refresh_token') ||
+          hash.includes('token_type') ||
+          hash.includes('type=recovery') ||
+          hash.includes('type=signup') ||
+          hash.includes('error_description'));
+
+      if (window.location.pathname === '/' || window.location.pathname === '' || hasOAuthHash) {
+        window.history.replaceState({ tab: currentTab }, '', targetPath);
+      }
+    };
+
+    cleanAndNormalizeUrl();
+    const timer = setTimeout(cleanAndNormalizeUrl, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   // Automatically track page views and user sessions

@@ -59,6 +59,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  // Helper to immediately remove unsightly Supabase OAuth token fragments (#access_token=...) from the browser address bar
+  const sanitizeAuthHashFromUrl = () => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (
+      hash &&
+      (hash.includes('access_token') ||
+        hash.includes('refresh_token') ||
+        hash.includes('token_type') ||
+        hash.includes('error_description') ||
+        hash.includes('type=recovery') ||
+        hash.includes('type=signup'))
+    ) {
+      const rawPath = window.location.pathname;
+      const cleanPath = !rawPath || rawPath === '/' ? '/home' : rawPath;
+      const cleanSearch = window.location.search || '';
+      window.history.replaceState(null, document.title, `${cleanPath}${cleanSearch}`);
+    }
+  };
+
   // Listen to Supabase Auth State
   useEffect(() => {
     const supabase = getSupabase();
@@ -76,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
+      sanitizeAuthHashFromUrl();
     });
 
     // Realtime auth listener (OAuth redirects, tokens, signouts)
@@ -85,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
+      sanitizeAuthHashFromUrl();
     });
 
     return () => {
@@ -102,10 +124,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      const rawPath = window.location.pathname;
+      const currentPath = !rawPath || rawPath === '/' ? '/home' : rawPath;
+      const redirectTo = `${window.location.origin}${currentPath}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -143,10 +168,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: null };
       } else {
         // Passwordless Magic Link
+        const rawPath = window.location.pathname;
+        const currentPath = !rawPath || rawPath === '/' ? '/home' : rawPath;
         const { error } = await supabase.auth.signInWithOtp({
           email: email.trim(),
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${window.location.origin}${currentPath}`,
           },
         });
         if (error) throw error;
