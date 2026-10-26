@@ -16,8 +16,13 @@ import {
   Target, 
   Eye, 
   Plus, 
-  Layers 
+  Layers,
+  FileText,
+  CreditCard,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { userStorageService } from '../../services/userStorageService';
 import type { 
   Point, 
   DocumentTypeId, 
@@ -25,6 +30,8 @@ import type {
   PrintQueueItem 
 } from '../../types';
 import { DOCUMENT_TYPES } from '../../utils/constants';
+import { analytics } from '../../services/analyticsService';
+import { createSampleIdCard, createSamplePaperDocument } from '../../utils/sampleImages';
 import { 
   autoDetectDocumentCorners, 
   warpPerspectiveCrop, 
@@ -72,6 +79,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   externalImage,
   onClearExternalImage,
 }) => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   // Multi-image state
   const [cards, setCards] = useState<ScannedCardItem[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
@@ -709,6 +717,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     const canvas = currentCard.processedCanvas;
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
+    // Save to user's isolated recent documents
+    userStorageService.addRecent(user?.id, {
+      name: `${currentCard.name} (${currentCard.cardSide.toUpperCase()})`,
+      dataUrl,
+      docType: currentCard.docType,
+      source: 'scanner',
+      aspectRatio: canvas.width / canvas.height,
+    });
+
     onSendToPrint({
       dataUrl,
       name: `${currentCard.name} (${currentCard.cardSide.toUpperCase()})`,
@@ -737,11 +754,21 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       }
 
       if (canvas) {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         itemsToSend.push({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.95),
+          dataUrl,
           name: `${card.name} (${card.cardSide.toUpperCase()})`,
           docType: card.docType,
           cardSide: card.cardSide,
+          aspectRatio: canvas.width / canvas.height,
+        });
+
+        // Save to user's isolated recent documents
+        userStorageService.addRecent(user?.id, {
+          name: `${card.name} (${card.cardSide.toUpperCase()})`,
+          dataUrl,
+          docType: card.docType,
+          source: 'scanner',
           aspectRatio: canvas.width / canvas.height,
         });
       }
@@ -759,11 +786,40 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   // Direct download
   const handleDownload = () => {
+    if (!isAuthenticated) {
+      openAuthModal('download straightened document');
+      return;
+    }
     if (!currentCard?.processedCanvas) return;
     const link = document.createElement('a');
     link.download = `${currentCard.name}_${currentCard.cardSide}_straightened.jpg`;
     link.href = currentCard.processedCanvas.toDataURL('image/jpeg', 0.96);
     link.click();
+    analytics.trackDownload({
+      type: 'Straightened Document JPG',
+      fileName: currentCard.name,
+      page: 'scanner',
+    });
+  };
+
+  const loadSampleDirectly = (type: 'id_front' | 'id_back' | 'paper') => {
+    const dataUrl = type === 'id_front' 
+      ? createSampleIdCard('front') 
+      : type === 'id_back' 
+      ? createSampleIdCard('back') 
+      : createSamplePaperDocument();
+    const img = new Image();
+    img.onload = () => {
+      const side = type === 'id_front' ? 'front' : (type === 'id_back' ? 'back' : 'single');
+      const name = type === 'id_front' ? 'Sample_ID_Front.jpg' : (type === 'id_back' ? 'Sample_ID_Back.jpg' : 'Certificate_Paper.jpg');
+      const docType: DocumentTypeId = type === 'paper' ? 'paper_a4' : 'id_standard';
+      const card = createCardFromImage(img, name, side, docType);
+      setCards([card]);
+      setActiveCardIndex(0);
+      setAutoDetectNotice('Sample document loaded & borders detected');
+      setTimeout(() => setAutoDetectNotice(''), 2500);
+    };
+    img.src = dataUrl;
   };
 
   return (
@@ -776,6 +832,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         accept="image/*"
         multiple
         className="hidden"
+        style={{ display: 'none' }}
       />
       <input
         type="file"
@@ -784,39 +841,121 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         accept="image/*"
         multiple
         className="hidden"
+        style={{ display: 'none' }}
       />
 
       {/* If no images uploaded yet */}
       {cards.length === 0 ? (
-        <div 
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className="border-2 border-dashed border-slate-200 hover:border-cyan-500/60 bg-white/70 rounded-2xl p-10 sm:p-14 text-center transition-all cursor-pointer group shadow-xl"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <div className="w-16 h-16 rounded-2xl bg-cyan-50 text-cyan-600 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 border border-cyan-200 transition-all duration-300">
-            <Upload className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">
-            Upload ID Card or Document Images
-          </h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
-            Select 1 or both sides (Front & Back). Drag & drop here, click to browse, or paste with <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-700">Ctrl+V</kbd>.
-          </p>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 mb-6 transition-all">
-            <Plus className="w-4 h-4" />
-            <span>Select 1 or 2 Images (Front & Back)</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
-              Auto Rotated Border Detection
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
-              Front & Back 2-Card Support
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">
-              Uneven Floor Lighting Correction
-            </span>
+        <div className="max-w-4xl mx-auto my-6">
+          <div 
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-3xl p-8 sm:p-12 text-center transition-all shadow-xl hover:shadow-2xl relative overflow-hidden"
+          >
+            {/* Subtle radial glow */}
+            <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
+            <div className="relative z-10">
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/30 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+              >
+                <Upload className="w-10 h-10" />
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+                Upload ID Card or Document Images
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-6 leading-relaxed">
+                Take a photo from your phone at any angle. PrintMate automatically detects the 4 corners, deskews slanted perspective, and adjusts scale for flawless printing.
+              </p>
+
+              {/* Browse CTA Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl text-white text-sm font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-all cursor-pointer active:scale-95"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Browse Images from Computer</span>
+              </button>
+
+              <p className="text-[11px] text-slate-400 mt-3">
+                or drag & drop files here • paste with <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-slate-600">Ctrl+V</kbd>
+              </p>
+
+              {/* 1-Click Studio Samples Direct Launch */}
+              <div className="mt-8 pt-8 border-t border-slate-100">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+                  Or test immediately with 1-click studio samples
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); loadSampleDirectly('id_front'); }}
+                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-blue-50/60 hover:border-blue-300 text-left transition-all group cursor-pointer shadow-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-blue-100 text-blue-700 group-hover:scale-110 transition-transform">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 group-hover:text-blue-700">Slanted ID Front</div>
+                        <div className="text-[10px] text-slate-500">Angled on wooden desk</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); loadSampleDirectly('id_back'); }}
+                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-emerald-50/60 hover:border-emerald-300 text-left transition-all group cursor-pointer shadow-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 group-hover:scale-110 transition-transform">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">ID Back Side</div>
+                        <div className="text-[10px] text-slate-500">Barcode & details</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); loadSampleDirectly('paper'); }}
+                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-amber-50/60 hover:border-amber-300 text-left transition-all group cursor-pointer shadow-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-100 text-amber-700 group-hover:scale-110 transition-transform">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 group-hover:text-amber-700">Paper Document</div>
+                        <div className="text-[10px] text-slate-500">A4 Certificate sheet</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Feature Pills */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-6 text-[11px] text-slate-500">
+                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
+                  ✓ Auto-Crop & Perspective Deskew
+                </span>
+                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
+                  ✓ Front & Back 2-Card Batching
+                </span>
+                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
+                  ✓ CR80 ID & A4 Document Scale
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -1305,10 +1444,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   <button
                     onClick={handleDownload}
-                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center justify-center gap-1.5 transition-all"
-                    title="Download Single Image File"
+                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    title={isAuthenticated ? 'Download Single Image File' : 'Sign in required to download'}
                   >
-                    <Download className="w-4 h-4" />
+                    {!isAuthenticated ? (
+                      <Lock className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
                     <span>Download</span>
                   </button>
                 </div>
@@ -1345,9 +1488,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               <span>{currentCard.processedCanvas.width} × {currentCard.processedCanvas.height} px • High Resolution</span>
               <button
                 onClick={handleDownload}
-                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 flex items-center gap-1.5 cursor-pointer"
               >
-                Download Output
+                {!isAuthenticated ? <Lock className="w-3.5 h-3.5 text-amber-300" /> : <Download className="w-3.5 h-3.5" />}
+                <span>Download Output</span>
               </button>
             </div>
           </div>

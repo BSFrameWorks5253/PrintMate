@@ -22,7 +22,8 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string, name?: string) => Promise<{ error: Error | null; message?: string }>;
   logout: () => Promise<void>;
   isAuthModalOpen: boolean;
-  openAuthModal: () => void;
+  authPromptReason: string | null;
+  openAuthModal: (reason?: string) => void;
   closeAuthModal: () => void;
   saveCredentials: (url: string, key: string) => void;
   supabaseUrl: string;
@@ -36,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authPromptReason, setAuthPromptReason] = useState<string | null>(null);
   const [config, setConfig] = useState(getSupabaseConfig());
 
   // Helper to map Supabase User to UserProfile
@@ -212,8 +214,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setConfig(getSupabaseConfig());
   };
 
-  const openAuthModal = () => setIsAuthModalOpen(true);
-  const closeAuthModal = () => setIsAuthModalOpen(false);
+  const openAuthModal = (reason?: string) => {
+    setAuthPromptReason(reason || null);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setAuthPromptReason(null);
+    setIsAuthModalOpen(false);
+  };
 
   return (
     <AuthContext.Provider
@@ -228,6 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUpWithEmail,
         logout,
         isAuthModalOpen,
+        authPromptReason,
         openAuthModal,
         closeAuthModal,
         saveCredentials,

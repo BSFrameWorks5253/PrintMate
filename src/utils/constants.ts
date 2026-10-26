@@ -1,5 +1,18 @@
 import type { DocumentTypeOption, PageDimension } from '../types';
 
+export const AUTHORIZED_ADMIN_EMAILS = [
+  'bs.framework5253@gmail.com',
+  'bs.framework5252@gmail.com',
+];
+
+export const AUTHORIZED_ADMIN_EMAIL = 'bs.framework5253@gmail.com';
+
+export const isAuthorizedAdmin = (email?: string | null): boolean => {
+  if (!email) return false;
+  const cleanEmail = email.trim().toLowerCase();
+  return AUTHORIZED_ADMIN_EMAILS.some((admin) => admin.toLowerCase() === cleanEmail);
+};
+
 export const DOCUMENT_TYPES: DocumentTypeOption[] = [
   {
     id: 'id_standard',
@@ -75,8 +88,10 @@ export const DOCUMENT_TYPES: DocumentTypeOption[] = [
 
 export const PAGE_SIZES: PageDimension[] = [
   { id: 'a4', name: 'A4 Standard (210 × 297 mm)', widthMm: 210, heightMm: 297 },
-  { id: 'a3', name: 'A3 Large (297 × 420 mm)', widthMm: 297, heightMm: 420 },
+  { id: '4x6', name: '4 × 6 in Photo Paper (4R / 102 × 152 mm)', widthMm: 101.6, heightMm: 152.4 },
+  { id: '5x7', name: '5 × 7 in Photo Paper (5R / 127 × 178 mm)', widthMm: 127.0, heightMm: 177.8 },
   { id: 'letter', name: 'US Letter (8.5 × 11 in / 216 × 279 mm)', widthMm: 215.9, heightMm: 279.4 },
+  { id: 'a3', name: 'A3 Large (297 × 420 mm)', widthMm: 297, heightMm: 420 },
   { id: 'legal', name: 'US Legal (8.5 × 14 in / 216 × 356 mm)', widthMm: 215.9, heightMm: 355.6 },
 ];
 

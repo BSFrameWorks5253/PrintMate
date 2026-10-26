@@ -44,7 +44,7 @@ export interface PrintQueueItem {
   createdAt: number;
 }
 
-export type PageSizeId = 'a4' | 'a3' | 'letter' | 'legal';
+export type PageSizeId = 'a4' | 'a3' | 'letter' | 'legal' | '4x6' | '5x7';
 
 export interface PageDimension {
   id: PageSizeId;
@@ -82,4 +82,22 @@ export interface PrintSettings {
   customCols: number;
   customRows: number;
   duplexActivePage: 1 | 2;
+}
+
+export interface RecentImageItem {
+  id: string;
+  name: string;
+  dataUrl: string;
+  docType: DocumentTypeId;
+  source: 'scanner' | 'print' | 'passport';
+  aspectRatio: number;
+  createdAt: number;
+}
+
+export interface ActiveDraftState {
+  queue: PrintQueueItem[];
+  scannerImage: string | null;
+  passportPhotoUrl: string | null;
+  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin';
+  updatedAt: number;
 }

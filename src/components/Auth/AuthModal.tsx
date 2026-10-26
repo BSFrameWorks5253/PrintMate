@@ -25,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 export const AuthModal: React.FC = () => {
   const {
     isAuthModalOpen,
+    authPromptReason,
     closeAuthModal,
     loginWithGoogle,
     loginWithEmail,
@@ -39,6 +40,8 @@ export const AuthModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showSignUpRedirect, setShowSignUpRedirect] = useState(false);
+  const [showSignInRedirect, setShowSignInRedirect] = useState(false);
 
   // Close on Escape key
   useEffect(() => {
@@ -58,6 +61,8 @@ export const AuthModal: React.FC = () => {
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    setShowSignUpRedirect(false);
+    setShowSignInRedirect(false);
     const { error } = await loginWithGoogle();
     setLoading(false);
     if (error) {
@@ -75,6 +80,8 @@ export const AuthModal: React.FC = () => {
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    setShowSignUpRedirect(false);
+    setShowSignInRedirect(false);
 
     if (mode === 'magiclink') {
       const res = await loginWithEmail(email);
@@ -91,7 +98,17 @@ export const AuthModal: React.FC = () => {
       const res = await loginWithEmail(email, password);
       setLoading(false);
       if (res.error) {
-        setErrorMessage(res.error.message);
+        const rawErr = (res.error.message || '').toLowerCase();
+        if (
+          rawErr.includes('invalid login credentials') ||
+          rawErr.includes('user not found') ||
+          rawErr.includes('invalid credential')
+        ) {
+          setErrorMessage("User doesn't exist with this email or password is invalid. Please sign up to create your account.");
+          setShowSignUpRedirect(true);
+        } else {
+          setErrorMessage(res.error.message);
+        }
       } else if (res.message) {
         setSuccessMessage(res.message);
       }
@@ -104,7 +121,13 @@ export const AuthModal: React.FC = () => {
       const res = await signUpWithEmail(email, password, name);
       setLoading(false);
       if (res.error) {
-        setErrorMessage(res.error.message);
+        const rawErr = (res.error.message || '').toLowerCase();
+        if (rawErr.includes('already registered') || rawErr.includes('already exists')) {
+          setErrorMessage('An account with this email already exists. Please sign in instead.');
+          setShowSignInRedirect(true);
+        } else {
+          setErrorMessage(res.error.message);
+        }
       } else if (res.message) {
         setSuccessMessage(res.message);
       }
@@ -115,6 +138,8 @@ export const AuthModal: React.FC = () => {
     setMode(newMode);
     setErrorMessage('');
     setSuccessMessage('');
+    setShowSignUpRedirect(false);
+    setShowSignInRedirect(false);
   };
 
   // Password strength helper
@@ -237,6 +262,19 @@ export const AuthModal: React.FC = () => {
         {/* Right Side: Interactive Authentication Form */}
         <div className="md:w-7/12 p-8 md:p-10 flex flex-col justify-between bg-white overflow-y-auto max-h-[85vh] md:max-h-none">
           <div>
+            {/* Contextual Lock Prompt Callout */}
+            {authPromptReason && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in">
+                <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-slate-900">Sign in required to {authPromptReason}</div>
+                  <div className="text-[11px] text-slate-600 mt-0.5">
+                    Your current work-in-progress and print queue are securely preserved and will be waiting for you right when you sign in!
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Segmented Mode Selector Switch */}
             <div className="p-1 bg-slate-100 rounded-2xl flex border border-slate-200/80 mb-6">
               <button
@@ -287,6 +325,50 @@ export const AuthModal: React.FC = () => {
               </div>
             )}
 
+            {/* User Doesn't Exist -> Prompt to Sign Up */}
+            {showSignUpRedirect && (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-900 text-xs flex flex-col gap-2.5 shadow-sm animate-in fade-in">
+                <div className="flex items-center gap-2 font-bold text-slate-900">
+                  <UserPlus className="w-4 h-4 text-amber-600" />
+                  <span>Account not found — Create your account</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  No registered account was found with <strong>{email}</strong>. Would you like to create a free account right now?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer hover:shadow-md"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Switch to Sign Up (Pre-fill {email})</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Account Already Exists -> Prompt to Sign In */}
+            {showSignInRedirect && (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-900 text-xs flex flex-col gap-2.5 shadow-sm animate-in fade-in">
+                <div className="flex items-center gap-2 font-bold text-slate-900">
+                  <LogIn className="w-4 h-4 text-blue-600" />
+                  <span>Existing account found</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  An account is already registered with <strong>{email}</strong>. Please sign in with your password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer hover:shadow-md"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Switch to Sign In</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {successMessage && (
               <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
@@ -322,8 +404,35 @@ export const AuthModal: React.FC = () => {
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                     />
                   </svg>
-                  <span>Continue with Google</span>
+                  <span>{mode === 'signin' ? 'Sign In with Google' : 'Sign Up with Google'}</span>
                 </button>
+
+                {/* Subtitle Hint */}
+                <div className="text-center mt-2">
+                  {mode === 'signin' ? (
+                    <span className="text-[11px] text-slate-500">
+                      New to PrintMate?{' '}
+                      <button
+                        type="button"
+                        onClick={() => switchMode('signup')}
+                        className="text-blue-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Sign up with Google here
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-slate-500">
+                      Already registered?{' '}
+                      <button
+                        type="button"
+                        onClick={() => switchMode('signin')}
+                        className="text-blue-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Sign in with Google here
+                      </button>
+                    </span>
+                  )}
+                </div>
 
                 {/* Divider */}
                 <div className="relative flex items-center justify-center my-5">

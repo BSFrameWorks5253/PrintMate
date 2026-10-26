@@ -12,14 +12,26 @@ import {
   ZoomOut, 
   Sliders, 
   Upload,
-  RotateCw
+  RotateCw,
+  Lock,
+  Clock,
+  Check,
+  Grid2X2,
+  Rows2,
+  Columns2,
+  LayoutGrid,
+  Maximize2,
+  FileText
 } from 'lucide-react';
 import type { 
   PrintQueueItem, 
   PrintSettings, 
-  PrintLayoutType 
+  PrintLayoutType,
+  PageSizeId
 } from '../../types';
 import { PAGE_SIZES, PRINT_LAYOUT_OPTIONS } from '../../utils/constants';
+import { analytics } from '../../services/analyticsService';
+import { useAuth } from '../../context/AuthContext';
 import './PrintStudio.css';
 
 interface PrintStudioViewProps {
@@ -30,6 +42,7 @@ interface PrintStudioViewProps {
   onDuplicateItem: (id: string) => void;
   onRotateItem?: (id: string) => void;
   onNavigateToScanner: () => void;
+  onOpenRecents?: () => void;
 }
 
 export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
@@ -40,7 +53,9 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   onDuplicateItem,
   onRotateItem,
   onNavigateToScanner,
+  onOpenRecents,
 }) => {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [settings, setSettings] = useState<PrintSettings>({
     pageSize: 'a4',
     orientation: 'portrait',
@@ -51,7 +66,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
     marginMm: 12,
     spacingMm: 8,
     copies: 1,
-    alignment: 'center',
+    alignment: 'top_center',
     customCols: 2,
     customRows: 2,
     duplexActivePage: 1,
@@ -60,6 +75,42 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const [previewZoom, setPreviewZoom] = useState<number>(100);
   const [slotOverrides, setSlotOverrides] = useState<Record<number, string>>({});
   const [activeSlotModal, setActiveSlotModal] = useState<number | null>(null);
+  const [layoutCategory, setLayoutCategory] = useState<'id_duo' | 'multi' | 'single' | 'all'>('id_duo');
+
+  const filteredLayouts = PRINT_LAYOUT_OPTIONS.filter((l) => {
+    if (layoutCategory === 'all') return true;
+    if (layoutCategory === 'id_duo') return l.category === 'id_duo' || l.category === 'id_special';
+    if (layoutCategory === 'multi') return l.category === 'multi';
+    if (layoutCategory === 'single') return l.category === 'single';
+    return true;
+  });
+
+  const getLayoutIcon = (id: string) => {
+    switch (id) {
+      case '2_vertical':
+        return <Rows2 className="w-4 h-4 text-blue-600" />;
+      case '2_horizontal':
+        return <Columns2 className="w-4 h-4 text-indigo-600" />;
+      case 'front_back_fold':
+        return <Scissors className="w-4 h-4 text-emerald-600" />;
+      case 'front_back_duplex':
+        return <Printer className="w-4 h-4 text-purple-600" />;
+      case '1_real_size':
+        return <Maximize2 className="w-4 h-4 text-blue-600" />;
+      case '1_fit':
+        return <FileText className="w-4 h-4 text-slate-600" />;
+      case '4_grid':
+        return <Grid2X2 className="w-4 h-4 text-amber-600" />;
+      case '6_grid':
+      case '8_grid':
+      case '9_grid':
+        return <LayoutGrid className="w-4 h-4 text-teal-600" />;
+      case 'custom_grid':
+        return <Sliders className="w-4 h-4 text-pink-600" />;
+      default:
+        return <Layers className="w-4 h-4 text-blue-600" />;
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const printSheetRef = useRef<HTMLDivElement | null>(null);
@@ -69,8 +120,40 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const pageWidthMm = isLandscape ? selectedPageDef.heightMm : selectedPageDef.widthMm;
   const pageHeightMm = isLandscape ? selectedPageDef.widthMm : selectedPageDef.heightMm;
 
+  // Dynamic CSS @page size calculator adhering strictly to CSS Paged Media Module Level 3
+  // This commands the browser/printer print dialog to preselect the exact matching paper tray & orientation!
+  const getPrintPageSizeRule = (pageId: PageSizeId, orientation: 'portrait' | 'landscape') => {
+    switch (pageId) {
+      case 'a4':
+        return `A4 ${orientation}`;
+      case 'a3':
+        return `A3 ${orientation}`;
+      case 'letter':
+        return `letter ${orientation}`;
+      case 'legal':
+        return `legal ${orientation}`;
+      case '4x6':
+        return orientation === 'landscape' ? '6in 4in' : '4in 6in';
+      case '5x7':
+        return orientation === 'landscape' ? '7in 5in' : '5in 7in';
+      default:
+        return orientation === 'landscape'
+          ? `${Math.max(pageWidthMm, pageHeightMm)}mm ${Math.min(pageWidthMm, pageHeightMm)}mm`
+          : `${Math.min(pageWidthMm, pageHeightMm)}mm ${Math.max(pageWidthMm, pageHeightMm)}mm`;
+    }
+  };
+
   // Handle printing (Clean paper print without confetti interference)
   const handlePrint = () => {
+    if (!isAuthenticated) {
+      openAuthModal('print documents');
+      return;
+    }
+    analytics.trackPrint({
+      pageSize: settings.pageSize,
+      itemCount: queue.length,
+      page: 'print',
+    });
     window.print();
   };
 
@@ -187,6 +270,10 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
   // Download high-resolution sheet with ONLY the pure edited images
   const handleDownloadSheet = () => {
+    if (!isAuthenticated) {
+      openAuthModal('download high-resolution sheets');
+      return;
+    }
     const scale = 3.5;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(pageWidthMm * scale * 3.7795); // 1mm = ~3.7795px at 96dpi
@@ -280,6 +367,10 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
       link.download = `PrintMate_${settings.pageSize.toUpperCase()}_Clean_Output.jpg`;
       link.href = canvas.toDataURL('image/jpeg', 0.98);
       link.click();
+      analytics.trackDownload({
+        type: `Clean Sheet (${settings.pageSize.toUpperCase()})`,
+        page: 'print',
+      });
     });
   };
 
@@ -293,6 +384,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
         accept="image/*"
         multiple
         className="hidden"
+        style={{ display: 'none' }}
       />
 
       {/* If queue is empty */}
@@ -308,18 +400,28 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={onNavigateToScanner}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30 inline-flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30 inline-flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Go to Scan & Straighten</span>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-cyan-700 font-semibold text-sm border border-cyan-200 inline-flex items-center gap-2"
+              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-cyan-700 font-semibold text-sm border border-cyan-200 inline-flex items-center gap-2 cursor-pointer"
             >
               <Upload className="w-4 h-4" />
               <span>Upload Image Directly</span>
             </button>
+            {onOpenRecents && (
+              <button
+                type="button"
+                onClick={onOpenRecents}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm border border-slate-200 inline-flex items-center gap-2 cursor-pointer"
+              >
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span>Pick from Recents</span>
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -379,65 +481,111 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
               </div>
             </div>
 
-            {/* 2. BACK & FORTH (2-SIDED PRINT) OPTIONS */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-400" />
-                <span>Back & Forth (2-Sided Options)</span>
-              </h4>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setSettings((s) => ({ ...s, layout: 'front_back_duplex' }))}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    settings.layout === 'front_back_duplex'
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-400'
-                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  <div className="text-xs font-bold flex items-center gap-1.5">
-                    <Printer className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Duplex 2-Sided</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-1">
-                    Exact mirrored coordinate back-to-back
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setSettings((s) => ({ ...s, layout: 'front_back_fold' }))}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    settings.layout === 'front_back_fold'
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-400'
-                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  <div className="text-xs font-bold flex items-center gap-1.5">
-                    <Scissors className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Fold & Laminate</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-1">
-                    Side-by-side to fold in half for pouch
-                  </div>
-                </button>
+            {/* 2. MULTI-UP SHEET LAYOUTS & DUO OPTIONS */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-blue-600" />
+                  <span>Multi-Up Sheet Layouts</span>
+                </h4>
+                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                  {PRINT_LAYOUT_OPTIONS.find((l) => l.id === settings.layout)?.name.split('(')[0].trim() || 'Selected'}
+                </span>
               </div>
 
+              {/* Category Filter Tabs */}
+              <div className="grid grid-cols-4 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-semibold gap-1">
+                {[
+                  { id: 'id_duo', label: '🪪 ID Duo' },
+                  { id: 'multi', label: '📑 Grids' },
+                  { id: 'single', label: '📄 Single' },
+                  { id: 'all', label: 'All (13)' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setLayoutCategory(cat.id as any)}
+                    className={`py-1.5 px-2 rounded-lg text-center transition-all truncate cursor-pointer ${
+                      layoutCategory === cat.id
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Layout Selection Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                {filteredLayouts.map((layout) => {
+                  const isSelected = settings.layout === layout.id;
+                  return (
+                    <button
+                      key={layout.id}
+                      type="button"
+                      onClick={() => setSettings((prev) => ({ ...prev, layout: layout.id as PrintLayoutType }))}
+                      className={`text-left p-2.5 rounded-xl transition-all border flex items-start gap-2.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-blue-600 text-slate-900 shadow-sm ring-2 ring-blue-500/20'
+                          : 'bg-slate-50/70 border-slate-200 text-slate-800 hover:bg-slate-100/90 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
+                        isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200'
+                      }`}>
+                        {isSelected ? <Check className="w-4 h-4 text-white" /> : getLayoutIcon(layout.id)}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
+                            {layout.name.split('(')[0].trim()}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                            isSelected ? 'bg-blue-200 text-blue-900' : 'bg-slate-200/70 text-slate-600'
+                          }`}>
+                            {layout.slots} slot{layout.slots === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5 line-clamp-2">
+                          {layout.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Duplex Preview Side Switcher if duplex layout is selected */}
               {settings.layout === 'front_back_duplex' && (
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                  <span className="text-slate-500 font-medium">Duplex Preview Side:</span>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/70 border border-purple-200 text-xs animate-in fade-in">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-purple-950 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Duplex 2-Sided Preview</span>
+                    </span>
+                    <p className="text-[10px] text-purple-700">Preview front or back coordinate sheet</p>
+                  </div>
                   <div className="flex items-center gap-1">
                     <button
+                      type="button"
                       onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 1 }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                        settings.duplexActivePage === 1 ? 'bg-cyan-500 text-black' : 'bg-slate-100 text-slate-500'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        settings.duplexActivePage === 1 
+                          ? 'bg-purple-600 text-white shadow-sm' 
+                          : 'bg-white border border-purple-200 text-purple-800 hover:bg-purple-100'
                       }`}
                     >
                       Page 1 (Front)
                     </button>
                     <button
+                      type="button"
                       onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 2 }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                        settings.duplexActivePage === 2 ? 'bg-cyan-500 text-black' : 'bg-slate-100 text-slate-500'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        settings.duplexActivePage === 2 
+                          ? 'bg-purple-600 text-white shadow-sm' 
+                          : 'bg-white border border-purple-200 text-purple-800 hover:bg-purple-100'
                       }`}
                     >
                       Page 2 (Back)
@@ -445,67 +593,67 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* 3. MULTI-UP LAYOUT PRESETS */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-indigo-400" />
-                <span>Multi-Up Sheet Layouts</span>
-              </h4>
-
-              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                {PRINT_LAYOUT_OPTIONS.map((layout) => (
-                  <button
-                    key={layout.id}
-                    onClick={() => setSettings((prev) => ({ ...prev, layout: layout.id as PrintLayoutType }))}
-                    className={`text-left p-2.5 rounded-xl transition-all border flex items-center justify-between ${
-                      settings.layout === layout.id
-                        ? 'bg-blue-600/15 border-blue-500 text-white font-medium shadow-sm ring-1 ring-blue-500/50'
-                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-semibold">{layout.name}</div>
-                      <div className="text-[10px] text-slate-500 truncate">{layout.description}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {/* Fold & Laminate helper tip if active */}
+              {settings.layout === 'front_back_fold' && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                  <Scissors className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Images aligned with center fold line for standard ID lamination pouches.</span>
+                </div>
+              )}
 
               {/* Custom Grid Controls if custom_grid selected */}
               {settings.layout === 'custom_grid' && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <div className="p-3.5 bg-gradient-to-br from-slate-50 to-blue-50/40 rounded-xl border border-blue-200 space-y-2.5 text-xs animate-in fade-in">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Columns:</span>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4].map((col) => (
-                        <button
-                          key={col}
-                          onClick={() => setSettings((s) => ({ ...s, customCols: col }))}
-                          className={`w-7 h-7 rounded-lg font-bold ${
-                            settings.customCols === col ? 'bg-cyan-500 text-black' : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {col}
-                        </button>
-                      ))}
-                    </div>
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Grid2X2 className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Custom Grid Dimensions</span>
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      {settings.customCols} × {settings.customRows} ({settings.customCols * settings.customRows} total slots)
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Rows:</span>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4].map((row) => (
-                        <button
-                          key={row}
-                          onClick={() => setSettings((s) => ({ ...s, customRows: row }))}
-                          className={`w-7 h-7 rounded-lg font-bold ${
-                            settings.customRows === row ? 'bg-cyan-500 text-black' : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {row}
-                        </button>
-                      ))}
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-semibold">Columns:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[1, 2, 3, 4].map((col) => (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => setSettings((s) => ({ ...s, customCols: col }))}
+                            className={`w-7 h-7 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                              settings.customCols === col 
+                                ? 'bg-blue-600 text-white shadow-xs' 
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {col}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-semibold">Rows:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[1, 2, 3, 4].map((row) => (
+                          <button
+                            key={row}
+                            type="button"
+                            onClick={() => setSettings((s) => ({ ...s, customRows: row }))}
+                            className={`w-7 h-7 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                              settings.customRows === row 
+                                ? 'bg-blue-600 text-white shadow-xs' 
+                                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {row}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -548,6 +696,29 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     }`}
                   >
                     Landscape
+                  </button>
+                </div>
+              </div>
+
+              {/* Sheet Placement Alignment */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 border border-slate-200">
+                <span className="text-xs font-semibold text-slate-700">Placement:</span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setSettings((s) => ({ ...s, alignment: 'top_center' }))}
+                    className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                      settings.alignment === 'top_center' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Top (Save Paper)
+                  </button>
+                  <button
+                    onClick={() => setSettings((s) => ({ ...s, alignment: 'center' }))}
+                    className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-all ${
+                      settings.alignment === 'center' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Center
                   </button>
                 </div>
               </div>
@@ -612,16 +783,27 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <span>Queue Items ({queue.length})</span>
                 </h4>
                 <div className="flex items-center gap-2">
+                  {onOpenRecents && (
+                    <button
+                      type="button"
+                      onClick={onOpenRecents}
+                      className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1 cursor-pointer"
+                      title="Load image from your recent documents"
+                    >
+                      <Clock className="w-3 h-3" />
+                      <span>Recents</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-[10px] text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+                    className="text-[10px] text-cyan-600 hover:text-cyan-700 flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Add</span>
                   </button>
                   <button
                     onClick={onClearQueue}
-                    className="text-[10px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                    className="text-[10px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>Clear All</span>
@@ -732,18 +914,27 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
                 <button
                   onClick={handleDownloadSheet}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center gap-1.5 transition-all"
-                  title="Download clean printable high-res image"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center gap-1.5 transition-all cursor-pointer"
+                  title={isAuthenticated ? 'Download clean printable high-res image' : 'Sign in required to download'}
                 >
-                  <Download className="w-4 h-4" />
+                  {!isAuthenticated ? (
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
                   <span>Download Clean Sheet</span>
                 </button>
 
                 <button
                   onClick={handlePrint}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-sm font-semibold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all transform active:scale-98"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-sm font-semibold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all transform active:scale-98 cursor-pointer"
+                  title={isAuthenticated ? 'Print clean paper page' : 'Sign in required to print'}
                 >
-                  <Printer className="w-4 h-4" />
+                  {!isAuthenticated ? (
+                    <Lock className="w-4 h-4 text-amber-300" />
+                  ) : (
+                    <Printer className="w-4 h-4" />
+                  )}
                   <span>Print Page</span>
                 </button>
               </div>
@@ -751,6 +942,16 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
             {/* PHYSICAL PAPER SHEET PREVIEW (Zoomable / Scaled to fit container) */}
             <div className="print-page-wrapper bg-slate-100 p-4 sm:p-8 rounded-2xl border border-slate-200 flex justify-center items-center overflow-auto min-h-[580px]">
+              {/* Dynamic print-media page size injection */}
+              <style>{`
+                @media print {
+                  @page {
+                    size: ${getPrintPageSizeRule(selectedPageDef.id, settings.orientation)};
+                    margin: 0 !important;
+                  }
+                }
+              `}</style>
+
               {/* This DIV is what gets printed directly via @media print!
                   CRITICAL: All UI labels, slot badges, scissors icons, and guides HAVE 'no-print'
                   so ONLY the pure images appear on the paper! */}
@@ -760,6 +961,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 style={{
                   '--print-sheet-width': `${pageWidthMm}mm`,
                   '--print-sheet-height': `${pageHeightMm}mm`,
+                  '--print-sheet-padding': `${settings.marginMm}mm`,
                   width: `${pageWidthMm}mm`,
                   maxWidth: `${(isLandscape ? 680 : 480) * (previewZoom / 100)}px`,
                   aspectRatio: `${pageWidthMm} / ${pageHeightMm}`,
@@ -777,21 +979,28 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
                     {(() => {
                       const activeItem = getImageForSlot(settings.duplexActivePage === 1 ? 0 : 1) || getImageForSlot(0);
+                      if (!activeItem) return null;
                       const isItemPortrait = activeItem && activeItem.aspectRatio < 1;
+                      const screenW = isItemPortrait ? '164px' : '280px';
+                      const printW = isItemPortrait ? '53.98mm' : '85.6mm';
+                      const printH = isItemPortrait ? '85.6mm' : '53.98mm';
+
                       return (
                         <div
-                          className="relative group flex items-center justify-center"
+                          className="card-exact-id-slot relative group flex items-center justify-center"
                           style={{
-                            width: settings.scaleMode === 'exact_id' ? (isItemPortrait ? '164px' : '280px') : '90%',
-                            aspectRatio: activeItem?.aspectRatio || 85.6 / 53.98,
-                          }}
+                            width: settings.scaleMode === 'exact_id' ? screenW : '90%',
+                            aspectRatio: activeItem.aspectRatio || 85.6 / 53.98,
+                            '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '90%',
+                            '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                          } as React.CSSProperties}
                         >
                           <img
-                            src={activeItem?.dataUrl}
+                            src={activeItem.dataUrl}
                             alt="Duplex Card"
-                            className="w-full h-full object-contain block rounded-none"
+                            className="card-exact-id w-full h-full object-contain block rounded-none"
                           />
-                          {activeItem && onRotateItem && (
+                          {onRotateItem && (
                             <div 
                               className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                               onClick={(e) => e.stopPropagation()}
@@ -817,21 +1026,28 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       {/* Left: Front Card */}
                       {(() => {
                         const frontItem = getImageForSlot(0);
+                        if (!frontItem) return null;
                         const isFrontPortrait = frontItem && frontItem.aspectRatio < 1;
+                        const screenW = isFrontPortrait ? '140px' : '210px';
+                        const printW = isFrontPortrait ? '53.98mm' : '85.6mm';
+                        const printH = isFrontPortrait ? '85.6mm' : '53.98mm';
+
                         return (
                           <div
-                            className="relative group flex items-center justify-center"
+                            className="card-exact-id-slot relative group flex items-center justify-center"
                             style={{
-                              width: settings.scaleMode === 'exact_id' ? (isFrontPortrait ? '140px' : '210px') : '45%',
-                              aspectRatio: frontItem?.aspectRatio || 85.6 / 53.98,
-                            }}
+                              width: settings.scaleMode === 'exact_id' ? screenW : '45%',
+                              aspectRatio: frontItem.aspectRatio || 85.6 / 53.98,
+                              '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '45%',
+                              '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                            } as React.CSSProperties}
                           >
                             <img
-                              src={frontItem?.dataUrl}
+                              src={frontItem.dataUrl}
                               alt="Front"
-                              className="w-full h-full object-contain block rounded-none"
+                              className="card-exact-id w-full h-full object-contain block rounded-none"
                             />
-                            {frontItem && onRotateItem && (
+                            {onRotateItem && (
                               <div 
                                 className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                                 onClick={(e) => e.stopPropagation()}
@@ -860,21 +1076,28 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       {/* Right: Back Card */}
                       {(() => {
                         const backItem = getImageForSlot(1);
+                        if (!backItem) return null;
                         const isBackPortrait = backItem && backItem.aspectRatio < 1;
+                        const screenW = isBackPortrait ? '140px' : '210px';
+                        const printW = isBackPortrait ? '53.98mm' : '85.6mm';
+                        const printH = isBackPortrait ? '85.6mm' : '53.98mm';
+
                         return (
                           <div
-                            className="relative group flex items-center justify-center"
+                            className="card-exact-id-slot relative group flex items-center justify-center"
                             style={{
-                              width: settings.scaleMode === 'exact_id' ? (isBackPortrait ? '140px' : '210px') : '45%',
-                              aspectRatio: backItem?.aspectRatio || 85.6 / 53.98,
-                            }}
+                              width: settings.scaleMode === 'exact_id' ? screenW : '45%',
+                              aspectRatio: backItem.aspectRatio || 85.6 / 53.98,
+                              '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '45%',
+                              '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                            } as React.CSSProperties}
                           >
                             <img
-                              src={backItem?.dataUrl}
+                              src={backItem.dataUrl}
                               alt="Back"
-                              className="w-full h-full object-contain block rounded-none"
+                              className="card-exact-id w-full h-full object-contain block rounded-none"
                             />
-                            {backItem && onRotateItem && (
+                            {onRotateItem && (
                               <div 
                                 className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                                 onClick={(e) => e.stopPropagation()}
@@ -899,42 +1122,43 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <div 
                     className="h-full flex flex-col items-center"
                     style={{
-                      justifyContent: settings.alignment === 'top_center' || settings.alignment === 'top_left' ? 'flex-start' : 'space-around',
-                      gap: `${settings.spacingMm * 1.5}px`,
-                      padding: `${settings.spacingMm}px 0`,
+                      justifyContent: settings.alignment === 'center' ? 'center' : 'flex-start',
+                      gap: `${settings.spacingMm}mm`,
+                      padding: `${settings.spacingMm}mm 0`,
                     }}
                   >
                     {[0, 1].map((slotIdx) => {
                       const item = getImageForSlot(slotIdx);
+                      if (!item) return null;
                       const isItemPortrait = item && item.aspectRatio < 1;
+                      const screenW = isItemPortrait ? '164px' : '260px';
+                      const printW = isItemPortrait ? '53.98mm' : '85.6mm';
+                      const printH = isItemPortrait ? '85.6mm' : '53.98mm';
+
                       return (
                         <div
                           key={slotIdx}
                           onClick={() => setActiveSlotModal(slotIdx)}
-                          className="relative cursor-pointer group flex items-center justify-center"
+                          className="card-exact-id-slot relative cursor-pointer group flex items-center justify-center"
                           style={{
-                            width: settings.scaleMode === 'exact_id' ? (isItemPortrait ? '164px' : '260px') : '88%',
-                            aspectRatio: item?.aspectRatio || 85.6 / 53.98,
-                          }}
+                            width: settings.scaleMode === 'exact_id' ? screenW : '88%',
+                            aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                            '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '88%',
+                            '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                          } as React.CSSProperties}
                         >
-                          {item ? (
-                            <img
-                              src={item.dataUrl}
-                              alt={`Slot ${slotIdx + 1}`}
-                              className="w-full h-full object-contain block rounded-none"
-                            />
-                          ) : (
-                            <div className="w-full h-full border border-dashed border-slate-300 flex items-center justify-center text-slate-500 text-xs no-print">
-                              Empty Slot (Click to Assign)
-                            </div>
-                          )}
+                          <img
+                            src={item.dataUrl}
+                            alt={`Slot ${slotIdx + 1}`}
+                            className="card-exact-id w-full h-full object-contain block rounded-none"
+                          />
 
                           {/* Screen-only hover actions */}
                           <div 
                             className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {item && onRotateItem && (
+                            {onRotateItem && (
                               <button
                                 onClick={() => onRotateItem(item.id)}
                                 className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 shadow"
@@ -960,39 +1184,40 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   /* 4. LAYOUT: 2 IMAGES HORIZONTAL (SIDE BY SIDE) */
                   <div 
                     className="h-full flex items-center justify-center"
-                    style={{ gap: `${settings.spacingMm * 1.5}px` }}
+                    style={{ gap: `${settings.spacingMm}mm` }}
                   >
                     {[0, 1].map((slotIdx) => {
                       const item = getImageForSlot(slotIdx);
+                      if (!item) return null;
                       const isItemPortrait = item && item.aspectRatio < 1;
+                      const screenW = isItemPortrait ? '150px' : '210px';
+                      const printW = isItemPortrait ? '53.98mm' : '85.6mm';
+                      const printH = isItemPortrait ? '85.6mm' : '53.98mm';
+
                       return (
                         <div
                           key={slotIdx}
                           onClick={() => setActiveSlotModal(slotIdx)}
-                          className="relative cursor-pointer group flex items-center justify-center"
+                          className="card-exact-id-slot relative cursor-pointer group flex items-center justify-center"
                           style={{
-                            width: settings.scaleMode === 'exact_id' ? (isItemPortrait ? '150px' : '210px') : '47%',
-                            aspectRatio: item?.aspectRatio || 85.6 / 53.98,
-                          }}
+                            width: settings.scaleMode === 'exact_id' ? screenW : '47%',
+                            aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                            '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '47%',
+                            '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                          } as React.CSSProperties}
                         >
-                          {item ? (
-                            <img
-                              src={item.dataUrl}
-                              alt={`Slot ${slotIdx + 1}`}
-                              className="w-full h-full object-contain block rounded-none"
-                            />
-                          ) : (
-                            <div className="w-full h-full border border-dashed border-slate-300 flex items-center justify-center text-slate-500 text-xs no-print">
-                              Empty Slot
-                            </div>
-                          )}
+                          <img
+                            src={item.dataUrl}
+                            alt={`Slot ${slotIdx + 1}`}
+                            className="card-exact-id w-full h-full object-contain block rounded-none"
+                          />
 
                           {/* Screen-only hover actions */}
                           <div 
                             className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {item && onRotateItem && (
+                            {onRotateItem && (
                               <button
                                 onClick={() => onRotateItem(item.id)}
                                 className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 shadow"
@@ -1017,21 +1242,35 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 ) : settings.layout === '1_fit' || settings.layout === '1_real_size' ? (
                   /* 5. LAYOUT: 1 IMAGE */
                   <div className="h-full flex items-center justify-center">
-                    <div
-                      className="relative"
-                      style={{
-                        width: settings.layout === '1_real_size' ? '280px' : '96%',
-                        aspectRatio: getImageForSlot(0)?.aspectRatio || 85.6 / 53.98,
-                      }}
-                    >
-                      {getImageForSlot(0) && (
-                        <img
-                          src={getImageForSlot(0)?.dataUrl}
-                          alt="Single"
-                          className="w-full h-full object-contain block rounded-none"
-                        />
-                      )}
-                    </div>
+                    {(() => {
+                      const item = getImageForSlot(0);
+                      if (!item) return null;
+                      const isItemPortrait = item.aspectRatio < 1;
+                      const isRealSize = settings.layout === '1_real_size';
+                      const screenW = isItemPortrait ? '176px' : '280px';
+                      const printW = isItemPortrait ? '53.98mm' : '85.6mm';
+                      const printH = isItemPortrait ? '85.6mm' : '53.98mm';
+
+                      return (
+                        <div
+                          className={isRealSize ? "card-exact-id-slot relative" : "relative"}
+                          style={{
+                            width: isRealSize ? screenW : '96%',
+                            aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                            ...(isRealSize ? {
+                              '--card-print-w': printW,
+                              '--card-print-h': printH,
+                            } : {}),
+                          } as React.CSSProperties}
+                        >
+                          <img
+                            src={item.dataUrl}
+                            alt="Single"
+                            className="card-exact-id w-full h-full object-contain block rounded-none"
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   /* 6. LAYOUT: MULTI-GRID (3, 4, 6, 8, 9 OR CUSTOM) */
@@ -1050,6 +1289,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       >
                         {Array.from({ length: slotCount }).map((_, slotIdx) => {
                           const item = getImageForSlot(slotIdx);
+                          if (!item) return null;
                           const isItemPortrait = item && item.aspectRatio < 1;
                           return (
                             <div
@@ -1058,26 +1298,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                               className="relative cursor-pointer group flex items-center justify-center w-full h-full p-1"
                               style={{ boxSizing: 'border-box' }}
                             >
-                              {item ? (
-                                <img
-                                  src={item.dataUrl}
-                                  alt={`Card ${slotIdx + 1}`}
-                                  className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
-                                  style={{
-                                    width: settings.scaleMode === 'exact_id'
-                                      ? (isItemPortrait ? '53.98mm' : '85.6mm')
-                                      : '95%',
-                                    aspectRatio: item.aspectRatio || 85.6 / 53.98,
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-full h-full border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs no-print min-h-[60px]">
-                                  Empty Slot {slotIdx + 1}
-                                </div>
-                              )}
+                              <img
+                                src={item.dataUrl}
+                                alt={`Card ${slotIdx + 1}`}
+                                className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
+                                style={{
+                                  width: settings.scaleMode === 'exact_id'
+                                    ? (isItemPortrait ? '53.98mm' : '85.6mm')
+                                    : '95%',
+                                  aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                                }}
+                              />
 
                               {/* Screen-only hover actions */}
-                              {item && onRotateItem && (
+                              {onRotateItem && (
                                 <div 
                                   className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
                                   onClick={(e) => e.stopPropagation()}

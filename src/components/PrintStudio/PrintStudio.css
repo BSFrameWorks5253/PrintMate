@@ -45,11 +45,10 @@
 @media print {
   @page {
     margin: 0 !important;
-    size: auto;
   }
 
-  /* Hide all UI elements, toolbars, guides, and background containers */
-  body, html {
+  /* Reset body and html completely */
+  html, body {
     background-color: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
@@ -58,9 +57,23 @@
     height: 100% !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    overflow: visible !important;
   }
 
+  /* Hide everything in the entire web app by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Make ONLY .print-studio-sheet and all its descendants visible */
+  .print-studio-sheet,
+  .print-studio-sheet * {
+    visibility: visible !important;
+  }
+
+  /* Completely suppress screen-only elements even inside the sheet */
   .no-print,
+  .no-print *,
   .slot-action-overlay,
   .fold-guide-line span,
   header,
@@ -69,6 +82,7 @@
   aside,
   canvas {
     display: none !important;
+    visibility: hidden !important;
   }
 
   /* Strip card styling and backgrounds from preview container wrapper */
@@ -76,30 +90,51 @@
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     min-height: auto !important;
     display: block !important;
   }
 
-  /* Physical paper sheet */
+  /* Physical paper sheet: pinned to top-left of physical page, exactly 1 sheet */
   .print-studio-sheet {
-    display: block !important;
-    margin: 0 auto !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    padding: var(--print-sheet-padding, 12mm) !important;
     background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
     width: var(--print-sheet-width, 100%) !important;
     height: var(--print-sheet-height, 100%) !important;
-    max-width: none !important;
+    max-width: var(--print-sheet-width, 100%) !important;
+    max-height: var(--print-sheet-height, 100%) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+  }
+
+  /* 100% Real ID Scale (CR80: 85.60 × 53.98 mm) on paper */
+  .card-exact-id-slot {
+    width: var(--card-print-w, 85.6mm) !important;
+    height: var(--card-print-h, 53.98mm) !important;
+    max-width: var(--card-print-w, 85.6mm) !important;
+    max-height: var(--card-print-h, 53.98mm) !important;
   }
 
   .card-exact-id {
     max-width: 100% !important;
     max-height: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
     box-shadow: none !important;
   }
 }

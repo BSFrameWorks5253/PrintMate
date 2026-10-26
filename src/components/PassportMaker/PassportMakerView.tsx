@@ -10,9 +10,13 @@ import {
   Palette, 
   FileText, 
   Grid, 
-  Scissors 
+  Scissors,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { analytics } from '../../services/analyticsService';
+import { useAuth } from '../../context/AuthContext';
+import { userStorageService } from '../../services/userStorageService';
 import type { PrintQueueItem } from '../../types';
 import './PassportMaker.css';
 
@@ -60,6 +64,8 @@ const PAPERS: Record<PaperSizeKey, PaperDef> = {
 };
 
 export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPrint }) => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
+
   // Photo source state
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string>('Passport_Photo');
@@ -579,27 +585,54 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
   // 1. Download 300 DPI Print Sheet
   const handleDownloadSheet = () => {
+    if (!isAuthenticated) {
+      openAuthModal('download 300 DPI passport sheets');
+      return;
+    }
     const sheetCanvas = generate300DpiSheetCanvas();
     const link = document.createElement('a');
     link.download = `Passport_${photoCount}up_${selectedPaper.id.toUpperCase()}_300DPI.jpg`;
     link.href = sheetCanvas.toDataURL('image/jpeg', 0.98);
     link.click();
     confetti({ particleCount: 35, spread: 50, origin: { y: 0.8 } });
+    analytics.trackDownload({
+      type: `Passport Sheet (${photoCount}-up, ${selectedPaper.name})`,
+      page: 'passport',
+    });
   };
 
   // 2. Download Single 35x45mm Passport Photo
   const handleDownloadSingle = () => {
+    if (!isAuthenticated) {
+      openAuthModal('download passport photo');
+      return;
+    }
     // 35mm x 45mm at 300 DPI is exactly 413 x 531 px
     const single = renderSinglePassportCanvas(413, 531, true);
     const link = document.createElement('a');
     link.download = `${photoName}_35x45mm_300DPI.jpg`;
     link.href = single.toDataURL('image/jpeg', 0.98);
     link.click();
+    analytics.trackDownload({
+      type: 'Single 35x45mm Passport Photo',
+      fileName: photoName,
+      page: 'passport',
+    });
   };
 
   // 3. Print Sheet directly
   const handlePrint = () => {
+    if (!isAuthenticated) {
+      openAuthModal('print passport photo sheet');
+      return;
+    }
+    setActiveTab('sheet');
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+    analytics.trackPrint({
+      pageSize: selectedPaper.id,
+      itemCount: photoCount,
+      page: 'passport',
+    });
     setTimeout(() => {
       window.print();
     }, 200);
@@ -609,11 +642,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const handleSendToPrintStudio = () => {
     if (!onSendToPrint) return;
     const single = renderSinglePassportCanvas(413, 531, true);
+    const singleDataUrl = single.toDataURL('image/jpeg', 0.98);
     onSendToPrint({
-      dataUrl: single.toDataURL('image/jpeg', 0.98),
+      dataUrl: singleDataUrl,
       name: `${photoName} (Passport 35×45mm)`,
       docType: 'id_standard',
       cardSide: 'single',
+      aspectRatio: 35 / 45,
+    });
+    userStorageService.addRecent(user?.id, {
+      name: `${photoName} (Passport 35×45mm)`,
+      dataUrl: singleDataUrl,
+      docType: 'id_standard',
+      source: 'passport',
       aspectRatio: 35 / 45,
     });
     setToastNotice('Passport photo dispatched to Print Studio queue!');
@@ -630,6 +671,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         onChange={handleFileUpload}
         accept="image/*"
         className="hidden"
+        style={{ display: 'none' }}
       />
 
       {/* STUDIO HEADER BANNER */}
@@ -1015,35 +1057,48 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownloadSingle}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                  title="Download 1 single 35x45mm 300 DPI photo with border"
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                  title={isAuthenticated ? 'Download 1 single 35x45mm 300 DPI photo with border' : 'Sign in required to download'}
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  {!isAuthenticated ? (
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
                   <span className="hidden sm:inline">Single (35×45mm)</span>
                   <span className="sm:hidden">Single</span>
                 </button>
 
                 <button
                   onClick={handleDownloadSheet}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-cyan-300 text-cyan-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
-                  title="Download whole 300 DPI photo print sheet"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-cyan-300 text-cyan-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  title={isAuthenticated ? 'Download whole 300 DPI photo print sheet' : 'Sign in required to download'}
                 >
-                  <Download className="w-4 h-4" />
+                  {!isAuthenticated ? (
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
                   <span>Download 300 DPI Sheet</span>
                 </button>
 
                 <button
                   onClick={handlePrint}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all transform active:scale-98"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all transform active:scale-98 cursor-pointer"
+                  title={isAuthenticated ? 'Print physical photo sheet' : 'Sign in required to print'}
                 >
-                  <Printer className="w-4 h-4" />
+                  {!isAuthenticated ? (
+                    <Lock className="w-4 h-4 text-amber-300" />
+                  ) : (
+                    <Printer className="w-4 h-4" />
+                  )}
                   <span>Print Sheet</span>
                 </button>
               </div>
             </div>
 
             {/* MAIN PREVIEW CONTAINER */}
-            <div className="bg-slate-100 p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center min-h-[560px] overflow-auto">
+            <div className="passport-preview-wrapper bg-slate-100 p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col items-center justify-center min-h-[560px] overflow-auto">
               {activeTab === 'editor' ? (
                 /* TAB 1: CROP & FACE POSITIONING (Interactive Pan & Zoom) */
                 <div className="flex flex-col items-center justify-center space-y-3">
@@ -1084,6 +1139,20 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
               ) : (
                 /* TAB 2: 4x6 INCH SHEET OUTPUT (MATCHING IMAGE 2 EXACTLY!) */
                 <div className="w-full flex flex-col items-center justify-center">
+                  {/* Dynamic print-media page size injection so browser automatically selects exact matching paper size & orientation */}
+                  <style>{`
+                    @media print {
+                      @page {
+                        size: ${
+                          selectedPaper.id === '4x6' ? '6in 4in' :
+                          selectedPaper.id === '5x7' ? '7in 5in' :
+                          'A4 portrait'
+                        };
+                        margin: 0 !important;
+                      }
+                    }
+                  `}</style>
+
                   {/* Screen-only dimension info */}
                   <div className="no-print pb-3 text-center text-xs text-slate-500 flex items-center gap-2">
                     <span className="font-semibold text-slate-900">{selectedPaper.name.split('(')[0]} Sheet</span>
@@ -1119,6 +1188,12 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           '--passport-sheet-width': `${selectedPaper.widthMm}mm`,
                           '--passport-sheet-height': `${selectedPaper.heightMm}mm`,
                           '--passport-sheet-ratio': `${selectedPaper.widthMm} / ${selectedPaper.heightMm}`,
+                          '--grid-cols': layout.cols,
+                          '--grid-rows': layout.rows,
+                          '--photo-w-mm': `${layout.photoWidthMm}mm`,
+                          '--photo-h-mm': `${layout.photoHeightMm}mm`,
+                          '--gap-mm': `${layout.gapMm}mm`,
+                          '--margin-mm': `${layout.marginMm}mm`,
                           width: `${previewSheetW}px`,
                           height: `${previewSheetH}px`,
                           maxWidth: '100%',
@@ -1133,6 +1208,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       >
                         {/* The Centered Grid of Passport Photos */}
                         <div
+                          className="passport-print-grid"
                           style={{
                             display: 'grid',
                             gridTemplateColumns: `repeat(${layout.cols}, ${previewPhotoW}px)`,
@@ -1147,7 +1223,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           {Array.from({ length: Math.min(layout.cols * layout.rows, photoCount) }).map((_, idx) => (
                             <div
                               key={idx}
-                              className="relative flex items-center justify-center overflow-hidden bg-white shadow-sm"
+                              className="passport-photo-cell relative flex items-center justify-center overflow-hidden bg-white shadow-sm"
                               style={{
                                 width: `${previewPhotoW}px`,
                                 height: `${previewPhotoH}px`,
@@ -1166,7 +1242,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                         {/* Full-Page Light Grey Dashed Cutting Guides Overlay */}
                         {showCutDividers && (
                           <svg
-                            className="absolute inset-0 pointer-events-none w-full h-full z-10"
+                            className="passport-cut-overlay absolute inset-0 pointer-events-none w-full h-full z-10"
                             viewBox={`0 0 ${previewSheetW} ${previewSheetH}`}
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
                           >
