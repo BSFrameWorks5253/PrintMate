@@ -36,14 +36,16 @@ const getPathFromTab = (tab: AppTab): string => {
 const MainAppContent: React.FC = () => {
   const { user, openAuthModal } = useAuth();
   const [activeTab, setActiveTabState] = useState<AppTab>(() => getTabFromPath(window.location.pathname));
-  const [queue, setQueue] = useState<PrintQueueItem[]>(() => userStorageService.getUserQueue(user?.id));
+  // Fresh visits always start with a clean print queue so last session images do not linger; past images remain in Recents
+  const [queue, setQueue] = useState<PrintQueueItem[]>([]);
   const [externalImage, setExternalImage] = useState<string | null>(null);
   const [isRecentsOpen, setIsRecentsOpen] = useState<boolean>(false);
 
-  // Sync tab with browser URL history and clear transient editor images when navigating between pages
+  // Sync tab with browser URL history and clear transient working images when navigating between pages
   const setActiveTab = (tab: AppTab) => {
     if (tab !== activeTab) {
       setExternalImage(null);
+      setQueue([]); // Clear working queue so old images don't linger across pages; all items are preserved in Recents
       userStorageService.clearDraft();
     }
     setActiveTabState(tab);
@@ -57,6 +59,9 @@ const MainAppContent: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const tab = getTabFromPath(window.location.pathname);
+      setExternalImage(null);
+      setQueue([]);
+      userStorageService.clearDraft();
       setActiveTabState(tab);
       if (window.location.pathname === '/' || window.location.pathname === '') {
         window.history.replaceState({ tab: 'home' }, '', '/home');
@@ -120,21 +125,12 @@ const MainAppContent: React.FC = () => {
     }
 
     if (user?.id && user.id !== previousUserIdRef.current) {
-      // User just logged in: migrate any active working images/queue so they DON'T go away
+      // User just logged in: migrate active in-memory queue from current session only
       const { migratedQueue, migratedTab } = userStorageService.migrateGuestDataToUser(user.id);
       if (migratedQueue && migratedQueue.length > 0) {
         setQueue(migratedQueue);
-      } else {
-        const userSavedQueue = userStorageService.getUserQueue(user.id);
-        if (queue.length > 0) {
-          // If user had items in memory before login, keep them in user's queue
-          const existingIds = new Set(userSavedQueue.map((q) => q.id));
-          const combined = [...queue.filter((q) => !existingIds.has(q.id)), ...userSavedQueue];
-          setQueue(combined);
-          userStorageService.setUserQueue(user.id, combined);
-        } else {
-          setQueue(userSavedQueue);
-        }
+      } else if (queue.length > 0) {
+        userStorageService.setUserQueue(user.id, queue);
       }
       if (migratedTab) {
         setActiveTab(migratedTab as any);
@@ -167,7 +163,7 @@ const MainAppContent: React.FC = () => {
       id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: Date.now(),
     };
-    setQueue((prev) => [newItem, ...prev]);
+    setQueue([newItem]);
     // Save to user's recent images
     userStorageService.addRecent(user?.id, {
       name: item.name,
@@ -176,7 +172,12 @@ const MainAppContent: React.FC = () => {
       source: 'print',
       aspectRatio: item.aspectRatio,
     });
-    setActiveTab('print');
+    setExternalImage(null);
+    setActiveTabState('print');
+    const targetPath = getPathFromTab('print');
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab: 'print' }, '', targetPath);
+    }
   };
 
   const handleSendMultipleToPrint = (items: Omit<PrintQueueItem, 'id' | 'createdAt'>[]) => {
@@ -185,7 +186,7 @@ const MainAppContent: React.FC = () => {
       id: `queue-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: Date.now() + idx,
     }));
-    setQueue((prev) => [...newItems, ...prev]);
+    setQueue(newItems);
     // Save each to user's recent images
     items.forEach((item) => {
       userStorageService.addRecent(user?.id, {
@@ -196,7 +197,12 @@ const MainAppContent: React.FC = () => {
         aspectRatio: item.aspectRatio,
       });
     });
-    setActiveTab('print');
+    setExternalImage(null);
+    setActiveTabState('print');
+    const targetPath = getPathFromTab('print');
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab: 'print' }, '', targetPath);
+    }
   };
 
   const handleRemoveItem = (id: string) => {
@@ -205,6 +211,8 @@ const MainAppContent: React.FC = () => {
 
   const handleClearQueue = () => {
     setQueue([]);
+    userStorageService.setUserQueue(user?.id, []);
+    userStorageService.clearDraft();
   };
 
   const handleDuplicateItem = (id: string) => {
