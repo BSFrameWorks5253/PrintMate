@@ -142,9 +142,21 @@
     top: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    z-index: 10 !important;
+    visibility: visible !important;
+  }
+
+  .passport-cut-overlay line {
+    visibility: visible !important;
+    stroke: #475569 !important;
+    stroke-width: 1.5px !important;
+    stroke-dasharray: 6px 4px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   @page {
     margin: 0 !important;
   }
 }
+

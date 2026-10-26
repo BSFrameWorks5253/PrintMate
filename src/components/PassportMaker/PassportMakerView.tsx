@@ -15,7 +15,8 @@ import {
   RotateCw,
   RotateCcw,
   RefreshCw,
-  Trash2
+  Trash2,
+  Eye
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { analytics } from '../../services/analyticsService';
@@ -428,7 +429,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const renderSinglePassportCanvas = (
     wPx?: number, 
     hPx?: number, 
-    includeBorders: boolean = true
+    includeBorders: boolean = true,
+    includeGuidelines: boolean = showGuidelines
   ): HTMLCanvasElement => {
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = document.createElement('canvas');
@@ -512,6 +514,60 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.restore();
     }
 
+    // Draw Biometric Face Guidelines directly inside canvas if requested (retained in print & downloads!)
+    if (includeGuidelines) {
+      ctx.save();
+      const scale = width / (std.widthPx300Dpi || 413);
+      ctx.lineWidth = Math.max(1.5, 2 * scale);
+      ctx.setLineDash([6 * scale, 4 * scale]);
+
+      // Eye Level Line (~42% from top)
+      ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)'; // Vivid cyan
+      ctx.beginPath();
+      ctx.moveTo(15 * scale, height * 0.42);
+      ctx.lineTo(width - 15 * scale, height * 0.42);
+      ctx.stroke();
+
+      // Chin Line (~80% from top)
+      ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(30 * scale, height * 0.80);
+      ctx.lineTo(width - 30 * scale, height * 0.80);
+      ctx.stroke();
+
+      // Crown / Top of head line (~15% from top)
+      ctx.strokeStyle = 'rgba(14, 165, 233, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(30 * scale, height * 0.15);
+      ctx.lineTo(width - 30 * scale, height * 0.15);
+      ctx.stroke();
+
+      // Face Oval Guide
+      ctx.setLineDash([6 * scale, 6 * scale]);
+      ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
+      ctx.beginPath();
+      ctx.ellipse(width / 2, height * 0.48, width * 0.30, height * 0.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Center vertical guide
+      ctx.setLineDash([4 * scale, 6 * scale]);
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(width / 2, 10 * scale);
+      ctx.lineTo(width / 2, height - 10 * scale);
+      ctx.stroke();
+
+      // Text labels
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(2, 132, 199, 0.98)';
+      ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
+      ctx.fillText('EYE LEVEL', 20 * scale, height * 0.40);
+      ctx.fillText('CHIN LINE', 35 * scale, height * 0.78);
+      ctx.fillText('CROWN', 35 * scale, height * 0.13);
+
+      ctx.restore();
+    }
+
     // Draw borders over photo if requested
     if (includeBorders) {
       if (borderStyle === 'studio_classic') {
@@ -558,61 +614,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     canvas.width = w;
     canvas.height = h;
 
-    const rendered = renderSinglePassportCanvas(w, h, true);
+    const rendered = renderSinglePassportCanvas(w, h, true, showGuidelines);
     ctx.drawImage(rendered, 0, 0);
-
-    // Biometric Guideline Overlays (ICAO & Indian Passport standards)
-    if (showGuidelines) {
-      ctx.save();
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-
-      // Eye Level Line (~42% from top)
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
-      ctx.beginPath();
-      ctx.moveTo(30, h * 0.42);
-      ctx.lineTo(w - 30, h * 0.42);
-      ctx.stroke();
-
-      // Chin Line (~80% from top)
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
-      ctx.beginPath();
-      ctx.moveTo(60, h * 0.80);
-      ctx.lineTo(w - 60, h * 0.80);
-      ctx.stroke();
-
-      // Crown / Top of head line (~15% from top)
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
-      ctx.beginPath();
-      ctx.moveTo(60, h * 0.15);
-      ctx.lineTo(w - 60, h * 0.15);
-      ctx.stroke();
-
-      // Face Oval Guide
-      ctx.setLineDash([6, 6]);
-      ctx.strokeStyle = 'rgba(14, 165, 233, 0.75)';
-      ctx.beginPath();
-      ctx.ellipse(w / 2, h * 0.48, w * 0.30, h * 0.32, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Center vertical guide
-      ctx.setLineDash([3, 5]);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
-      ctx.beginPath();
-      ctx.moveTo(w / 2, 20);
-      ctx.lineTo(w / 2, h - 20);
-      ctx.stroke();
-
-      // Text labels
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(14, 165, 233, 0.95)';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillText('EYE LEVEL', 35, h * 0.40);
-      ctx.fillText('CHIN LINE', 65, h * 0.78);
-      ctx.fillText('CROWN', 65, h * 0.13);
-
-      ctx.restore();
-    }
   }, [imageObj, zoom, pan, rotation, presetStandard, showGuidelines, borderStyle, backgroundColor, adjustments]);
 
   // Update clean single photo preview data URL whenever editing state changes
@@ -622,9 +625,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       return;
     }
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const canvas = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
+    const canvas = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, showGuidelines);
     setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
-  }, [imageObj, zoom, pan, rotation, presetStandard, borderStyle, backgroundColor, adjustments]);
+  }, [imageObj, zoom, pan, rotation, presetStandard, borderStyle, backgroundColor, adjustments, showGuidelines]);
 
   // Pointer panning handler for face positioning
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -678,8 +681,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const startX = Math.round((sheetCanvas.width - totalGridW) / 2);
     const startY = Math.round((sheetCanvas.height - totalGridH) / 2);
 
-    // Pre-render a single passport photo at 300 DPI
-    const singlePhoto = renderSinglePassportCanvas(photoPxW, photoPxH, true);
+    // Pre-render a single passport photo at 300 DPI (with biometric guides if enabled)
+    const singlePhoto = renderSinglePassportCanvas(photoPxW, photoPxH, true, showGuidelines);
 
     const count = Math.min(cols * rows, photoCount);
 
@@ -692,12 +695,12 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.drawImage(singlePhoto, x, y, photoPxW, photoPxH);
     }
 
-    // Draw full-page light grey dashed cutting guidelines across entire sheet
+    // Draw full-page dark slate dashed cutting guidelines across entire sheet
     if (showCutDividers) {
       ctx.save();
-      ctx.strokeStyle = '#cbd5e1'; // Light grey
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([8, 6]); // Dash-dash like for cutting
+      ctx.strokeStyle = '#475569'; // Slate-600: dark, crisp, visible on physical white paper in print & downloads
+      ctx.lineWidth = Math.max(2.5, Math.round(pxPerMm * 0.22)); // High-visibility ~0.22mm hairline for 300DPI
+      ctx.setLineDash([14, 10]); // High-contrast dash pattern for scissors and paper trimmers
 
       // Vertical full-page cutting lines
       const vCutPositions = [startX - gapPx / 2];
@@ -760,7 +763,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       return;
     }
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
+    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, showGuidelines);
     const link = document.createElement('a');
     link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_300DPI.jpg`;
     link.href = single.toDataURL('image/jpeg', 0.98);
@@ -1336,25 +1339,44 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     </div>
                   </div>
 
-                  {/* 3. CUTTING GUIDES & DIVIDERS */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
+                  {/* 3. CUTTING GUIDES & BIOMETRIC FACE GUIDES */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-md">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                         <Scissors className="w-4 h-4 text-emerald-600" />
                         <span>Cutting Line Guides</span>
                       </h4>
-                      <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold cursor-pointer">
                         <input
                           type="checkbox"
                           checked={showCutDividers}
                           onChange={(e) => setShowCutDividers(e.target.checked)}
                           className="w-3.5 h-3.5 rounded text-blue-600 bg-slate-50 border-slate-200 cursor-pointer"
                         />
-                        <span>Print Cutting Guides</span>
+                        <span>Print Cutting Lines</span>
                       </label>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Renders light grey dashed lines between all rows and columns to guide straight cuts with a paper trimmer or scissors.
+                      Renders high-contrast dark dashed lines around and between all photos so you can cut straight with a scissors or trimmer.
+                    </p>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-cyan-600" />
+                        <span>Biometric Face Guidelines</span>
+                      </h4>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showGuidelines}
+                          onChange={(e) => setShowGuidelines(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded text-cyan-600 bg-slate-50 border-slate-200 cursor-pointer"
+                        />
+                        <span>Keep in Print/Download</span>
+                      </label>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Keeps biometric alignment guides (Eye level, Chin, Crown, and Face Oval) visible on printed photos & single downloads.
                     </p>
                   </div>
 
@@ -1679,9 +1701,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                                   y1={0}
                                   x2={Math.round(xVal) + 0.5}
                                   y2={previewSheetH}
-                                  stroke="#cbd5e1"
-                                  strokeWidth="1.2"
-                                  strokeDasharray="6 4"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="7 5"
                                 />
                               ));
                             })()}
@@ -1701,9 +1723,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                                   y1={Math.round(yVal) + 0.5}
                                   x2={previewSheetW}
                                   y2={Math.round(yVal) + 0.5}
-                                  stroke="#cbd5e1"
-                                  strokeWidth="1.2"
-                                  strokeDasharray="6 4"
+                                  stroke="#475569"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="7 5"
                                 />
                               ));
                             })()}
