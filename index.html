@@ -6,11 +6,42 @@
     <link rel="alternate icon" href="/favicon.svg?v=2" />
     <link rel="apple-touch-icon" href="/favicon.svg?v=2" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="PrintMate" />
+    <link rel="manifest" href="/manifest.json" />
     <title>PrintMate - ID Card & Document Border Detection, Deskew & Print Studio</title>
     <meta name="description" content="Auto-detect borders, crop background, straighten slanted ID cards and documents, adjust brightness & contrast, and print in multi-up A4/A3 layouts." />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('printmate_theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator && !window.location.host.includes('localhost:5173')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.log('[PWA] Service Worker registration skipped in dev:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   CreditCard, 
   Upload, 
@@ -11,7 +11,6 @@ import {
   FileText, 
   Grid, 
   Scissors,
-  Lock,
   RotateCw,
   RotateCcw,
   RefreshCw,
@@ -31,7 +30,7 @@ interface PassportMakerViewProps {
 
 export type BorderStyleType = 'studio_classic' | 'black_border' | 'white_margin' | 'borderless';
 export type PaperSizeKey = '5x7' | 'a4' | '4x6';
-export type PassportStandardKey = '35x45' | '51x51' | '30x40' | '33x48';
+export type PassportStandardKey = '34x45' | '35x45' | '51x51' | '30x40' | '33x48';
 
 export interface PassportStandardDef {
   id: PassportStandardKey;
@@ -44,6 +43,15 @@ export interface PassportStandardDef {
 }
 
 export const PASSPORT_STANDARDS: Record<PassportStandardKey, PassportStandardDef> = {
+  '34x45': {
+    id: '34x45',
+    name: '34 × 45 mm (Standard Studio)',
+    widthMm: 34,
+    heightMm: 45,
+    country: 'India Studio, Passport & Visa (With Crisp Borders)',
+    widthPx300Dpi: 402,
+    heightPx300Dpi: 531,
+  },
   '35x45': {
     id: '35x45',
     name: '35 × 45 mm (Standard)',
@@ -119,7 +127,7 @@ const PAPERS: Record<PaperSizeKey, PaperDef> = {
 };
 
 export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPrint }) => {
-  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { user } = useAuth();
 
   // Photo source state
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -127,8 +135,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
 
   // Passport Standard Preset & Rotation
-  const [presetStandard, setPresetStandard] = useState<PassportStandardKey>('35x45');
+  const [presetStandard, setPresetStandard] = useState<PassportStandardKey>('34x45');
   const [rotation, setRotation] = useState<number>(0);
+  const [straightenAngle, setStraightenAngle] = useState<number>(0);
 
   // Framing & Crop state
   const [zoom, setZoom] = useState<number>(1.15);
@@ -168,6 +177,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     setImageObj(img);
     setPan({ x: 0, y: 0 });
     setZoom(1.15);
+    setStraightenAngle(0);
 
     // Auto-rotate: passport photos must be vertical portrait.
     // If uploaded photo is wider than it is tall, automatically rotate 90°!
@@ -271,6 +281,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       setImageObj(null);
       setCleanSinglePhotoUrl('');
       setRotation(0);
+      setStraightenAngle(0);
       setActiveTab('editor');
       setToastNotice('Photo cleared from canvas • Preserved in Recent Documents');
       setTimeout(() => setToastNotice(''), 3000);
@@ -282,6 +293,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const rotateCcw = () => setRotation((r) => ((r - 90 + 360) % 360));
   const autoRotate = () => {
     if (!imageObj) return;
+    setStraightenAngle(0);
     if (imageObj.naturalWidth > imageObj.naturalHeight) {
       setRotation(90);
       setToastNotice('Rotated upright to portrait');
@@ -388,7 +400,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const maxCellW = availW / cols;
     const maxCellH = availH / rows;
 
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
     const standardW = std.widthMm;
     const standardH = std.heightMm;
     const passportRatio = standardW / standardH;
@@ -426,13 +438,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const layout = computeGridLayout();
 
   // Draw the cropped/framed passport photo onto a canvas
-  const renderSinglePassportCanvas = (
+  const renderSinglePassportCanvas = useCallback((
     wPx?: number, 
     hPx?: number, 
     includeBorders: boolean = true,
     includeGuidelines: boolean = showGuidelines
   ): HTMLCanvasElement => {
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
     const canvas = document.createElement('canvas');
     const width = wPx || std.widthPx300Dpi;
     const height = hPx || std.heightPx300Dpi;
@@ -487,28 +499,23 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       const centerX = insetX + photoAreaW / 2 + (pan.x * photoAreaW);
       const centerY = insetY + photoAreaH / 2 + (pan.y * photoAreaH);
 
+      const effectiveRotation = rotation + straightenAngle;
+
       ctx.translate(centerX, centerY);
-      if (rotation !== 0) {
-        ctx.rotate((rotation * Math.PI) / 180);
+      if (effectiveRotation !== 0) {
+        ctx.rotate((effectiveRotation * Math.PI) / 180);
       }
 
-      // Calculate effective aspect ratio after rotation
-      const isRotated90 = rotation === 90 || rotation === 270;
-      const effectiveW = isRotated90 ? imageObj.height : imageObj.width;
-      const effectiveH = isRotated90 ? imageObj.width : imageObj.height;
-      const imgAspect = effectiveW / effectiveH;
-      const targetAspect = photoAreaW / photoAreaH;
+      // Calculate effective bounding box after rotation so photo covers the area without gaps
+      const rad = (Math.abs(effectiveRotation) * Math.PI) / 180;
+      const cos = Math.abs(Math.cos(rad));
+      const sin = Math.abs(Math.sin(rad));
+      const effectiveW = imageObj.width * cos + imageObj.height * sin;
+      const effectiveH = imageObj.width * sin + imageObj.height * cos;
 
-      let drawW: number;
-      let drawH: number;
-
-      if (imgAspect > targetAspect) {
-        drawH = photoAreaH * zoom;
-        drawW = drawH * (imageObj.width / imageObj.height);
-      } else {
-        drawW = photoAreaW * zoom;
-        drawH = drawW / (imageObj.width / imageObj.height);
-      }
+      const scale = Math.max(photoAreaW / (effectiveW || 1), photoAreaH / (effectiveH || 1)) * zoom;
+      const drawW = imageObj.width * scale;
+      const drawH = imageObj.height * scale;
 
       ctx.drawImage(imageObj, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
@@ -599,7 +606,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     }
 
     return canvas;
-  };
+  }, [presetStandard, backgroundColor, borderStyle, imageObj, zoom, pan, rotation, straightenAngle, showGuidelines, adjustments]);
 
   // Render crop editor canvas
   useEffect(() => {
@@ -608,7 +615,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
     const w = std.widthPx300Dpi;
     const h = std.heightPx300Dpi;
     canvas.width = w;
@@ -616,7 +623,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
     const rendered = renderSinglePassportCanvas(w, h, true, showGuidelines);
     ctx.drawImage(rendered, 0, 0);
-  }, [imageObj, zoom, pan, rotation, presetStandard, showGuidelines, borderStyle, backgroundColor, adjustments]);
+  }, [presetStandard, showGuidelines, renderSinglePassportCanvas]);
 
   // Update clean single photo preview data URL whenever editing state changes
   useEffect(() => {
@@ -624,10 +631,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       setCleanSinglePhotoUrl('');
       return;
     }
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
     const canvas = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, showGuidelines);
     setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
-  }, [imageObj, zoom, pan, rotation, presetStandard, borderStyle, backgroundColor, adjustments, showGuidelines]);
+  }, [imageObj, presetStandard, showGuidelines, renderSinglePassportCanvas]);
 
   // Pointer panning handler for face positioning
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -740,54 +747,54 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
   // 1. Download 300 DPI Print Sheet
   const handleDownloadSheet = () => {
-    if (!isAuthenticated) {
-      openAuthModal('download 300 DPI passport sheets');
-      return;
-    }
     const sheetCanvas = generate300DpiSheetCanvas();
     const link = document.createElement('a');
     link.download = `Passport_${photoCount}up_${selectedPaper.id.toUpperCase()}_300DPI.jpg`;
     link.href = sheetCanvas.toDataURL('image/jpeg', 0.98);
     link.click();
     confetti({ particleCount: 35, spread: 50, origin: { y: 0.8 } });
-    analytics.trackDownload({
-      type: `Passport Sheet (${photoCount}-up, ${selectedPaper.name})`,
-      page: 'passport',
-    });
+    try {
+      analytics.trackDownload({
+        type: `Passport Sheet (${photoCount}-up, ${selectedPaper.name})`,
+        page: 'passport',
+      });
+    } catch (e) {
+      console.warn('Analytics tracking failed', e);
+    }
   };
 
   // 2. Download Single Passport Photo (Current Standard Preset)
   const handleDownloadSingle = () => {
-    if (!isAuthenticated) {
-      openAuthModal('download passport photo');
-      return;
-    }
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
     const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, showGuidelines);
     const link = document.createElement('a');
     link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_300DPI.jpg`;
     link.href = single.toDataURL('image/jpeg', 0.98);
     link.click();
-    analytics.trackDownload({
-      type: `Single ${std.name} Passport Photo`,
-      fileName: photoName,
-      page: 'passport',
-    });
+    try {
+      analytics.trackDownload({
+        type: `Single ${std.name} Passport Photo`,
+        fileName: photoName,
+        page: 'passport',
+      });
+    } catch (e) {
+      console.warn('Analytics tracking failed', e);
+    }
   };
 
   // 3. Print Sheet directly
   const handlePrint = () => {
-    if (!isAuthenticated) {
-      openAuthModal('print passport photo sheet');
-      return;
-    }
     setActiveTab('sheet');
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
-    analytics.trackPrint({
-      pageSize: selectedPaper.id,
-      itemCount: photoCount,
-      page: 'passport',
-    });
+    try {
+      analytics.trackPrint({
+        pageSize: selectedPaper.id,
+        itemCount: photoCount,
+        page: 'passport',
+      });
+    } catch (e) {
+      console.warn('Analytics tracking failed', e);
+    }
     setTimeout(() => {
       window.print();
     }, 200);
@@ -796,8 +803,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // 4. Send to Main Print Studio Queue
   const handleSendToPrintStudio = () => {
     if (!onSendToPrint) return;
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true);
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, showGuidelines);
     const singleDataUrl = single.toDataURL('image/jpeg', 0.98);
     const ratio = std.widthMm / std.heightMm;
     onSendToPrint({
@@ -819,8 +826,32 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   };
 
 
+  const handlePrintRef = useRef(handlePrint);
+  useEffect(() => {
+    handlePrintRef.current = handlePrint;
+  });
+
+  // Global Ctrl+P / Cmd+P shortcut to trigger print sheet
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handlePrintRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Toast Notification */}
+      {toastNotice && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm animate-fade-in">
+          <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span className="font-semibold">{toastNotice}</span>
+        </div>
+      )}
       {/* Hidden file input */}
       <input
         type="file"
@@ -1040,14 +1071,14 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   </div>
 
                   {/* 2. PHOTO ROTATION & ORIENTATION CONTROLS */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-md">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-md">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                         <RotateCw className="w-4 h-4 text-indigo-600" />
                         <span>Photo Orientation & Rotation</span>
                       </h4>
                       <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                        {rotation}°
+                        {(rotation + straightenAngle).toFixed(1)}°
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
@@ -1078,6 +1109,71 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                         <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
                         <span>Auto-Upright</span>
                       </button>
+                    </div>
+
+                    {/* Fine Straightening / Deskew Slider & Nudge Buttons */}
+                    <div className="pt-2.5 border-t border-slate-100 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-700 font-semibold flex items-center gap-1">
+                          <span>Fine Angle Straighten / Deskew:</span>
+                        </span>
+                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                          {straightenAngle > 0 ? `+${straightenAngle.toFixed(1)}°` : `${straightenAngle.toFixed(1)}°`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setStraightenAngle((a) => Math.max(-25, Math.round((a - 1) * 10) / 10))}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 cursor-pointer shadow-xs active:scale-95"
+                          title="Tilt -1°"
+                        >
+                          -1°
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStraightenAngle((a) => Math.max(-25, Math.round((a - 0.5) * 10) / 10))}
+                          className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 cursor-pointer shadow-xs active:scale-95"
+                          title="Tilt -0.5°"
+                        >
+                          -0.5°
+                        </button>
+                        <input
+                          type="range"
+                          min="-25"
+                          max="25"
+                          step="0.5"
+                          value={straightenAngle}
+                          onChange={(e) => setStraightenAngle(parseFloat(e.target.value))}
+                          className="flex-1 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStraightenAngle((a) => Math.min(25, Math.round((a + 0.5) * 10) / 10))}
+                          className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 cursor-pointer shadow-xs active:scale-95"
+                          title="Tilt +0.5°"
+                        >
+                          +0.5°
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStraightenAngle((a) => Math.min(25, Math.round((a + 1) * 10) / 10))}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 cursor-pointer shadow-xs active:scale-95"
+                          title="Tilt +1°"
+                        >
+                          +1°
+                        </button>
+                        {straightenAngle !== 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setStraightenAngle(0)}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold border border-rose-200 cursor-pointer shadow-xs"
+                            title="Reset Straightening to 0°"
+                          >
+                            0°
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1412,13 +1508,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     <button
                       onClick={handleDownloadSingle}
                       className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                      title={isAuthenticated ? 'Download 1 single cropped photo' : 'Sign in required to download'}
+                      title="Download 1 single cropped photo"
                     >
-                      {!isAuthenticated ? (
-                        <Lock className="w-3.5 h-3.5 text-amber-600" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5" />
-                      )}
+                      <Download className="w-3.5 h-3.5" />
                       <span>Single Photo</span>
                     </button>
 
@@ -1448,43 +1540,45 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {onSendToPrint && (
+                      <button
+                        onClick={handleSendToPrintStudio}
+                        className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                        title="Send 1 photo to Print Studio queue for A4 multi-up / ID mix"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="hidden sm:inline">Add to Print Studio</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={handleDownloadSingle}
                       className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                      title={isAuthenticated ? 'Download 1 single photo with border' : 'Sign in required to download'}
+                      title="Download 1 single photo with border"
                     >
-                      {!isAuthenticated ? (
-                        <Lock className="w-3.5 h-3.5 text-amber-600" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5" />
-                      )}
+                      <Download className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Single</span>
                     </button>
 
                     <button
                       onClick={handleDownloadSheet}
                       className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-cyan-300 text-cyan-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-                      title={isAuthenticated ? 'Download whole 300 DPI photo print sheet' : 'Sign in required to download'}
+                      title="Download whole 300 DPI photo print sheet"
                     >
-                      {!isAuthenticated ? (
-                        <Lock className="w-3.5 h-3.5 text-amber-600" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
+                      <Download className="w-4 h-4" />
                       <span>Download Sheet</span>
                     </button>
 
                     <button
                       onClick={handlePrint}
                       className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all transform active:scale-98 cursor-pointer"
-                      title={isAuthenticated ? 'Print physical photo sheet' : 'Sign in required to print'}
+                      title="Print physical photo sheet (Ctrl+P)"
                     >
-                      {!isAuthenticated ? (
-                        <Lock className="w-4 h-4 text-amber-300" />
-                      ) : (
-                        <Printer className="w-4 h-4" />
-                      )}
+                      <Printer className="w-4 h-4" />
                       <span>Print Sheet</span>
+                      <kbd className="hidden sm:inline text-[10px] font-mono bg-white/20 px-1 py-0.2 rounded border border-white/30 text-white">
+                        Ctrl+P
+                      </kbd>
                     </button>
                   </div>
                 </>
@@ -1562,6 +1656,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                         setPan({ x: 0, y: 0 });
                         setZoom(1.0);
                         setRotation(0);
+                        setStraightenAngle(0);
                       }}
                       className="text-xs px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shadow-sm"
                     >
@@ -1614,11 +1709,6 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     const previewPhotoW = Math.floor(layout.photoWidthMm * pxPerMm);
                     const previewPhotoH = Math.floor(layout.photoHeightMm * pxPerMm);
                     const previewGapPx = Math.round(layout.gapMm * pxPerMm);
-
-                    const totalGridW = (layout.cols * previewPhotoW) + ((layout.cols - 1) * previewGapPx);
-                    const totalGridH = (layout.rows * previewPhotoH) + ((layout.rows - 1) * previewGapPx);
-                    const previewStartX = Math.round((previewSheetW - totalGridW) / 2);
-                    const previewStartY = Math.round((previewSheetH - totalGridH) / 2);
 
                     return (
                       <div
@@ -1679,58 +1769,64 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           ))}
                         </div>
 
-                        {/* Full-Page Light Grey Dashed Cutting Guides Overlay */}
-                        {showCutDividers && (
-                          <svg
-                            className="passport-cut-overlay absolute inset-0 pointer-events-none w-full h-full z-10"
-                            viewBox={`0 0 ${previewSheetW} ${previewSheetH}`}
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-                          >
-                            {/* Vertical full-page cutting lines */}
-                            {(() => {
-                              const vLines = [previewStartX - previewGapPx / 2];
-                              for (let c = 1; c < layout.cols; c++) {
-                                vLines.push(previewStartX + (c * (previewPhotoW + previewGapPx)) - previewGapPx / 2);
-                              }
-                              vLines.push(previewStartX + (layout.cols * (previewPhotoW + previewGapPx)) - previewGapPx / 2);
+                        {/* Full-Page Light Grey Dashed Cutting Guides Overlay (Exact Millimeter Alignment for Screen & Print) */}
+                        {showCutDividers && (() => {
+                          const paperW = selectedPaper.widthMm;
+                          const paperH = selectedPaper.heightMm;
+                          const totalGridMmW = (layout.cols * layout.photoWidthMm) + ((layout.cols - 1) * layout.gapMm);
+                          const totalGridMmH = (layout.rows * layout.photoHeightMm) + ((layout.rows - 1) * layout.gapMm);
+                          const startMmX = (paperW - totalGridMmW) / 2;
+                          const startMmY = (paperH - totalGridMmH) / 2;
 
-                              return vLines.map((xVal, i) => (
+                          const vLinesMm = [startMmX - layout.gapMm / 2];
+                          for (let c = 1; c < layout.cols; c++) {
+                            vLinesMm.push(startMmX + (c * (layout.photoWidthMm + layout.gapMm)) - layout.gapMm / 2);
+                          }
+                          vLinesMm.push(startMmX + (layout.cols * (layout.photoWidthMm + layout.gapMm)) - layout.gapMm / 2);
+
+                          const hLinesMm = [startMmY - layout.gapMm / 2];
+                          for (let r = 1; r < layout.rows; r++) {
+                            hLinesMm.push(startMmY + (r * (layout.photoHeightMm + layout.gapMm)) - layout.gapMm / 2);
+                          }
+                          hLinesMm.push(startMmY + (layout.rows * (layout.photoHeightMm + layout.gapMm)) - layout.gapMm / 2);
+
+                          return (
+                            <svg
+                              className="passport-cut-overlay absolute inset-0 pointer-events-none w-full h-full z-10"
+                              viewBox={`0 0 ${paperW} ${paperH}`}
+                              preserveAspectRatio="none"
+                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                            >
+                              {/* Vertical full-page cutting lines */}
+                              {vLinesMm.map((xVal, i) => (
                                 <line
                                   key={`v-${i}`}
-                                  x1={Math.round(xVal) + 0.5}
+                                  x1={xVal}
                                   y1={0}
-                                  x2={Math.round(xVal) + 0.5}
-                                  y2={previewSheetH}
-                                  stroke="#475569"
-                                  strokeWidth="1.5"
-                                  strokeDasharray="7 5"
+                                  x2={xVal}
+                                  y2={paperH}
+                                  stroke="#000000"
+                                  strokeWidth="0.35"
+                                  strokeDasharray="2.5 1.5"
                                 />
-                              ));
-                            })()}
+                              ))}
 
-                            {/* Horizontal full-page cutting lines */}
-                            {(() => {
-                              const hLines = [previewStartY - previewGapPx / 2];
-                              for (let r = 1; r < layout.rows; r++) {
-                                hLines.push(previewStartY + (r * (previewPhotoH + previewGapPx)) - previewGapPx / 2);
-                              }
-                              hLines.push(previewStartY + (layout.rows * (previewPhotoH + previewGapPx)) - previewGapPx / 2);
-
-                              return hLines.map((yVal, i) => (
+                              {/* Horizontal full-page cutting lines */}
+                              {hLinesMm.map((yVal, i) => (
                                 <line
                                   key={`h-${i}`}
                                   x1={0}
-                                  y1={Math.round(yVal) + 0.5}
-                                  x2={previewSheetW}
-                                  y2={Math.round(yVal) + 0.5}
-                                  stroke="#475569"
-                                  strokeWidth="1.5"
-                                  strokeDasharray="7 5"
+                                  y1={yVal}
+                                  x2={paperW}
+                                  y2={yVal}
+                                  stroke="#000000"
+                                  strokeWidth="0.35"
+                                  strokeDasharray="2.5 1.5"
                                 />
-                              ));
-                            })()}
-                          </svg>
-                        )}
+                              ))}
+                            </svg>
+                          );
+                        })()}
                       </div>
                     );
                   })()}

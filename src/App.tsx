@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { ScannerView } from './components/Scanner/ScannerView';
 import { PrintStudioView } from './components/PrintStudio/PrintStudioView';
@@ -8,9 +8,12 @@ import { RecentImagesModal } from './components/Recents/RecentImagesModal';
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
-import { ShieldAlert, ArrowLeft, LogIn, Phone } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, LogIn, Mail, MessageSquarePlus, CheckCircle2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthModal } from './components/Auth/AuthModal';
+import { FeedbackModal } from './components/Feedback/FeedbackModal';
+import { feedbackService, type FeedbackItem } from './services/feedbackService';
 import { analytics } from './services/analyticsService';
 import { HomePage } from './components/Home/HomePage';
 import { isAuthorizedAdmin, AUTHORIZED_ADMIN_EMAIL } from './utils/constants';
@@ -40,28 +43,34 @@ const MainAppContent: React.FC = () => {
   const [queue, setQueue] = useState<PrintQueueItem[]>([]);
   const [externalImage, setExternalImage] = useState<string | null>(null);
   const [isRecentsOpen, setIsRecentsOpen] = useState<boolean>(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState<boolean>(false);
+  const [unreadResolved, setUnreadResolved] = useState<FeedbackItem[]>([]);
 
-  // Sync tab with browser URL history and clear transient working images when navigating between pages
-  const setActiveTab = (tab: AppTab) => {
-    if (tab !== activeTab) {
-      setExternalImage(null);
-      setQueue([]); // Clear working queue so old images don't linger across pages; all items are preserved in Recents
-      userStorageService.clearDraft();
-    }
+  // Check for resolved tickets submitted on this device
+  useEffect(() => {
+    const checkResolved = () => {
+      setUnreadResolved(feedbackService.getMyUnreadResolvedTokens());
+    };
+    checkResolved();
+    const interval = setInterval(checkResolved, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync tab with browser URL history
+  const setActiveTab = useCallback((tab: AppTab) => {
+    setExternalImage(null);
     setActiveTabState(tab);
     const targetPath = getPathFromTab(tab);
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ tab }, '', targetPath);
     }
-  };
+  }, []);
 
   // Browser Back & Forward buttons navigation support
   useEffect(() => {
     const handlePopState = () => {
       const tab = getTabFromPath(window.location.pathname);
       setExternalImage(null);
-      setQueue([]);
-      userStorageService.clearDraft();
       setActiveTabState(tab);
       if (window.location.pathname === '/' || window.location.pathname === '') {
         window.history.replaceState({ tab: 'home' }, '', '/home');
@@ -114,9 +123,12 @@ const MainAppContent: React.FC = () => {
   }, [user]);
 
   // User-wise state isolation & Seamless Guest-to-User migration
-  // "when the user signs in and comes to the print option the image he was working shouldn't go away"
-  // "users data shouldn't go to other users"
   const previousUserIdRef = useRef<string | null | undefined>(undefined);
+  const queueRef = useRef(queue);
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
   useEffect(() => {
     // Initial mount check: do not resurrect old images on fresh visits (accessible via Recents)
     if (previousUserIdRef.current === undefined) {
@@ -129,8 +141,8 @@ const MainAppContent: React.FC = () => {
       const { migratedQueue, migratedTab } = userStorageService.migrateGuestDataToUser(user.id);
       if (migratedQueue && migratedQueue.length > 0) {
         setQueue(migratedQueue);
-      } else if (queue.length > 0) {
-        userStorageService.setUserQueue(user.id, queue);
+      } else if (queueRef.current.length > 0) {
+        userStorageService.setUserQueue(user.id, queueRef.current);
       }
       if (migratedTab) {
         setActiveTab(migratedTab as any);
@@ -143,7 +155,7 @@ const MainAppContent: React.FC = () => {
     }
 
     previousUserIdRef.current = user?.id || null;
-  }, [user]);
+  }, [user, setActiveTab]);
 
   // Keep active queue and draft in sync
   useEffect(() => {
@@ -163,7 +175,7 @@ const MainAppContent: React.FC = () => {
       id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: Date.now(),
     };
-    setQueue([newItem]);
+    setQueue((prev) => [newItem, ...prev.filter((p) => p.dataUrl !== item.dataUrl)]);
     // Save to user's recent images
     userStorageService.addRecent(user?.id, {
       name: item.name,
@@ -215,16 +227,21 @@ const MainAppContent: React.FC = () => {
     userStorageService.clearDraft();
   };
 
+  const handleUpdateItemCopies = (id: string, delta: number) => {
+    setQueue((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const currentCopies = item.copies || 1;
+          const nextCopies = Math.max(1, Math.min(50, currentCopies + delta));
+          return { ...item, copies: nextCopies };
+        }
+        return item;
+      })
+    );
+  };
+
   const handleDuplicateItem = (id: string) => {
-    const target = queue.find((q) => q.id === id);
-    if (!target) return;
-    const duplicated: PrintQueueItem = {
-      ...target,
-      id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name: `${target.name} (Copy)`,
-      createdAt: Date.now(),
-    };
-    setQueue((prev) => [...prev, duplicated]);
+    handleUpdateItemCopies(id, 1);
   };
 
   const handleRotateItem = (id: string) => {
@@ -262,7 +279,7 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -271,24 +288,53 @@ const MainAppContent: React.FC = () => {
         onOpenRecents={() => setIsRecentsOpen(true)}
       />
 
+      {/* Real-time Notification Banner for Solved / Added Issues */}
+      {unreadResolved.length > 0 && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 text-white px-4 py-2 text-xs font-semibold shadow-md flex items-center justify-between gap-3 animate-in slide-in-from-top sticky top-16 z-40">
+          <div className="flex items-center gap-2 max-w-4xl truncate">
+            <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span className="truncate">
+              Great news! Your request <strong className="underline font-mono bg-white/20 px-1.5 py-0.5 rounded">{unreadResolved[0].token}</strong> ("{unreadResolved[0].title}") has been marked as <strong>{unreadResolved[0].status === 'added' ? 'FEATURE ADDED' : 'SOLVED'}</strong>!
+              {unreadResolved[0].adminNote && (
+                <span className="opacity-95 ml-2 font-normal italic">
+                  — Note: "{unreadResolved[0].adminNote}"
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                feedbackService.markAsViewed(unreadResolved[0].token);
+                setUnreadResolved(feedbackService.getMyUnreadResolvedTokens());
+              }}
+              className="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-all cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1">
-        {activeTab === 'home' && (
+        <div className={`no-print ${activeTab === 'home' ? 'block' : 'hidden'}`}>
           <HomePage
             onNavigate={setActiveTab}
             onOpenSample={handleLoadSample}
           />
-        )}
+        </div>
 
-        {activeTab === 'scanner' && (
+        <div className={`no-print ${activeTab === 'scanner' ? 'block' : 'hidden'}`}>
           <ScannerView
             onSendToPrint={handleSendToPrint}
             onSendMultipleToPrint={handleSendMultipleToPrint}
             externalImage={externalImage}
             onClearExternalImage={() => setExternalImage(null)}
+            isVisible={activeTab === 'scanner'}
           />
-        )}
+        </div>
 
-        {activeTab === 'print' && (
+        <div className={activeTab === 'print' ? 'block' : 'hidden'}>
           <PrintStudioView
             queue={queue}
             onAddItem={handleSendToPrint}
@@ -296,14 +342,15 @@ const MainAppContent: React.FC = () => {
             onClearQueue={handleClearQueue}
             onDuplicateItem={handleDuplicateItem}
             onRotateItem={handleRotateItem}
+            onUpdateItemCopies={handleUpdateItemCopies}
             onNavigateToScanner={() => setActiveTab('scanner')}
             onOpenRecents={() => setIsRecentsOpen(true)}
           />
-        )}
+        </div>
 
-        {activeTab === 'passport' && (
+        <div className={`no-print ${activeTab === 'passport' ? 'block' : 'hidden'}`}>
           <PassportMakerView onSendToPrint={handleSendToPrint} />
-        )}
+        </div>
 
         {activeTab === 'admin' && (
           isAuthorizedAdmin(user?.email) ? (
@@ -357,32 +404,43 @@ const MainAppContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="no-print border-t border-slate-200 py-4 bg-white text-center text-xs text-slate-500">
+      <footer className="no-print border-t border-slate-200 dark:border-slate-800 py-4 bg-white dark:bg-slate-900 text-center text-xs text-slate-500 dark:text-slate-400 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
-            <span className="font-semibold text-slate-800">PrintMate</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">PrintMate</span>
             <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
           </div>
 
-          {/* Distinct Royal Purple & Vibrant Pink Gradient Creator Badge */}
-          <div className="flex items-center gap-2">
-            <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white font-bold text-xs shadow-md shadow-purple-500/25 border border-purple-300/40 flex items-center gap-2 transition-transform hover:scale-102">
-              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-              <span className="tracking-wide">Burhanuddin Sounasath</span>
-              <span className="opacity-60">•</span>
-              <a 
-                href="tel:YOUR_PHONE_NUMBER" 
-                className="inline-flex items-center gap-1.5 font-semibold text-purple-100 hover:text-white transition-colors cursor-pointer"
-                title="Contact Burhanuddin Sounasath"
+          {/* Creator Credit & Issue/Feature Request Actions */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {/* Subtle, Tasteful Creator Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="font-medium">Created by Burhanuddin Sounasath</span>
+              <span className="text-slate-300 dark:text-slate-600">•</span>
+              <a
+                href="mailto:bs.framework52523@gmail.com"
+                className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
+                title="Send Email to Creator"
               >
-                <Phone className="w-3.5 h-3.5 text-pink-200" />
-                <span className="underline decoration-pink-300/60 underline-offset-2">[Phone Number]</span>
+                <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                <span className="font-mono text-[11px]">bs.framework52523@gmail.com</span>
               </a>
             </div>
+
+            {/* Address an Issue / Request Feature Button */}
+            <button
+              type="button"
+              onClick={() => setIsFeedbackOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <MessageSquarePlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Address an Issue / Request Feature</span>
+            </button>
           </div>
 
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-slate-400 dark:text-slate-500">
             A4 • A3 • Letter • Duplex • CR80 ID Standard Scale
           </div>
         </div>
@@ -399,6 +457,13 @@ const MainAppContent: React.FC = () => {
         onAddToPrintQueue={handleSendToPrint}
       />
 
+      {/* Address an Issue & Request Feature Modal with Token System */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        userEmail={user?.email}
+      />
+
       {/* Real Authentication Modal (Google OAuth & Email/Password) */}
       <AuthModal />
     </div>
@@ -407,9 +472,11 @@ const MainAppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <MainAppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainAppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

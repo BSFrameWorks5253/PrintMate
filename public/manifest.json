@@ -1,0 +1,42 @@
+{
+  "name": "PrintMate Studio - ID Scanner & Print Studio",
+  "short_name": "PrintMate",
+  "description": "Smart ID card border detection, photo enhancement, passport photo maker & exact-scale physical printing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scanner & Deskew",
+      "url": "/#scanner",
+      "description": "Scan and crop ID cards"
+    },
+    {
+      "name": "Print Studio",
+      "url": "/#print",
+      "description": "Print ID cards and layouts"
+    },
+    {
+      "name": "Passport Maker",
+      "url": "/#passport",
+      "description": "Generate passport photos"
+    }
+  ]
+}

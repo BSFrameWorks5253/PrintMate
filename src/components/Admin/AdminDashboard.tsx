@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Users, 
   Printer, 
@@ -18,9 +18,19 @@ import {
   CreditCard,
   Clock,
   Activity,
-  Mail
+  Mail,
+  Trash2,
+  Cloud,
+  CheckCircle2,
+  AlertCircle,
+  UserPlus,
+  ExternalLink,
+  MessageSquarePlus,
+  Bug,
+  Lightbulb
 } from 'lucide-react';
 import { analytics, type UserAnalytics, type AnalyticsEvent } from '../../services/analyticsService';
+import { feedbackService, type FeedbackItem } from '../../services/feedbackService';
 import { useAuth } from '../../context/AuthContext';
 import { isAuthorizedAdmin, AUTHORIZED_ADMIN_EMAIL } from '../../utils/constants';
 import { BroadcastEmailModal } from './BroadcastEmailModal';
@@ -33,17 +43,233 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
   const { user: currentUser } = useAuth();
   const isAdmin = isAuthorizedAdmin(currentUser?.email);
 
+  // By default, strictly show ACTUAL LIVE DATA
+  const [includeDemo, setIncludeDemo] = useState<boolean>(false);
   const [users, setUsers] = useState<UserAnalytics[]>([]);
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [providerFilter, setProviderFilter] = useState<'all' | 'google' | 'email' | 'guest'>('all');
+  const [providerFilter, setProviderFilter] = useState<'all' | 'google' | 'email' | 'demo' | 'guest'>('all');
   const [sortBy, setSortBy] = useState<'lastActive' | 'prints' | 'downloads' | 'views'>('lastActive');
   const [selectedUser, setSelectedUser] = useState<UserAnalytics | null>(null);
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserProvider, setNewUserProvider] = useState<'google' | 'email' | 'demo'>('email');
+  const [cloudHealth, setCloudHealth] = useState<{ connected: boolean; profilesTable: boolean; eventsTable: boolean; error?: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<{ message: string; type: 'success' | 'info' | 'error' | null }>({
+    message: '',
+    type: null,
+  });
 
-  // Early return if unauthorized
+
+  // Feedback & User Requests state
+  const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>(() => feedbackService.getAll());
+  const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'pending' | 'in_progress' | 'solved' | 'added'>('all');
+  const [feedbackSearch, setFeedbackSearch] = useState('');
+  const [activeFeedbackEdit, setActiveFeedbackEdit] = useState<FeedbackItem | null>(null);
+  const [editStatus, setEditStatus] = useState<'pending' | 'in_progress' | 'solved' | 'added'>('pending');
+  const [editAdminNote, setEditAdminNote] = useState('');
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+
+  const refreshFeedback = () => {
+    setFeedbackList(feedbackService.getAll());
+  };
+
+  const handleOpenEditFeedback = (item: FeedbackItem) => {
+    setActiveFeedbackEdit(item);
+    setEditStatus(item.status);
+    setEditAdminNote(item.adminNote || '');
+  };
+
+  const handleSaveFeedbackStatus = () => {
+    if (!activeFeedbackEdit) return;
+    feedbackService.updateStatus(activeFeedbackEdit.token, editStatus, editAdminNote);
+    refreshFeedback();
+    setActiveFeedbackEdit(null);
+    setFeedbackToast(`Token ${activeFeedbackEdit.token} marked as ${editStatus.toUpperCase()}! User will be notified.`);
+    setTimeout(() => setFeedbackToast(null), 4000);
+  };
+
+  // Load analytics data (actual or with demo toggle)
+  const loadData = useCallback(() => {
+    // If admin is signed in, ensure admin user is registered in the list so admin is always visible
+    if (currentUser) {
+      analytics.registerUser(currentUser);
+    }
+    setUsers(analytics.getAllUsers(includeDemo));
+    setEvents(analytics.getEventsList(includeDemo));
+  }, [currentUser, includeDemo]);
+
+  const checkHealth = async () => {
+    try {
+      const health = await analytics.checkSupabaseHealth();
+      setCloudHealth(health);
+    } catch {
+      setCloudHealth({ connected: false, profilesTable: false, eventsTable: false });
+    }
+  };
+
+  const handleSyncCloud = async () => {
+    setIsSyncing(true);
+    setSyncStatus({ message: 'Syncing with Supabase cloud...', type: 'info' });
+    try {
+      await checkHealth();
+      const res = await analytics.syncFromSupabase();
+      if (res.success && (res.cloudProfilesCount > 0 || res.cloudEventsCount > 0)) {
+        setSyncStatus({
+          message: `Synced ${res.cloudProfilesCount} user profiles and ${res.cloudEventsCount} telemetry events from Supabase cloud!`,
+          type: 'success',
+        });
+      } else if (res.missingTables) {
+        setSyncStatus({
+          message: 'Supabase connected, but SQL tables are not yet created. Click "Setup Cloud Tables" to copy the SQL script.',
+          type: 'info',
+        });
+      } else {
+        setSyncStatus({
+          message: 'Supabase cloud connected & synchronized.',
+          type: 'success',
+        });
+      }
+    } catch {
+      setSyncStatus({
+        message: 'Local live telemetry active.',
+        type: 'info',
+      });
+    } finally {
+      setIsSyncing(false);
+      loadData();
+      setTimeout(() => setSyncStatus({ message: '', type: null }), 6000);
+    }
+  };
+
+  const handleCreateRealUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) return;
+
+    await analytics.createRealUser({
+      name: newUserName.trim(),
+      email: newUserEmail.trim(),
+      provider: newUserProvider,
+    });
+
+    setNewUserName('');
+    setNewUserEmail('');
+    setShowAddUserModal(false);
+    loadData();
+    setSyncStatus({
+      message: `User ${newUserEmail.trim()} successfully registered in live directory!`,
+      type: 'success',
+    });
+    setTimeout(() => setSyncStatus({ message: '', type: null }), 5000);
+  };
+
+  const handlePurgeMockData = () => {
+    if (window.confirm('Purge all seeded demo/sample users? This will leave strictly actual real user activity.')) {
+      analytics.purgeDemoData();
+      setIncludeDemo(false);
+      loadData();
+      setSyncStatus({ message: 'All demo and mock data purged. Displaying strictly actual live data.', type: 'success' });
+      setTimeout(() => setSyncStatus({ message: '', type: null }), 4000);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadData();
+    checkHealth();
+    // Track admin page view
+    analytics.trackPageView('admin', currentUser);
+    // Background sync check
+    analytics.syncFromSupabase().catch(() => {});
+  }, [isAdmin, loadData, currentUser]);
+
+  const stats = useMemo(() => {
+    void users;
+    void events;
+    return analytics.getGlobalStats(includeDemo);
+  }, [includeDemo, users, events]);
+
+  // Filter & sort users
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter((u) => {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesQuery = 
+          u.name.toLowerCase().includes(query) || 
+          u.email.toLowerCase().includes(query) ||
+          u.id.toLowerCase().includes(query);
+        const matchesProvider = 
+          providerFilter === 'all' ? true : u.provider === providerFilter;
+        return matchesQuery && matchesProvider;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'prints') return (b.printCount || 0) - (a.printCount || 0);
+        if (sortBy === 'downloads') return (b.downloadCount || 0) - (a.downloadCount || 0);
+        if (sortBy === 'views') {
+          const viewsA = (a.pageViews.scanner || 0) + (a.pageViews.print || 0) + (a.pageViews.passport || 0);
+          const viewsB = (b.pageViews.scanner || 0) + (b.pageViews.print || 0) + (b.pageViews.passport || 0);
+          return viewsB - viewsA;
+        }
+        return b.lastActive - a.lastActive;
+      });
+  }, [users, searchQuery, providerFilter, sortBy]);
+
+  const filteredFeedback = useMemo(() => {
+    return feedbackList.filter((item) => {
+      const q = feedbackSearch.toLowerCase().trim();
+      const matchesSearch = !q || 
+        item.token.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        (item.email && item.email.toLowerCase().includes(q));
+      const matchesFilter = feedbackFilter === 'all' || item.status === feedbackFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [feedbackList, feedbackSearch, feedbackFilter]);
+
+  const handleExportCSV = () => {
+    const csvContent = analytics.exportCSV(includeDemo);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PrintMate_Users_Analytics_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(analytics.getSupabaseSQLSchema());
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(seconds / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const getPrimaryPage = (pageViews: UserAnalytics['pageViews']) => {
+    const entries = [
+      { page: 'Passport Maker', count: pageViews.passport || 0, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      { page: 'Print Studio', count: pageViews.print || 0, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { page: 'Scanner', count: pageViews.scanner || 0, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    ];
+    entries.sort((a, b) => b.count - a.count);
+    return entries[0].count > 0 ? entries[0] : null;
+  };
+
   if (!isAdmin) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
@@ -72,87 +298,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
     );
   }
 
-  // Load analytics data
-  const refreshData = () => {
-    setUsers(analytics.getAllUsers());
-    setEvents(analytics.getEventsList());
-  };
-
-  useEffect(() => {
-    refreshData();
-    // Track admin page view
-    analytics.trackPageView('admin', currentUser);
-  }, []);
-
-  const stats = useMemo(() => {
-    return analytics.getGlobalStats();
-  }, [users, events]);
-
-  // Filter & sort users
-  const filteredUsers = useMemo(() => {
-    return users
-      .filter((u) => {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesQuery = 
-          u.name.toLowerCase().includes(query) || 
-          u.email.toLowerCase().includes(query) ||
-          u.id.toLowerCase().includes(query);
-        const matchesProvider = 
-          providerFilter === 'all' ? true : u.provider === providerFilter;
-        return matchesQuery && matchesProvider;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'prints') return (b.printCount || 0) - (a.printCount || 0);
-        if (sortBy === 'downloads') return (b.downloadCount || 0) - (a.downloadCount || 0);
-        if (sortBy === 'views') {
-          const viewsA = (a.pageViews.scanner || 0) + (a.pageViews.print || 0) + (a.pageViews.passport || 0);
-          const viewsB = (b.pageViews.scanner || 0) + (b.pageViews.print || 0) + (b.pageViews.passport || 0);
-          return viewsB - viewsA;
-        }
-        return b.lastActive - a.lastActive;
-      });
-  }, [users, searchQuery, providerFilter, sortBy]);
-
-  const handleExportCSV = () => {
-    const csvContent = analytics.exportCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `PrintMate_Users_Analytics_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(analytics.getSupabaseSQLSchema());
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2000);
-  };
-
-  const formatTimeAgo = (timestamp: number) => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return 'Just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  };
-
-  const getPrimaryPage = (pageViews: UserAnalytics['pageViews']) => {
-    const entries = [
-      { page: 'Passport Maker', count: pageViews.passport || 0, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { page: 'Print Studio', count: pageViews.print || 0, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { page: 'Scanner', count: pageViews.scanner || 0, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ];
-    entries.sort((a, b) => b.count - a.count);
-    return entries[0].count > 0 ? entries[0] : null;
-  };
-
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-50/70 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50/70 py-8 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Top Header Card */}
@@ -162,58 +309,214 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-xs font-semibold mb-3">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Executive Telemetry & Admin Console</span>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-xs font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Executive Telemetry & Admin Console</span>
+                </div>
+
+                {/* Actual vs Demo Mode Indicator Badge */}
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                  includeDemo 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' 
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${includeDemo ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+                  <span>{includeDemo ? 'Mode: Including Mock Demo Data' : 'Mode: Actual Live Data Only'}</span>
+                </div>
               </div>
+
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 Studio Analytics & User Intelligence
               </h1>
               <p className="text-xs sm:text-sm text-slate-300/80 mt-1.5 max-w-2xl leading-relaxed">
-                Track all registered & active studio users, real-time page engagement, document download frequencies, and physical print volume counts.
+                Real-time tracking of actual registered users, live page visits, document downloads, and physical print volume metrics.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Broadcast Modal Button */}
               <button
                 type="button"
                 onClick={() => setShowBroadcastModal(true)}
                 className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-purple-600/25 cursor-pointer hover:scale-102 active:scale-98"
-                title="Broadcast professional announcement email to registered studio users"
+                title="Broadcast announcement email to registered studio users"
               >
                 <Mail className="w-4 h-4 text-white" />
                 <span>Broadcast Email</span>
               </button>
 
+              {/* Export CSV Button */}
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer hover:scale-102 active:scale-98"
+                className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer hover:scale-102 active:scale-98"
                 title="Download user analytics spreadsheet in CSV format"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                 <span>Export CSV</span>
               </button>
 
+              {/* Supabase Schema Modal Button */}
               <button
                 type="button"
                 onClick={() => setShowSqlModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer hover:scale-102 active:scale-98"
+                className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer hover:scale-102 active:scale-98"
                 title="View Supabase table schema"
               >
                 <Database className="w-4 h-4 text-cyan-400" />
                 <span>Supabase Schema</span>
               </button>
 
+              {/* Refresh & Sync Cloud Button */}
               <button
                 type="button"
-                onClick={refreshData}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-blue-600/30 cursor-pointer hover:scale-102 active:scale-98"
+                onClick={handleSyncCloud}
+                disabled={isSyncing}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-blue-600/30 cursor-pointer hover:scale-102 active:scale-98 disabled:opacity-50"
+                title="Sync with Supabase cloud and refresh analytics"
               >
-                <RefreshCw className="w-4 h-4" />
-                <span>Refresh</span>
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Refresh'}</span>
               </button>
             </div>
+          </div>
+
+          {/* Sync Status Toast Banner */}
+          {syncStatus.message && (
+            <div className={`mt-5 p-3 rounded-2xl text-xs font-medium flex items-center gap-2.5 border animate-in fade-in ${
+              syncStatus.type === 'success' 
+                ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                : syncStatus.type === 'error'
+                ? 'bg-rose-950/70 border-rose-500/40 text-rose-300'
+                : 'bg-blue-950/70 border-blue-500/40 text-blue-300'
+            }`}>
+              {syncStatus.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : syncStatus.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              ) : (
+                <Cloud className="w-4 h-4 text-blue-400 shrink-0" />
+              )}
+              <span>{syncStatus.message}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Supabase Cloud Connection & Diagnostics Banner */}
+        {cloudHealth && (
+          <div className={`rounded-2xl p-4.5 border transition-all ${
+            cloudHealth.profilesTable && cloudHealth.eventsTable
+              ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-950'
+              : 'bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-blue-50/80 border-amber-200/80 text-slate-900 shadow-xs'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className={`p-2.5 rounded-xl mt-0.5 shrink-0 ${
+                  cloudHealth.profilesTable && cloudHealth.eventsTable
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                      {cloudHealth.profilesTable && cloudHealth.eventsTable
+                        ? 'Supabase Cloud Database: 100% Synchronized'
+                        : 'Supabase Cloud Database: 1 Setup Step Needed for Cross-Device Sync'}
+                    </h4>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      cloudHealth.profilesTable && cloudHealth.eventsTable
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {cloudHealth.profilesTable && cloudHealth.eventsTable ? 'SYNCED' : 'ACTION NEEDED'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
+                    {cloudHealth.profilesTable && cloudHealth.eventsTable
+                      ? 'Real-time telemetry and user profiles are securely streaming to and from your PostgreSQL database.'
+                      : 'Live user actions are currently captured locally in this browser. To sync actual user signups and scans across all devices in real-time, execute the SQL script in your Supabase dashboard once.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopySql}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-blue-600" />}
+                  <span>{copiedSql ? 'Copied!' : 'Copy SQL Script'}</span>
+                </button>
+
+                <a
+                  href="https://supabase.com/dashboard/project/bijmhruqlqovpniedmuu/sql/new"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  <span>Open Supabase SQL</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleSyncCloud}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Verify Schema</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Mode Switcher & Management Bar */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-700">Display Mode:</span>
+            <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setIncludeDemo(false)}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  !includeDemo
+                    ? 'bg-white text-emerald-700 shadow-xs font-bold border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>Actual Live Data</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeDemo(true)}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  includeDemo
+                    ? 'bg-white text-amber-700 shadow-xs font-bold border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>Include Demo / Mock Seed</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePurgeMockData}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Permanently remove mock/demo seed users from local storage"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-slate-500 group-hover:text-rose-600" />
+              <span>Purge Mock Data</span>
+            </button>
           </div>
         </div>
 
@@ -230,7 +533,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-slate-900">{stats.totalUsers}</span>
               <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                Active
+                {!includeDemo ? 'Actual' : 'Total'}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2">
@@ -253,7 +556,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2 truncate">
-              Top: <strong className="text-slate-700">{stats.pagePopularity[0]?.label}</strong>
+              Top: <strong className="text-slate-700">{stats.pagePopularity[0]?.label || 'None yet'}</strong>
             </p>
           </div>
 
@@ -364,7 +667,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
             <div>
               <h3 className="text-lg font-bold text-slate-900">User Intelligence Directory</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Full breakdown of all registered users, their most viewed tools, total printed sheets, and downloads
+                {!includeDemo ? 'Showing actual live studio users' : 'Showing all users including mock demo seed'}
               </p>
             </div>
 
@@ -377,7 +680,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search user name or email..."
-                  className="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                  className="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium text-slate-900"
                 />
               </div>
 
@@ -390,6 +693,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                 <option value="all">All Providers</option>
                 <option value="google">Google OAuth</option>
                 <option value="email">Email / Password</option>
+                <option value="demo">Verified / Demo Accounts</option>
                 <option value="guest">Guest Sessions</option>
               </select>
 
@@ -399,7 +703,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-transparent border-none text-xs font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent border-none text-xs font-semibold focus:outline-none cursor-pointer text-slate-800"
                 >
                   <option value="lastActive">Recently Active</option>
                   <option value="prints">Most Printed</option>
@@ -407,6 +711,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                   <option value="views">Most Page Views</option>
                 </select>
               </div>
+
+              {/* Add Real User Button */}
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(true)}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-blue-500/20 cursor-pointer active:scale-95"
+                title="Manually register an actual user profile in directory"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Add Real User</span>
+              </button>
             </div>
           </div>
 
@@ -428,8 +743,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
-                      No users found matching your search query.
+                    <td colSpan={8} className="py-14 text-center">
+                      <div className="max-w-md mx-auto space-y-4">
+                        <div className="w-14 h-14 rounded-3xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
+                          <Users className="w-7 h-7 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900">
+                            Live Production Directory Ready
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                            No external accounts match the current filter. Real visitors and registered accounts are captured automatically as they access the studio.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddUserModal(true)}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-blue-500/25 cursor-pointer"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Add Real User Profile</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIncludeDemo(true)}
+                            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+                          >
+                            Preview Demo Seed Data
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowSqlModal(true)}
+                            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Database className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Setup Cloud Tables</span>
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -460,8 +815,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                               <div className="flex items-center gap-1.5 font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                                 <span>{user.name}</span>
                                 {user.isDemo && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-                                    Demo
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                                    Mock Demo
                                   </span>
                                 )}
                               </div>
@@ -548,7 +903,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                               e.stopPropagation();
                               setSelectedUser(user);
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                             title="View user details"
                           >
                             <ChevronRight className="w-4 h-4" />
@@ -580,9 +935,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
 
           <div className="space-y-3">
             {events.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No events recorded yet.</p>
+              <p className="text-xs text-slate-400 italic">No live events recorded yet.</p>
             ) : (
-              events.slice(0, 10).map((evt) => {
+              events.slice(0, 15).map((evt) => {
                 const isPrint = evt.type === 'print';
                 const isDownload = evt.type === 'download';
                 const isScan = evt.type === 'scan';
@@ -622,14 +977,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
                           {evt.page === 'passport' ? 'Passport Maker' : evt.page === 'print' ? 'Print Studio' : evt.page}
                         </span>
                         {evt.meta?.pageSize && (
-                          <span className="ml-1 text-[11px] text-slate-400 font-mono">
+                          <span className="ml-1 text-[11px] text-slate-500 font-mono">
                             [{evt.meta.pageSize}]
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 shrink-0">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0">
                       <Clock className="w-3 h-3" />
                       <span>{formatTimeAgo(evt.timestamp)}</span>
                     </div>
@@ -640,7 +995,251 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
           </div>
         </div>
 
+        {/* User Issue & Feature Request Management Console */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                  <MessageSquarePlus className="w-4 h-4" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">User Issue Reports & Feature Requests</h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  {feedbackList.length} total
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Track user-submitted tokens, review issues, mark them solved or added, and provide custom resolution notes.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <div className="relative min-w-[200px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={feedbackSearch}
+                  onChange={(e) => setFeedbackSearch(e.target.value)}
+                  placeholder="Search token, title, email..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 font-medium"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <select
+                value={feedbackFilter}
+                onChange={(e) => setFeedbackFilter(e.target.value as any)}
+                className="py-1.5 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="all">All Statuses ({feedbackList.length})</option>
+                <option value="pending">Pending ({feedbackList.filter(f => f.status === 'pending').length})</option>
+                <option value="in_progress">In Progress ({feedbackList.filter(f => f.status === 'in_progress').length})</option>
+                <option value="solved">Solved ({feedbackList.filter(f => f.status === 'solved').length})</option>
+                <option value="added">Feature Added ({feedbackList.filter(f => f.status === 'added').length})</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={refreshFeedback}
+                className="p-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+                title="Refresh requests"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback Toast Banner */}
+          {feedbackToast && (
+            <div className="mx-6 mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{feedbackToast}</span>
+            </div>
+          )}
+
+          {/* Table / List */}
+          <div className="divide-y divide-slate-100">
+            {filteredFeedback.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                No user issue or feature requests match the selected filters.
+              </div>
+            ) : (
+              filteredFeedback.map((item) => {
+                const isBug = item.type === 'bug';
+                const statusStyles = {
+                  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+                  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
+                  solved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  added: 'bg-purple-50 text-purple-700 border-purple-200',
+                }[item.status];
+
+                const statusLabel = {
+                  pending: 'Pending Review',
+                  in_progress: 'In Progress',
+                  solved: 'Solved / Fixed',
+                  added: 'Feature Added',
+                }[item.status];
+
+                return (
+                  <div key={item.token} className="p-5 hover:bg-slate-50/70 transition-colors flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-slate-900 text-white tracking-wider">
+                          {item.token}
+                        </span>
+
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                          isBug ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                        }`}>
+                          {isBug ? <Bug className="w-3 h-3 text-rose-500" /> : <Lightbulb className="w-3 h-3 text-purple-500" />}
+                          <span>{isBug ? 'Bug Report' : 'Feature Request'}</span>
+                        </span>
+
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusStyles}`}>
+                          {statusLabel}
+                        </span>
+
+                        <span className="text-[11px] text-slate-400">
+                          Submitted {formatTimeAgo(new Date(item.createdAt).getTime())}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.description}</p>
+
+                      {item.email && (
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-slate-400" />
+                          <span>Submitter: <strong className="text-slate-700">{item.email}</strong></span>
+                        </div>
+                      )}
+
+                      {item.adminNote && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="text-slate-900">Admin Note to User:</strong> {item.adminNote}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row md:flex-col items-end gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditFeedback(item)}
+                        className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Update Status / Note</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
       </div>
+
+      {/* Update Feedback Item Modal */}
+      {activeFeedbackEdit && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setActiveFeedbackEdit(null)}
+        >
+          <div
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 sm:p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setActiveFeedbackEdit(null)}
+              className="absolute top-5 right-5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Update Request <span className="font-mono text-blue-600">{activeFeedbackEdit.token}</span>
+                </h3>
+                <p className="text-xs text-slate-500">Change status and attach resolution note to notify reporter</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 text-xs">
+              <span className="font-bold text-slate-700">{activeFeedbackEdit.title}</span>
+              <p className="text-slate-500 mt-0.5 line-clamp-2">{activeFeedbackEdit.description}</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Request Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'pending', label: 'Pending Review' },
+                    { id: 'in_progress', label: 'In Progress' },
+                    { id: 'solved', label: 'Solved / Fixed' },
+                    { id: 'added', label: 'Feature Added' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setEditStatus(s.id as any)}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
+                        editStatus === s.id
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Resolution Note to Submitter
+                </label>
+                <textarea
+                  rows={3}
+                  value={editAdminNote}
+                  onChange={(e) => setEditAdminNote(e.target.value)}
+                  placeholder="e.g. Fixed slider styling and dark mode contrast in latest update! Thank you for reporting."
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 font-medium"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  When marked as "Solved" or "Feature Added", the submitter will see an active banner notification: "Great news! Your request [Token] has been solved/added!"
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveFeedbackEdit(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveFeedbackStatus}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer text-center"
+                >
+                  Save & Notify
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* User Detail Inspector Modal / Drawer */}
       {selectedUser && (
@@ -654,7 +1253,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
           >
             <button
               onClick={() => setSelectedUser(null)}
-              className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              className="absolute top-5 right-5 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -758,7 +1357,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Supabase Cloud Analytics SQL</h3>
-                <p className="text-xs text-slate-400">Run this in your Supabase SQL Editor for cloud-persisted telemetry</p>
+                <p className="text-xs text-slate-400">Run this once in your Supabase SQL Editor for cloud-persisted telemetry</p>
               </div>
             </div>
 
@@ -780,6 +1379,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
               <p>💡 <strong>Tip:</strong> In your Supabase dashboard, go to <strong>SQL Editor</strong> → click <strong>New Query</strong> → paste this script and click <strong>Run</strong>.</p>
               <p>PrintMate will automatically log live events directly to your Supabase cloud table!</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Real User Modal */}
+      {showAddUserModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setShowAddUserModal(false)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 sm:p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowAddUserModal(false)}
+              className="absolute top-5 right-5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Add Real User Profile</h3>
+                <p className="text-xs text-slate-500">Register an actual client/user account into the live directory</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateRealUser} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-900 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="e.g. ramesh@example.com"
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-900 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Authentication / Account Provider</label>
+                <select
+                  value={newUserProvider}
+                  onChange={(e) => setNewUserProvider(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                >
+                  <option value="email">Email / Password</option>
+                  <option value="google">Google OAuth</option>
+                  <option value="demo">Verified Studio Account</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer text-center"
+                >
+                  Save & Register
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -112,7 +112,7 @@
   /* Centered photo grid on physical paper - exact millimeter matching */
   .passport-print-grid {
     display: grid !important;
-    grid-template-columns: repeat(var(--grid-cols, 4), var(--photo-w-mm, 35mm)) !important;
+    grid-template-columns: repeat(var(--grid-cols, 4), var(--photo-w-mm, 34mm)) !important;
     grid-template-rows: repeat(var(--grid-rows, 2), var(--photo-h-mm, 45mm)) !important;
     gap: var(--gap-mm, 2mm) !important;
     justify-content: center !important;
@@ -122,10 +122,14 @@
   }
 
   .passport-photo-cell {
-    width: var(--photo-w-mm, 35mm) !important;
+    width: var(--photo-w-mm, 34mm) !important;
     height: var(--photo-h-mm, 45mm) !important;
     box-sizing: border-box !important;
+    border: 1px solid #000000 !important;
+    outline: 1px solid #000000 !important;
     box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .passport-photo-cell img {
@@ -133,6 +137,8 @@
     height: 100% !important;
     object-fit: contain !important;
     display: block !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Full-bleed cutting overlay SVG */
@@ -144,13 +150,14 @@
     height: 100% !important;
     z-index: 10 !important;
     visibility: visible !important;
+    pointer-events: none !important;
   }
 
   .passport-cut-overlay line {
     visibility: visible !important;
-    stroke: #475569 !important;
-    stroke-width: 1.5px !important;
-    stroke-dasharray: 6px 4px !important;
+    stroke: #000000 !important;
+    stroke-width: 0.35mm !important;
+    stroke-dasharray: 2.5mm 1.5mm !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

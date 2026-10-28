@@ -36,8 +36,8 @@ const STORAGE_KEY_USERS = 'printmate_analytics_users_v1';
 const STORAGE_KEY_EVENTS = 'printmate_analytics_events_v1';
 const GUEST_ID_KEY = 'printmate_guest_session_id';
 
-// Initial realistic demo users for studio analytics presentation
-const INITIAL_DEMO_USERS: UserAnalytics[] = [
+// Reference sample mock dataset (only loaded when user explicitly toggles Demo mode)
+export const INITIAL_DEMO_USERS: UserAnalytics[] = [
   {
     id: 'usr-demo-1',
     name: 'Rajesh Sharma',
@@ -104,6 +104,39 @@ const INITIAL_DEMO_USERS: UserAnalytics[] = [
   },
 ];
 
+const INITIAL_DEMO_EVENTS: AnalyticsEvent[] = [
+  {
+    id: 'evt-init-1',
+    type: 'print',
+    userId: 'usr-demo-1',
+    userName: 'Rajesh Sharma',
+    userEmail: 'rajesh.studio@printquick.in',
+    page: 'passport',
+    meta: { pageSize: '4x6 (10x15cm)', layout: '8-up Passport Grid' },
+    timestamp: Date.now() - 1000 * 60 * 12,
+  },
+  {
+    id: 'evt-init-2',
+    type: 'download',
+    userId: 'usr-demo-2',
+    userName: 'Ananya Verma',
+    userEmail: 'ananya.v@gmail.com',
+    page: 'print',
+    meta: { type: 'Clean Sheet Output (A4)' },
+    timestamp: Date.now() - 1000 * 60 * 45,
+  },
+  {
+    id: 'evt-init-3',
+    type: 'scan',
+    userId: 'usr-demo-3',
+    userName: 'Mohammad Al-Khatib',
+    userEmail: 'm.khatib@cybercafe.ae',
+    page: 'scanner',
+    meta: { cardSide: 'id_front' },
+    timestamp: Date.now() - 1000 * 60 * 180,
+  },
+];
+
 class AnalyticsService {
   private guestId: string;
 
@@ -122,43 +155,12 @@ class AnalyticsService {
   }
 
   private initializeStore(): void {
+    // Initialize clean empty stores for actual live telemetry
     if (!localStorage.getItem(STORAGE_KEY_USERS)) {
-      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(INITIAL_DEMO_USERS));
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEY_EVENTS)) {
-      const initialEvents: AnalyticsEvent[] = [
-        {
-          id: 'evt-init-1',
-          type: 'print',
-          userId: 'usr-demo-1',
-          userName: 'Rajesh Sharma',
-          userEmail: 'rajesh.studio@printquick.in',
-          page: 'passport',
-          meta: { pageSize: '4x6 (10x15cm)', layout: '8-up Passport Grid' },
-          timestamp: Date.now() - 1000 * 60 * 12,
-        },
-        {
-          id: 'evt-init-2',
-          type: 'download',
-          userId: 'usr-demo-2',
-          userName: 'Ananya Verma',
-          userEmail: 'ananya.v@gmail.com',
-          page: 'print',
-          meta: { type: 'Clean Sheet Output (A4)' },
-          timestamp: Date.now() - 1000 * 60 * 45,
-        },
-        {
-          id: 'evt-init-3',
-          type: 'scan',
-          userId: 'usr-demo-3',
-          userName: 'Mohammad Al-Khatib',
-          userEmail: 'm.khatib@cybercafe.ae',
-          page: 'scanner',
-          meta: { cardSide: 'id_front' },
-          timestamp: Date.now() - 1000 * 60 * 180,
-        },
-      ];
-      localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(initialEvents));
+      localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify([]));
     }
   }
 
@@ -167,7 +169,7 @@ class AnalyticsService {
       const data = localStorage.getItem(STORAGE_KEY_USERS);
       return data ? JSON.parse(data) : [];
     } catch {
-      return INITIAL_DEMO_USERS;
+      return [];
     }
   }
 
@@ -198,6 +200,42 @@ class AnalyticsService {
     }
   }
 
+  private isDemoUser(user: UserAnalytics): boolean {
+    if (user.isDemo) return true;
+    if (user.id.startsWith('usr-demo-')) return true;
+    const demoEmails = [
+      'rajesh.studio@printquick.in',
+      'ananya.v@gmail.com',
+      'm.khatib@cybercafe.ae',
+      'sarah.jenkins@visa-express.co.uk',
+      'dchen.prints@fastdocs.org',
+    ];
+    return demoEmails.includes(user.email.toLowerCase());
+  }
+
+  private isDemoEvent(evt: AnalyticsEvent): boolean {
+    if (evt.id.startsWith('evt-init-')) return true;
+    if (evt.userId.startsWith('usr-demo-')) return true;
+    const demoEmails = [
+      'rajesh.studio@printquick.in',
+      'ananya.v@gmail.com',
+      'm.khatib@cybercafe.ae',
+      'sarah.jenkins@visa-express.co.uk',
+      'dchen.prints@fastdocs.org',
+    ];
+    return demoEmails.includes(evt.userEmail?.toLowerCase());
+  }
+
+  public purgeDemoData(): void {
+    const rawUsers = this.getUsers();
+    const cleanUsers = rawUsers.filter((u) => !this.isDemoUser(u));
+    this.saveUsers(cleanUsers);
+
+    const rawEvents = this.getEvents();
+    const cleanEvents = rawEvents.filter((e) => !this.isDemoEvent(e));
+    this.saveEvents(cleanEvents);
+  }
+
   private resolveUserInfo(currentUser?: UserProfile | null) {
     if (currentUser && currentUser.email) {
       return {
@@ -224,13 +262,13 @@ class AnalyticsService {
     updater: (user: UserAnalytics) => void
   ): UserAnalytics {
     const users = this.getUsers();
-    let userIndex = users.findIndex((u) => u.id === info.id || u.email === info.email);
+    let userIndex = users.findIndex((u) => u.id === info.id || u.email.toLowerCase() === info.email.toLowerCase());
 
     let targetUser: UserAnalytics;
     if (userIndex >= 0) {
       targetUser = { ...users[userIndex] };
       targetUser.lastActive = Date.now();
-      if (info.name && targetUser.name === 'Guest Studio User') {
+      if (info.name && (targetUser.name === 'Guest Studio User' || targetUser.name === 'User')) {
         targetUser.name = info.name;
       }
       if (info.avatarUrl) {
@@ -343,21 +381,243 @@ class AnalyticsService {
   public registerUser(user: UserProfile): void {
     const info = this.resolveUserInfo(user);
     this.updateOrCreateUser(info, () => {});
+
+    // Sync profile to Supabase cloud if table exists
+    const supabase = getSupabase();
+    if (supabase && user.email) {
+      Promise.resolve(
+        supabase.from('profiles').upsert(
+          {
+            id: user.id,
+            email: user.email,
+            full_name: user.name,
+            avatar_url: user.avatarUrl,
+            provider: user.provider || 'email',
+            last_sign_in_at: new Date().toISOString(),
+            created_at: new Date(user.createdAt || Date.now()).toISOString(),
+          },
+          { onConflict: 'email' }
+        )
+      ).catch(() => {});
+    }
+  }
+
+  // --- Cloud Sync with Supabase ---
+
+  public async checkSupabaseHealth(): Promise<{
+    connected: boolean;
+    profilesTable: boolean;
+    eventsTable: boolean;
+    error?: string;
+  }> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { connected: false, profilesTable: false, eventsTable: false, error: 'No client configured' };
+    }
+    let profilesTable = false;
+    let eventsTable = false;
+    let errorMsg: string | undefined = undefined;
+
+    try {
+      const resProfiles = await supabase.from('profiles').select('id').limit(1);
+      if (resProfiles.error) {
+        if (!resProfiles.error.message.includes('schema cache')) {
+          profilesTable = true;
+        }
+      } else {
+        profilesTable = true;
+      }
+    } catch (e: any) {
+      errorMsg = e?.message;
+    }
+
+    try {
+      const resEvents = await supabase.from('analytics_events').select('id').limit(1);
+      if (resEvents.error) {
+        if (!resEvents.error.message.includes('schema cache')) {
+          eventsTable = true;
+        }
+      } else {
+        eventsTable = true;
+      }
+    } catch {}
+
+    return {
+      connected: true,
+      profilesTable,
+      eventsTable,
+      error: errorMsg,
+    };
+  }
+
+  public async createRealUser(data: { name: string; email: string; provider?: string }): Promise<UserAnalytics> {
+    const info = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      avatarUrl: undefined,
+      provider: (data.provider || 'email') as any,
+      isDemo: false,
+    };
+
+    const user = this.updateOrCreateUser(info, (u) => {
+      u.lastActive = Date.now();
+    });
+
+    // Also push to Supabase profiles
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('profiles').upsert(
+          {
+            id: info.id,
+            email: info.email,
+            full_name: info.name,
+            provider: info.provider,
+            created_at: new Date().toISOString(),
+            last_sign_in_at: new Date().toISOString(),
+          },
+          { onConflict: 'email' }
+        );
+      } catch {}
+    }
+
+    return user;
+  }
+
+  public async syncFromSupabase(): Promise<{ 
+    success: boolean; 
+    cloudProfilesCount: number; 
+    cloudEventsCount: number; 
+    error?: string;
+    missingTables?: boolean;
+  }> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { success: false, cloudProfilesCount: 0, cloudEventsCount: 0, error: 'Supabase client is not configured' };
+    }
+
+    let cloudProfilesCount = 0;
+    let cloudEventsCount = 0;
+    let missingTables = false;
+
+    // 1. Sync Profiles Table
+    try {
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (pError && pError.message.includes('schema cache')) {
+        missingTables = true;
+      } else if (profiles && profiles.length > 0) {
+        cloudProfilesCount = profiles.length;
+        profiles.forEach((p: any) => {
+          const info = {
+            id: p.id || `usr_${p.email}`,
+            name: p.full_name || p.email?.split('@')[0] || 'User',
+            email: p.email,
+            avatarUrl: p.avatar_url,
+            provider: (p.provider || 'email') as any,
+            isDemo: false,
+          };
+          this.updateOrCreateUser(info, (u) => {
+            if (p.created_at) u.firstSeen = new Date(p.created_at).getTime();
+            if (p.last_sign_in_at) u.lastActive = new Date(p.last_sign_in_at).getTime();
+          });
+        });
+      }
+    } catch {}
+
+    // 2. Sync Events Table
+    try {
+      const { data, error } = await supabase
+        .from('analytics_events')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error && error.message.includes('schema cache')) {
+        missingTables = true;
+      } else if (data && data.length > 0) {
+        cloudEventsCount = data.length;
+        const localEvents = this.getEvents();
+        const existingIds = new Set(localEvents.map((e) => e.id));
+
+        const newMappedEvents: AnalyticsEvent[] = data
+          .map((row: any) => ({
+            id: row.id,
+            type: (row.event_type || 'page_view') as AnalyticsEvent['type'],
+            page: (row.page || 'scanner') as AnalyticsEvent['page'],
+            userId: row.user_id || 'unknown',
+            userName: row.user_name || row.user_email?.split('@')[0] || 'User',
+            userEmail: row.user_email || '',
+            meta: row.metadata || {},
+            timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+          }))
+          .filter((evt) => !existingIds.has(evt.id));
+
+        if (newMappedEvents.length > 0) {
+          const merged = [...newMappedEvents, ...localEvents];
+          this.saveEvents(merged);
+
+          // Update users list with cloud events
+          newMappedEvents.forEach((evt) => {
+            if (evt.userEmail) {
+              const info = {
+                id: evt.userId,
+                name: evt.userName,
+                email: evt.userEmail,
+                avatarUrl: undefined,
+                provider: (evt.userEmail.endsWith('@guest.printmate.local') ? 'guest' : 'google') as any,
+                isDemo: false,
+              };
+              this.updateOrCreateUser(info, (u) => {
+                if (evt.type === 'print') u.printCount = (u.printCount || 0) + 1;
+                if (evt.type === 'download') u.downloadCount = (u.downloadCount || 0) + 1;
+                if (evt.type === 'page_view' && evt.page) {
+                  u.pageViews[evt.page] = (u.pageViews[evt.page] || 0) + 1;
+                }
+              });
+            }
+          });
+        }
+      }
+    } catch (err: any) {
+      return { 
+        success: false, 
+        cloudProfilesCount, 
+        cloudEventsCount, 
+        error: err?.message || 'Sync failed',
+        missingTables 
+      };
+    }
+
+    return { 
+      success: true, 
+      cloudProfilesCount, 
+      cloudEventsCount, 
+      missingTables 
+    };
   }
 
   // --- Query Methods for Dashboard ---
 
-  public getAllUsers(): UserAnalytics[] {
-    return this.getUsers().sort((a, b) => b.lastActive - a.lastActive);
+  public getAllUsers(includeDemo: boolean = false): UserAnalytics[] {
+    const rawUsers = this.getUsers();
+    const filtered = includeDemo ? rawUsers : rawUsers.filter((u) => !this.isDemoUser(u));
+    return filtered.sort((a, b) => b.lastActive - a.lastActive);
   }
 
-  public getEventsList(): AnalyticsEvent[] {
-    return this.getEvents();
+  public getEventsList(includeDemo: boolean = false): AnalyticsEvent[] {
+    const rawEvents = this.getEvents();
+    return includeDemo ? rawEvents : rawEvents.filter((e) => !this.isDemoEvent(e));
   }
 
-  public getGlobalStats() {
-    const users = this.getUsers();
-    const events = this.getEvents();
+  public getGlobalStats(includeDemo: boolean = false) {
+    const users = this.getAllUsers(includeDemo);
+    const events = this.getEventsList(includeDemo);
 
     let totalPageViews = 0;
     let scannerViews = 0;
@@ -419,12 +679,11 @@ class AnalyticsService {
 
   public resetToSample(): void {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(INITIAL_DEMO_USERS));
-    localStorage.removeItem(STORAGE_KEY_EVENTS);
-    this.initializeStore();
+    localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(INITIAL_DEMO_EVENTS));
   }
 
-  public exportCSV(): string {
-    const users = this.getUsers();
+  public exportCSV(includeDemo: boolean = false): string {
+    const users = this.getAllUsers(includeDemo);
     const headers = [
       'ID',
       'Name',
@@ -461,7 +720,32 @@ class AnalyticsService {
   }
 
   public getSupabaseSQLSchema(): string {
-    return `-- Run this in your Supabase SQL Editor (SQL Editor -> New Query -> Run)
+    return `-- ========================================================
+-- PRINTMATE STUDIO: CLOUD DATABASE SETUP SCRIPT
+-- Paste and run this in your Supabase SQL Editor:
+-- (Supabase Dashboard -> SQL Editor -> New Query -> Run)
+-- ========================================================
+
+-- 1. Create public profiles table (Real User Accounts)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  provider TEXT DEFAULT 'email',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_sign_in_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Allow reading, inserting, and updating user profiles
+CREATE POLICY "Allow public read profiles" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Allow public insert profiles" ON public.profiles FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update profiles" ON public.profiles FOR UPDATE USING (true);
+
+-- 2. Create analytics events table (Live Telemetry & Logs)
 CREATE TABLE IF NOT EXISTS public.analytics_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type TEXT NOT NULL,
@@ -476,15 +760,9 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users and public to insert events
-CREATE POLICY "Allow public insert to analytics_events"
-  ON public.analytics_events FOR INSERT
-  WITH CHECK (true);
-
--- Allow reading analytics events for authenticated users
-CREATE POLICY "Allow read to analytics_events"
-  ON public.analytics_events FOR SELECT
-  USING (true);
+-- Allow logging and viewing analytics events
+CREATE POLICY "Allow public read analytics" ON public.analytics_events FOR SELECT USING (true);
+CREATE POLICY "Allow public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
 `;
   }
 }

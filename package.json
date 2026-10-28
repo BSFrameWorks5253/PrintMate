@@ -1,19 +1,43 @@
 {
   "name": "printmate",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.printmate.studio",
+    "productName": "PrintMate Studio",
+    "directories": {
+      "output": "C:/temp/printmate-release"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/downloads/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "compression": "maximum",
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/jszip": "^3.4.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "jszip": "^3.10.2",
     "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -26,6 +50,9 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "cross-env": "^10.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
     "jpeg-js": "^0.4.4",
     "oxlint": "^1.88.0",
     "pngjs": "^7.0.0",

@@ -39,6 +39,60 @@
   justify-content: center;
 }
 
+/* Screen Cut Guide (Screen-only alignment dashed boundary) */
+.screen-cut-guide {
+  outline: 1.5px dashed rgba(59, 130, 246, 0.75) !important;
+  outline-offset: 1px;
+}
+
+/* Printable Crop Marks (Corner ticks for paper guillotine/scissor cutting) */
+.print-crop-marks {
+  position: relative;
+}
+
+.crop-tick {
+  position: absolute;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.crop-tick-tl {
+  top: -5px;
+  left: -5px;
+  width: 9px;
+  height: 9px;
+  border-top: 1.5px solid #000000;
+  border-left: 1.5px solid #000000;
+}
+
+.crop-tick-tr {
+  top: -5px;
+  right: -5px;
+  width: 9px;
+  height: 9px;
+  border-top: 1.5px solid #000000;
+  border-right: 1.5px solid #000000;
+}
+
+.crop-tick-bl {
+  bottom: -5px;
+  left: -5px;
+  width: 9px;
+  height: 9px;
+  border-bottom: 1.5px solid #000000;
+  border-left: 1.5px solid #000000;
+}
+
+.crop-tick-br {
+  bottom: -5px;
+  right: -5px;
+  width: 9px;
+  height: 9px;
+  border-bottom: 1.5px solid #000000;
+  border-right: 1.5px solid #000000;
+}
+
+
 /* ==========================================================================
    Strict Print Isolation: Pure Clean Images On Physical Paper Only
    ========================================================================== */
@@ -79,8 +133,7 @@
   header,
   footer,
   nav,
-  aside,
-  canvas {
+  aside {
     display: none !important;
     visibility: hidden !important;
   }
@@ -97,12 +150,21 @@
     display: block !important;
   }
 
-  /* Physical paper sheet: pinned to top-left of physical page, exactly 1 sheet */
+  /* Ensure all sheets are visible and displayed in print */
+  .print-studio-sheet.hidden,
+  .print-page-wrapper .hidden {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Physical paper sheet: exactly 1 physical page per sheet container */
   .print-studio-sheet {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    margin: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    margin: 0 auto !important;
     padding: var(--print-sheet-padding, 12mm) !important;
     background: #ffffff !important;
     box-shadow: none !important;
@@ -115,11 +177,14 @@
     box-sizing: border-box !important;
     overflow: hidden !important;
     page-break-inside: avoid !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
     break-inside: avoid !important;
-    break-after: avoid !important;
-    break-before: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .print-studio-sheet:last-of-type {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   /* 100% Real ID Scale (CR80: 85.60 × 53.98 mm) on paper */
@@ -136,5 +201,15 @@
     width: 100% !important;
     height: 100% !important;
     box-shadow: none !important;
+  }
+
+  .screen-cut-guide {
+    outline: none !important;
+  }
+
+  .crop-tick {
+    border-color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

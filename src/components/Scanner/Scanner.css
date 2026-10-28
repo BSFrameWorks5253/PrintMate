@@ -52,3 +52,59 @@
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
+
+/* Tone Setter Range Slider Enhancements */
+.tone-slider-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background-color: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tone-slider-container:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.tone-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.tone-slider-track {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Dark Mode Overrides for Scanner */
+html.dark .scanner-loupe,
+[data-theme="dark"] .scanner-loupe {
+  border-color: #60a5fa;
+  background-color: #0f172a;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 12px rgba(96, 165, 250, 0.3);
+}
+
+html.dark .scanner-preview-box,
+[data-theme="dark"] .scanner-preview-box {
+  background-color: #0b0f19;
+  border-color: #334155;
+}
+
+html.dark .tone-slider-container,
+[data-theme="dark"] .tone-slider-container {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+html.dark .tone-slider-container:hover,
+[data-theme="dark"] .tone-slider-container:hover {
+  border-color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}

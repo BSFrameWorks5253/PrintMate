@@ -42,6 +42,7 @@ export interface PrintQueueItem {
   cardSide?: 'front' | 'back' | 'single';
   aspectRatio: number;
   createdAt: number;
+  copies?: number;
 }
 
 export type PageSizeId = 'a4' | 'a3' | 'letter' | 'legal' | '4x6' | '5x7';

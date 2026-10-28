@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Upload, 
   RotateCw, 
@@ -10,17 +10,22 @@ import {
   RefreshCw, 
   Sun, 
   Contrast, 
+  Sliders,
+  Palette,
   FileCheck, 
   Maximize2, 
   X, 
-  Target, 
   Eye, 
   Plus, 
   Layers,
   FileText,
   CreditCard,
-  Lock
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Archive
 } from 'lucide-react';
+import JSZip from 'jszip';
 import { useAuth } from '../../context/AuthContext';
 import { userStorageService } from '../../services/userStorageService';
 import type { 
@@ -46,6 +51,8 @@ import './Scanner.css';
 export interface ScannedCardItem {
   id: string;
   name: string;
+  rawFileName?: string;
+  fileHandle?: any;
   cardSide: 'front' | 'back' | 'single';
   docType: DocumentTypeId;
   sourceImage: HTMLImageElement;
@@ -53,6 +60,7 @@ export interface ScannedCardItem {
   adjustments: ImageAdjustments;
   aspectMode: 'standard' | 'portrait' | 'free';
   processedCanvas: HTMLCanvasElement | null;
+  processedDataUrl?: string; // Cache base64 dataUrl so JSX render is instant
 }
 
 interface ScannerViewProps {
@@ -60,6 +68,7 @@ interface ScannerViewProps {
   onSendMultipleToPrint?: (items: Omit<PrintQueueItem, 'id' | 'createdAt'>[]) => void;
   externalImage?: string | null;
   onClearExternalImage?: () => void;
+  isVisible?: boolean;
 }
 
 const defaultAdjustments: ImageAdjustments = {
@@ -78,8 +87,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   onSendMultipleToPrint,
   externalImage,
   onClearExternalImage,
+  isVisible = true,
 }) => {
-  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { user } = useAuth();
   // Multi-image state
   const [cards, setCards] = useState<ScannedCardItem[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
@@ -96,6 +106,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
   const [autoDetectNotice, setAutoDetectNotice] = useState<string>('');
   const [fullPreviewOpen, setFullPreviewOpen] = useState<boolean>(false);
+  const [isZipping, setIsZipping] = useState<boolean>(false);
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
 
   // Refs
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -104,17 +116,69 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const loupeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  // High-performance cache for perspective warp unwarping (drastically speeds up Tone Setter sliders)
+  const unwarpedCacheRef = useRef<{
+    cardId: string;
+    sourceW: number;
+    sourceH: number;
+    cornersKey: string;
+    aspectMode: string;
+    docType: string;
+    canvas: HTMLCanvasElement;
+  } | null>(null);
+
   // Current active card
   const currentCard = cards[activeCardIndex] || null;
 
+  // Helper to switch to another card cleanly
+  const selectCard = (index: number) => {
+    if (index < 0 || index >= cards.length) return;
+    setActiveHandle(null);
+    setIsDragging(false);
+    setLoupePos((prev) => ({ ...prev, visible: false }));
+    setActiveCardIndex(index);
+    const target = cards[index];
+    const sideName = target.cardSide === 'front' ? 'Front Side' : target.cardSide === 'back' ? 'Back Side' : `Image ${index + 1}`;
+    setAutoDetectNotice(`Editing ${sideName} (${target.name})`);
+    setTimeout(() => setAutoDetectNotice(''), 2000);
+  };
+
   // Helper to update active card fields
-  const updateCurrentCard = (updater: (prev: ScannedCardItem) => ScannedCardItem) => {
+  const updateCurrentCard = useCallback((updater: (prev: ScannedCardItem) => ScannedCardItem) => {
     setCards((prev) => {
       if (!prev[activeCardIndex]) return prev;
       const updated = [...prev];
       updated[activeCardIndex] = updater(updated[activeCardIndex]);
       return updated;
     });
+  }, [activeCardIndex]);
+
+  // Reset entire scan session back to clean initial state
+  const handleResetSession = () => {
+    setCards([]);
+    setActiveCardIndex(0);
+    unwarpedCacheRef.current = null;
+    setShowResetModal(false);
+    setAutoDetectNotice('Session cleared. Ready for new scan.');
+    setTimeout(() => setAutoDetectNotice(''), 2500);
+  };
+
+  // 1-Click reset for all Tone Setter adjustments on current card
+  const handleResetTone = () => {
+    if (!currentCard) return;
+    updateCurrentCard((c) => ({
+      ...c,
+      adjustments: {
+        ...c.adjustments,
+        brightness: 0,
+        contrast: 0,
+        exposure: 0,
+        saturation: 0,
+        filter: 'none',
+      },
+    }));
+    setAutoDetectNotice('Tone & lighting reset to defaults');
+    setTimeout(() => setAutoDetectNotice(''), 2000);
   };
 
   // Helper: process image URL into a ScannedCardItem
@@ -122,16 +186,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     img: HTMLImageElement, 
     name: string, 
     side: 'front' | 'back' | 'single' = 'front',
-    docType: DocumentTypeId = 'id_standard'
+    docType: DocumentTypeId = 'id_standard',
+    rawFileName?: string,
+    fileHandle?: any
   ): ScannedCardItem => {
     const detected = autoDetectDocumentCorners(img, 'auto');
     const docDef = DOCUMENT_TYPES.find((d) => d.id === docType);
     const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
 
     let processed: HTMLCanvasElement | null = null;
+    let dataUrl: string | undefined = undefined;
     try {
       const unwarped = warpPerspectiveCrop(img, detected, targetRatio, 2000, 'standard');
       processed = applyAdjustments(unwarped, defaultAdjustments);
+      dataUrl = processed.toDataURL('image/jpeg', 0.94);
     } catch (e) {
       console.warn('Initial warp error:', e);
     }
@@ -139,6 +207,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     return {
       id: `card-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: name.replace(/\.[^/.]+$/, ''),
+      rawFileName: rawFileName || name,
+      fileHandle,
       cardSide: side,
       docType,
       sourceImage: img,
@@ -146,6 +216,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       adjustments: { ...defaultAdjustments },
       aspectMode: 'standard',
       processedCanvas: processed,
+      processedDataUrl: dataUrl,
     };
   };
 
@@ -155,17 +226,19 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        const side: 'front' | 'back' | 'single' = cards.length === 0 ? 'front' : (cards.length === 1 ? 'back' : 'single');
-        const newCard = createCardFromImage(img, 'Sample_Document.jpg', side);
-        setCards((prev) => [...prev, newCard]);
-        setActiveCardIndex(cards.length);
+        setCards((prev) => {
+          const side: 'front' | 'back' | 'single' = prev.length === 0 ? 'front' : (prev.length === 1 ? 'back' : 'single');
+          const newCard = createCardFromImage(img, 'Sample_Document.jpg', side);
+          setActiveCardIndex(prev.length);
+          return [...prev, newCard];
+        });
         setAutoDetectNotice('Document auto-detected & ready');
         setTimeout(() => setAutoDetectNotice(''), 2500);
       };
       img.src = externalImage;
       if (onClearExternalImage) onClearExternalImage();
     }
-  }, [externalImage]);
+  }, [externalImage, onClearExternalImage]);
 
   // Handle Clipboard Paste
   useEffect(() => {
@@ -219,13 +292,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             const totalExisting = cards.length + newCards.length;
             const side: 'front' | 'back' | 'single' = 
               totalExisting === 0 ? 'front' : (totalExisting === 1 ? 'back' : 'single');
-            const card = createCardFromImage(img, file.name, side);
+            const card = createCardFromImage(img, file.name, side, 'id_standard', file.name, (file as any).handle);
             newCards.push(card);
             processedCount++;
 
             if (processedCount === filesArray.length) {
               setCards((prev) => [...prev, ...newCards]);
-              setActiveCardIndex(cards.length);
+              selectCard(cards.length);
               setAutoDetectNotice(
                 filesArray.length > 1 
                   ? `${filesArray.length} images added (Front & Back)` 
@@ -239,6 +312,53 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  // Open files with direct File System Access API if supported, or trigger file input
+  const openWithFilePicker = async () => {
+    if ('showOpenFilePicker' in window) {
+      try {
+        const handles = await (window as any).showOpenFilePicker({
+          multiple: true,
+          types: [{
+            description: 'Images',
+            accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] }
+          }]
+        });
+        if (!handles || handles.length === 0) return;
+        const newCards: ScannedCardItem[] = [];
+        for (let i = 0; i < handles.length; i++) {
+          const handle = handles[i];
+          const file = await handle.getFile();
+          const dataUrl = await new Promise<string>((res) => {
+            const reader = new FileReader();
+            reader.onload = (e) => res(e.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+          const img = await new Promise<HTMLImageElement>((res) => {
+            const image = new Image();
+            image.onload = () => res(image);
+            image.src = dataUrl;
+          });
+          const totalExisting = cards.length + newCards.length;
+          const side: 'front' | 'back' | 'single' = 
+            totalExisting === 0 ? 'front' : (totalExisting === 1 ? 'back' : 'single');
+          const card = createCardFromImage(img, file.name, side, 'id_standard', file.name, handle);
+          newCards.push(card);
+        }
+        if (newCards.length > 0) {
+          setCards((prev) => [...prev, ...newCards]);
+          selectCard(cards.length);
+          setAutoDetectNotice(`${newCards.length} image(s) loaded with direct overwrite access`);
+          setTimeout(() => setAutoDetectNotice(''), 3000);
+        }
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        console.warn('showOpenFilePicker error, falling back:', err);
+      }
+    }
+    fileInputRef.current?.click();
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -479,7 +599,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     });
 
     ctx.restore();
-  }, [currentCard, activeHandle]);
+  }, [currentCard, activeHandle, isVisible]);
 
   // Loupe magnifier
   useEffect(() => {
@@ -532,49 +652,88 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     ctx.restore();
   }, [currentCard, activeHandle, loupePos]);
 
-  // Perspective Warp & Adjustments
-  useEffect(() => {
-    if (!currentCard || isDragging) return;
+  const currentCorners = currentCard?.corners;
+  const currentDocType = currentCard?.docType;
+  const currentAdjustments = currentCard?.adjustments;
+  const currentAspectMode = currentCard?.aspectMode;
+  const currentSourceImage = currentCard?.sourceImage;
 
-    setIsProcessing(true);
+  // Perspective Warp & Adjustments (Optimized with unwarped canvas caching)
+  useEffect(() => {
+    if (!currentSourceImage || !currentCorners || isDragging) return;
+
     const timer = setTimeout(() => {
+      setIsProcessing(true);
       try {
-        const docDef = DOCUMENT_TYPES.find((d) => d.id === currentCard.docType);
+        const docDef = DOCUMENT_TYPES.find((d) => d.id === currentDocType);
         let targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
 
-        if (currentCard.aspectMode === 'free') {
+        if (currentAspectMode === 'free') {
           targetRatio = 0;
-        } else if (currentCard.aspectMode === 'portrait' && targetRatio > 0) {
+        } else if (currentAspectMode === 'portrait' && targetRatio > 0) {
           targetRatio = 1 / Math.max(targetRatio, 1 / targetRatio);
-        } else if (currentCard.aspectMode === 'standard' && targetRatio > 0) {
+        } else if (currentAspectMode === 'standard' && targetRatio > 0) {
           targetRatio = Math.max(targetRatio, 1 / targetRatio);
         }
 
-        const unwarped = warpPerspectiveCrop(
-          currentCard.sourceImage, 
-          currentCard.corners, 
-          targetRatio,
-          2000,
-          currentCard.aspectMode
-        );
-        const adjusted = applyAdjustments(unwarped, currentCard.adjustments);
+        const cornersKey = `${currentCorners.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('_')}`;
+        let unwarped: HTMLCanvasElement;
 
-        updateCurrentCard((c) => ({ ...c, processedCanvas: adjusted }));
+        if (
+          unwarpedCacheRef.current &&
+          unwarpedCacheRef.current.cardId === currentCard?.id &&
+          unwarpedCacheRef.current.cornersKey === cornersKey &&
+          unwarpedCacheRef.current.aspectMode === (currentAspectMode || 'standard') &&
+          unwarpedCacheRef.current.docType === (currentDocType || 'id_standard') &&
+          unwarpedCacheRef.current.sourceW === currentSourceImage.naturalWidth &&
+          unwarpedCacheRef.current.sourceH === currentSourceImage.naturalHeight
+        ) {
+          // Fast path: Reuse unwarped canvas when adjusting brightness/contrast/tone
+          unwarped = unwarpedCacheRef.current.canvas;
+        } else {
+          // Perspective crop changed
+          unwarped = warpPerspectiveCrop(
+            currentSourceImage, 
+            currentCorners, 
+            targetRatio,
+            2000,
+            currentAspectMode
+          );
+          unwarpedCacheRef.current = {
+            cardId: currentCard?.id || '',
+            cornersKey,
+            aspectMode: currentAspectMode || 'standard',
+            docType: currentDocType || 'id_standard',
+            sourceW: currentSourceImage.naturalWidth,
+            sourceH: currentSourceImage.naturalHeight,
+            canvas: unwarped,
+          };
+        }
+
+        const adjusted = applyAdjustments(unwarped, currentAdjustments);
+        const dataUrl = adjusted.toDataURL('image/jpeg', 0.94);
+
+        updateCurrentCard((c) => ({
+          ...c,
+          processedCanvas: adjusted,
+          processedDataUrl: dataUrl,
+        }));
       } catch (err) {
         console.error('Processing error:', err);
       } finally {
         setIsProcessing(false);
       }
-    }, 40);
+    }, 25);
 
     return () => clearTimeout(timer);
   }, [
-    currentCard?.corners, 
-    currentCard?.docType, 
-    currentCard?.adjustments, 
-    currentCard?.aspectMode, 
+    currentCorners, 
+    currentDocType, 
+    currentAdjustments, 
+    currentAspectMode, 
+    currentSourceImage,
+    updateCurrentCard,
     isDragging,
-    activeCardIndex
   ]);
 
   // Pointer interactions
@@ -705,16 +864,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       setLoupePos((prev) => ({ ...prev, visible: false }));
       try {
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {
+      } catch {
         // ignore
       }
     }
   };
 
   // Push Active Card to Print Studio
-  const handlePushCurrentToPrint = () => {
-    if (!currentCard?.processedCanvas) return;
-    const canvas = currentCard.processedCanvas;
+  const handlePushCurrentToPrint = (autoPrint: boolean = false) => {
+    if (!currentCard) return;
+    let canvas = currentCard.processedCanvas;
+    if (!canvas) {
+      const docDef = DOCUMENT_TYPES.find((d) => d.id === currentCard.docType);
+      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const unwarped = warpPerspectiveCrop(currentCard.sourceImage, currentCard.corners, targetRatio, 2000, currentCard.aspectMode);
+      canvas = applyAdjustments(unwarped, currentCard.adjustments);
+    }
+    if (!canvas) return;
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
     // Save to user's isolated recent documents
@@ -736,6 +903,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
     setCopiedSuccess(true);
     setTimeout(() => setCopiedSuccess(false), 2200);
+
+    if (autoPrint) {
+      setTimeout(() => {
+        window.print();
+      }, 450);
+    }
   };
 
   // Push ALL Cards to Print Studio (e.g. Front & Back)
@@ -784,22 +957,193 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     setTimeout(() => setCopiedSuccess(false), 2200);
   };
 
-  // Direct download
-  const handleDownload = () => {
-    if (!isAuthenticated) {
-      openAuthModal('download straightened document');
-      return;
+  // Save & Overwrite raw file on PC (Downloads section) using File System Access API or exact filename
+  const handleSaveOverwrite = async (cardToSave: ScannedCardItem | null = currentCard) => {
+    if (!cardToSave) return;
+    let canvas = cardToSave.processedCanvas;
+    if (!canvas) {
+      const docDef = DOCUMENT_TYPES.find((d) => d.id === cardToSave.docType);
+      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const unwarped = warpPerspectiveCrop(cardToSave.sourceImage, cardToSave.corners, targetRatio, 2000, cardToSave.aspectMode);
+      canvas = applyAdjustments(unwarped, cardToSave.adjustments);
     }
-    if (!currentCard?.processedCanvas) return;
+    if (!canvas) return;
+
+    const rawName = cardToSave.rawFileName || `${cardToSave.name}.jpg`;
+
+    // 1. Direct in-place overwrite if fileHandle exists
+    if (cardToSave.fileHandle && 'createWritable' in cardToSave.fileHandle) {
+      try {
+        const blob: Blob = await new Promise((res) => canvas!.toBlob((b) => res(b!), 'image/jpeg', 0.96));
+        const writable = await cardToSave.fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        setAutoDetectNotice(`✓ Successfully overwritten "${rawName}" directly on PC!`);
+        setTimeout(() => setAutoDetectNotice(''), 3500);
+        return;
+      } catch (err: any) {
+        console.warn('File handle write error, falling back:', err);
+      }
+    }
+
+    // 2. Open native Save dialog pre-populated with rawFileName to overwrite in Downloads folder
+    if ('showSaveFilePicker' in window) {
+      try {
+        const blob: Blob = await new Promise((res) => canvas!.toBlob((b) => res(b!), 'image/jpeg', 0.96));
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: rawName,
+          types: [{
+            description: 'JPEG Image',
+            accept: { 'image/jpeg': ['.jpg', '.jpeg'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        updateCurrentCard((c) => ({ ...c, fileHandle: handle, rawFileName: handle.name }));
+        setAutoDetectNotice(`✓ Saved & overwritten "${handle.name}"!`);
+        setTimeout(() => setAutoDetectNotice(''), 3500);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        console.warn('showSaveFilePicker cancelled or error:', err);
+      }
+    }
+
+    // 3. Fallback: standard download matching raw file name so browser replaces file in Downloads folder
+    const link = document.createElement('a');
+    link.download = rawName;
+    link.href = canvas.toDataURL('image/jpeg', 0.96);
+    link.click();
+    setAutoDetectNotice(`✓ Saved as "${rawName}" in Downloads folder`);
+    setTimeout(() => setAutoDetectNotice(''), 3500);
+  };
+
+  // Direct download of single card
+  const handleDownload = () => {
+    let canvas = currentCard?.processedCanvas;
+    if (!canvas && currentCard) {
+      const docDef = DOCUMENT_TYPES.find((d) => d.id === currentCard.docType);
+      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const unwarped = warpPerspectiveCrop(currentCard.sourceImage, currentCard.corners, targetRatio, 2000, currentCard.aspectMode);
+      canvas = applyAdjustments(unwarped, currentCard.adjustments);
+    }
+    if (!canvas || !currentCard) return;
+
     const link = document.createElement('a');
     link.download = `${currentCard.name}_${currentCard.cardSide}_straightened.jpg`;
-    link.href = currentCard.processedCanvas.toDataURL('image/jpeg', 0.96);
+    link.href = canvas.toDataURL('image/jpeg', 0.96);
     link.click();
-    analytics.trackDownload({
-      type: 'Straightened Document JPG',
-      fileName: currentCard.name,
-      page: 'scanner',
-    });
+    try {
+      analytics.trackDownload({
+        type: 'Straightened Document JPG',
+        fileName: currentCard.name,
+        page: 'scanner',
+      });
+    } catch (e) {
+      console.warn('Analytics tracking failed', e);
+    }
+  };
+
+  // Download All Cards as a unified ZIP file
+  const handleDownloadZip = async () => {
+    if (cards.length === 0) return;
+    setIsZipping(true);
+    setAutoDetectNotice(`Packaging all ${cards.length} images into a ZIP file...`);
+
+    try {
+      const zip = new JSZip();
+
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        let canvas = card.processedCanvas;
+        if (!canvas) {
+          const docDef = DOCUMENT_TYPES.find((d) => d.id === card.docType);
+          const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+          const unwarped = warpPerspectiveCrop(card.sourceImage, card.corners, targetRatio, 2000, card.aspectMode);
+          canvas = applyAdjustments(unwarped, card.adjustments);
+        }
+        if (!canvas) continue;
+
+        const blob: Blob = await new Promise((res) => canvas!.toBlob((b) => res(b!), 'image/jpeg', 0.96));
+
+        // Format clean filename for inside zip
+        let cleanName = card.rawFileName 
+          ? card.rawFileName.replace(/\.[^/.]+$/, '') 
+          : `${card.name}_${card.cardSide}`;
+        if (!cleanName.toLowerCase().endsWith('_straightened') && !cleanName.toLowerCase().endsWith('_clean')) {
+          cleanName += `_${card.cardSide}`;
+        }
+        const fileNameInZip = `${cleanName}.jpg`;
+
+        zip.file(fileNameInZip, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      const baseName = cards[0]?.rawFileName 
+        ? cards[0].rawFileName.replace(/\.[^/.]+$/, '') 
+        : (cards[0]?.name || 'PrintMate_Documents');
+      const zipName = `${baseName}_all_${cards.length}_images.zip`;
+      link.download = zipName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setAutoDetectNotice(`✓ Successfully downloaded ${zipName}!`);
+      setTimeout(() => setAutoDetectNotice(''), 3500);
+
+      try {
+        analytics.trackDownload({
+          type: 'Straightened Document ZIP Archive',
+          fileName: zipName,
+          page: 'scanner',
+        });
+      } catch (e) {
+        console.warn('Analytics tracking failed', e);
+      }
+    } catch (err) {
+      console.error('Error generating zip:', err);
+      setAutoDetectNotice('Failed to create ZIP, falling back to batch download...');
+      await handleDownloadAllSequential();
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
+  // Sequential individual downloads (fallback if needed)
+  const handleDownloadAllSequential = async (preferRawName: boolean = false) => {
+    if (cards.length === 0) return;
+    setAutoDetectNotice(`Downloading all ${cards.length} processed images...`);
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      let canvas = card.processedCanvas;
+      if (!canvas) {
+        const docDef = DOCUMENT_TYPES.find((d) => d.id === card.docType);
+        const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+        const unwarped = warpPerspectiveCrop(card.sourceImage, card.corners, targetRatio, 2000, card.aspectMode);
+        canvas = applyAdjustments(unwarped, card.adjustments);
+      }
+      if (!canvas) continue;
+
+      const filename = preferRawName && card.rawFileName 
+        ? card.rawFileName 
+        : `${card.name}_${card.cardSide}_straightened.jpg`;
+
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/jpeg', 0.96);
+      link.click();
+
+      if (i < cards.length - 1) {
+        await new Promise((res) => setTimeout(res, 350));
+      }
+    }
+
+    setAutoDetectNotice(`✓ Successfully downloaded all ${cards.length} images!`);
+    setTimeout(() => setAutoDetectNotice(''), 3000);
   };
 
   const loadSampleDirectly = (type: 'id_front' | 'id_back' | 'paper') => {
@@ -844,13 +1188,58 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         style={{ display: 'none' }}
       />
 
+      {/* SCANNER VIEW TITLE & REFRESH ACTION BAR (ALWAYS PROMINENTLY VISIBLE) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800 transition-colors">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              Document Scanner & Straightener
+            </h1>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+              AI AUTO-DESKEW
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {cards.length > 0 
+              ? `Session active: ${cards.length} image${cards.length > 1 ? 's' : ''} loaded. Edits persist across tab switches until you click Refresh.`
+              : 'Auto-detect 4 corners, straighten slanted perspective, and balance lighting for crisp printing.'}
+          </p>
+        </div>
+
+        {/* ALWAYS-VISIBLE PROMINENT REFRESH BUTTON */}
+        <div className="flex items-center gap-2">
+          {cards.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
+              title="Clear current scan session and start fresh"
+            >
+              <RefreshCw className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:rotate-180 transition-transform duration-300" />
+              <span>Refresh / New Scan</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadSampleDirectly('id_front')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Try Demo ID Card</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* If no images uploaded yet */}
       {cards.length === 0 ? (
         <div className="max-w-4xl mx-auto my-6">
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-3xl p-8 sm:p-12 text-center transition-all shadow-xl hover:shadow-2xl relative overflow-hidden"
+            className="border-2 border-dashed border-blue-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-white dark:bg-slate-900 rounded-3xl p-8 sm:p-12 text-center transition-all shadow-xl hover:shadow-2xl relative overflow-hidden"
           >
             {/* Subtle radial glow */}
             <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
@@ -858,23 +1247,23 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
             <div className="relative z-10">
               <div 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openWithFilePicker}
                 className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/30 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
               >
                 <Upload className="w-10 h-10" />
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
                 Upload ID Card or Document Images
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-6 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto mb-6 leading-relaxed">
                 Take a photo from your phone at any angle. PrintMate automatically detects the 4 corners, deskews slanted perspective, and adjusts scale for flawless printing.
               </p>
 
               {/* Browse CTA Button */}
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openWithFilePicker}
                 style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
                 className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl text-white text-sm font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-all cursor-pointer active:scale-95"
               >
@@ -882,13 +1271,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <span>Browse Images from Computer</span>
               </button>
 
-              <p className="text-[11px] text-slate-400 mt-3">
-                or drag & drop files here • paste with <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-mono text-slate-600">Ctrl+V</kbd>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">
+                or drag & drop files here • paste with <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded font-mono text-slate-600 dark:text-slate-300">Ctrl+V</kbd>
               </p>
 
               {/* 1-Click Studio Samples Direct Launch */}
-              <div className="mt-8 pt-8 border-t border-slate-100">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+              <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">
                   Or test immediately with 1-click studio samples
                 </div>
                 
@@ -896,15 +1285,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); loadSampleDirectly('id_front'); }}
-                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-blue-50/60 hover:border-blue-300 text-left transition-all group cursor-pointer shadow-xs"
+                    className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-blue-50/60 dark:hover:bg-blue-950/40 hover:border-blue-300 dark:hover:border-blue-600 text-left transition-all group cursor-pointer shadow-xs"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-blue-100 text-blue-700 group-hover:scale-110 transition-transform">
+                      <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 group-hover:scale-110 transition-transform">
                         <CreditCard className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-slate-900 group-hover:text-blue-700">Slanted ID Front</div>
-                        <div className="text-[10px] text-slate-500">Angled on wooden desk</div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300">Slanted ID Front</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Angled on wooden desk</div>
                       </div>
                     </div>
                   </button>
@@ -912,15 +1301,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); loadSampleDirectly('id_back'); }}
-                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-emerald-50/60 hover:border-emerald-300 text-left transition-all group cursor-pointer shadow-xs"
+                    className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-600 text-left transition-all group cursor-pointer shadow-xs"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 group-hover:scale-110 transition-transform">
+                      <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 group-hover:scale-110 transition-transform">
                         <Layers className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">ID Back Side</div>
-                        <div className="text-[10px] text-slate-500">Barcode & details</div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-300">ID Back Side</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Barcode & details</div>
                       </div>
                     </div>
                   </button>
@@ -928,15 +1317,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); loadSampleDirectly('paper'); }}
-                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 hover:bg-amber-50/60 hover:border-amber-300 text-left transition-all group cursor-pointer shadow-xs"
+                    className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 hover:bg-amber-50/60 dark:hover:bg-amber-950/40 hover:border-amber-300 dark:hover:border-amber-600 text-left transition-all group cursor-pointer shadow-xs"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-amber-100 text-amber-700 group-hover:scale-110 transition-transform">
+                      <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 group-hover:scale-110 transition-transform">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-slate-900 group-hover:text-amber-700">Paper Document</div>
-                        <div className="text-[10px] text-slate-500">A4 Certificate sheet</div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-700 dark:group-hover:text-amber-300">Paper Document</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">A4 Certificate sheet</div>
                       </div>
                     </div>
                   </button>
@@ -944,15 +1333,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               </div>
 
               {/* Feature Pills */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-6 text-[11px] text-slate-500">
-                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-6 text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
                   ✓ Auto-Crop & Perspective Deskew
                 </span>
-                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
+                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
                   ✓ Front & Back 2-Card Batching
                 </span>
-                <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-medium">
-                  ✓ CR80 ID & A4 Document Scale
+                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
+                  ✓ Direct In-Place Raw Image Overwrite
                 </span>
               </div>
             </div>
@@ -960,11 +1349,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {/* MULTI-IMAGE TRAY & CARD SELECTOR */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          {/* UNIFIED CLEAN TOP NAVIGATION BAR */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            {/* Left: Multi-card Selector Pills & Add More */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
-                <Layers className="w-4 h-4 text-cyan-600" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mr-1 shrink-0">
+                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Images ({cards.length}):</span>
               </span>
 
@@ -973,23 +1363,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 return (
                   <div
                     key={card.id}
-                    onClick={() => setActiveCardIndex(idx)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition-all flex-shrink-0 ${
+                    onClick={() => selectCard(idx)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition-all shrink-0 ${
                       isActive
-                        ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-cyan-400 text-white shadow-md shadow-cyan-500/10'
-                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-500'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-300 dark:ring-blue-500/40'
+                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'}`} />
-                    <span className="font-semibold">
-                      {card.cardSide === 'front' 
-                        ? '🪪 Front Side' 
-                        : card.cardSide === 'back' 
-                        ? '🪪 Back Side' 
-                        : `Image ${idx + 1}`}
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      isActive ? 'bg-white text-blue-600' : 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {idx + 1}
                     </span>
-                    <span className="text-[10px] text-slate-500 max-w-[100px] truncate">
-                      {card.name}
+                    <span className="font-bold">
+                      {card.cardSide === 'front' 
+                        ? '🪪 Front' 
+                        : card.cardSide === 'back' 
+                        ? '🪪 Back' 
+                        : `Side ${idx + 1}`}
                     </span>
                     {cards.length > 1 && (
                       <button
@@ -997,7 +1388,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           e.stopPropagation();
                           handleRemoveCard(idx);
                         }}
-                        className="p-0.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-all"
+                        className={`p-0.5 rounded transition-all ${
+                          isActive ? 'hover:bg-blue-700 text-blue-200 hover:text-white' : 'hover:bg-rose-100 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400'
+                        }`}
                         title="Remove image"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -1009,184 +1402,146 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
               {/* Add 1 More Image Button */}
               <button
+                type="button"
                 onClick={() => addMoreFileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 border border-cyan-300 text-cyan-700 hover:bg-cyan-500/25 transition-all text-xs font-semibold flex-shrink-0 shadow-sm"
-                title="Add second image (e.g. Back side of Aadhaar card)"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all text-xs font-semibold shrink-0 cursor-pointer shadow-2xs"
+                title="Add second image (e.g. Back side of ID card)"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add 1 More Image {cards.length === 1 ? '(Back Side)' : ''}</span>
+                <span>+ Add {cards.length === 1 ? 'Back Side' : 'Image'}</span>
               </button>
             </div>
 
-            {/* Quick Actions for All Cards */}
-            <div className="flex items-center gap-2">
+            {/* Center/Right: Document Standard & Session Controls */}
+            <div className="flex items-center gap-2 flex-wrap ml-auto">
+              {/* Document Standard Type Pills */}
+              {currentCard && (
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                  {DOCUMENT_TYPES.slice(0, 3).map((dt) => (
+                    <button
+                      key={dt.id}
+                      onClick={() => updateCurrentCard((c) => ({ ...c, docType: dt.id }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                        currentCard.docType === dt.id
+                          ? 'bg-blue-600 text-white font-bold shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                      title={dt.description}
+                    >
+                      {dt.name.replace('Standard ', '')}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Multi-image Send Both Button */}
               {cards.length > 1 && (
                 <button
+                  type="button"
                   onClick={handlePushAllToPrint}
-                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Send Both ({cards.length}) to Print Studio</span>
+                  <span>Send Both ({cards.length}) to Print</span>
                 </button>
               )}
+
+              {/* Session Refresh / Start New Scan Button */}
+              <button
+                type="button"
+                onClick={() => setShowResetModal(true)}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 text-slate-700 dark:text-slate-300 hover:text-rose-700 dark:hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
+                title="Clear session and start fresh with new image"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 group-hover:rotate-180 transition-transform" />
+                <span>Refresh / New Scan</span>
+              </button>
             </div>
           </div>
 
           {/* Toast Notification */}
           {autoDetectNotice && (
             <div className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg animate-fade-in">
-              <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>{autoDetectNotice}</span>
             </div>
           )}
 
-          {/* Active Card Configuration Bar */}
-          {currentCard && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">
-                  ID Standard:
-                </span>
-                {DOCUMENT_TYPES.map((dt) => (
-                  <button
-                    key={dt.id}
-                    onClick={() => updateCurrentCard((c) => ({ ...c, docType: dt.id }))}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                      currentCard.docType === dt.id
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                    title={dt.description}
-                  >
-                    {dt.name}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Card Side:
-                </span>
-                {(['front', 'back', 'single'] as const).map((side) => (
-                  <button
-                    key={side}
-                    onClick={() => updateCurrentCard((c) => ({ ...c, cardSide: side }))}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
-                      currentCard.cardSide === side
-                        ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                        : 'bg-slate-100 text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {side}
-                  </button>
-                ))}
-                <button
-                  onClick={() => addMoreFileInputRef.current?.click()}
-                  className="ml-auto md:ml-2 px-2.5 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-cyan-700 rounded-lg border border-cyan-200 flex items-center gap-1.5"
-                  title="Add another image"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Another</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* MAIN 2-COLUMN WORKSPACE: LEFT = DETECTOR & PINS, RIGHT = STRAIGHTENED & ADJUSTMENTS */}
+          {/* MAIN 2-COLUMN WORKSPACE: LEFT = CROP & PINS, RIGHT = STRAIGHTENED & TONE SETTER */}
           {currentCard && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* LEFT: SOURCE IMAGE WITH CROP HANDLES */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+              {/* LEFT COLUMN: CROP & CORNER PIN DETECTOR */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col space-y-3 shadow-xs">
+                {/* Header Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse" />
-                    <h4 className="text-sm font-semibold text-slate-900">
-                      Border Detection & Crop Pins ({currentCard.cardSide.toUpperCase()})
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Crop & Corner Pins ({currentCard.cardSide.toUpperCase()})
                     </h4>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Primary 1-Click Auto-Detect */}
                     <button
-                      onClick={() => rotateSourceImage(-90)}
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-white transition-all flex items-center gap-1 text-xs"
-                      title="Rotate Source 90° CCW"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Rotate Left</span>
-                    </button>
-
-                    <button
-                      onClick={() => rotateSourceImage(90)}
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-white transition-all flex items-center gap-1 text-xs"
-                      title="Rotate Source 90° CW"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Rotate Right</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleRotatePins('cw')}
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-amber-700 hover:text-white transition-all flex items-center gap-1 text-xs"
-                      title="Shift Pin Top-Edge 90° CW"
-                    >
-                      <RotateCw className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="hidden sm:inline">Shift Pins</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleRotatePins('180')}
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-amber-700 hover:text-white transition-all flex items-center gap-1 text-xs"
-                      title="Flip Pins 180°"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="hidden sm:inline">Flip 180°</span>
-                    </button>
-
-                    <button
+                      type="button"
                       onClick={() => runAutoDetect('auto')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-300 hover:bg-cyan-500/25 transition-all shadow-sm"
-                      title="Run auto border detection"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-xs cursor-pointer active:scale-95"
+                      title="Run automatic 4-corner document detection"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
+                      <Sparkles className="w-3.5 h-3.5" />
                       <span>Auto-Detect</span>
                     </button>
 
                     <button
+                      type="button"
+                      onClick={() => runAutoDetect('inner_card')}
+                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      title="Trim transparent lamination plastic and snap to card interior"
+                    >
+                      Snap Tight
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => runAutoDetect('outer_border')}
+                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      title="Include outer laminated plastic border"
+                    >
+                      With Border
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => rotateSourceImage(90)}
+                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all text-xs cursor-pointer shadow-2xs"
+                      title="Rotate Original Source 90° Clockwise"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRotatePins('cw')}
+                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all text-xs cursor-pointer shadow-2xs"
+                      title="Shift Pin Top-Edge 90° Clockwise"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={handleResetCorners}
-                      className="p-1.5 text-xs text-slate-500 hover:text-white rounded-lg hover:bg-slate-100 transition-all"
-                      title="Reset to outer margins"
+                      className="p-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
+                      title="Reset pins to full outer boundary"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Snap Quick Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1.5 text-cyan-600 font-medium">
-                    <Target className="w-3.5 h-3.5" />
-                    <span>💡 Click anywhere on card to snap pins instantly</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => runAutoDetect('inner_card')}
-                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-cyan-700 border border-slate-200 transition-all"
-                      title="Trim transparent lamination plastic and snap to card"
-                    >
-                      Snap to Card
-                    </button>
-                    <button
-                      onClick={() => runAutoDetect('outer_border')}
-                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-cyan-700 border border-slate-200 transition-all"
-                      title="Expand to outer laminated plastic margin"
-                    >
-                      Include Border
-                    </button>
-                  </div>
-                </div>
-
                 {/* Canvas Viewport */}
-                <div className="relative w-full aspect-[4/3] bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 select-none">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800 select-none">
                   <canvas
                     ref={editorCanvasRef}
                     onPointerDown={handlePointerDown}
@@ -1211,137 +1566,187 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                  <span>Drag corners • Drag edge midpoints to slide sides</span>
-                  <span className="font-mono text-cyan-600">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                  <span>💡 Drag pins or edge midpoints to frame document boundary.</span>
+                  <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold">
                     {currentCard.sourceImage.naturalWidth} × {currentCard.sourceImage.naturalHeight} px
                   </span>
                 </div>
               </div>
 
-              {/* RIGHT: STRAIGHTENED RESULT & IMAGE ADJUSTMENTS */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              {/* RIGHT COLUMN: STRAIGHTENED OUTPUT & TONE SETTER STUDIO */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col space-y-4 shadow-xs">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-emerald-400" />
-                    <h4 className="text-sm font-semibold text-slate-900">
-                      Deskewed Result & Filters
+                    <FileCheck className="w-4 h-4 text-emerald-500" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Deskewed Result ({currentCard.cardSide.toUpperCase()})
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
                     {isProcessing && (
-                      <span className="text-xs text-amber-600 flex items-center gap-1 animate-pulse">
-                        <Sparkles className="w-3 h-3" /> Processing...
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5" /> Applying Tone...
                       </span>
                     )}
                     <button
+                      type="button"
                       onClick={() => setFullPreviewOpen(true)}
-                      className="p-1 text-slate-500 hover:text-white rounded hover:bg-slate-100"
-                      title="View Fullscreen"
+                      className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors shadow-2xs"
+                      title="View Fullscreen High Resolution"
                     >
                       <Maximize2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Preview Canvas */}
-                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 p-4">
-                  {currentCard.processedCanvas ? (
+                {/* Straightened Result Preview Canvas / Image */}
+                <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800 p-3">
+                  {currentCard.processedDataUrl || currentCard.processedCanvas ? (
                     <img
-                      src={currentCard.processedCanvas.toDataURL()}
+                      src={currentCard.processedDataUrl || currentCard.processedCanvas?.toDataURL('image/jpeg', 0.94) || ''}
                       alt="Straightened Result"
-                      className="max-w-full max-h-full object-contain rounded-md shadow-2xl transition-all"
+                      className="max-w-full max-h-full object-contain rounded-md shadow-lg transition-all"
                     />
                   ) : (
-                    <div className="text-slate-500 text-xs">Generating preview...</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 animate-spin text-blue-500" />
+                      <span>Generating preview...</span>
+                    </div>
                   )}
 
-                  <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-700 border border-cyan-200">
+                  <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30">
                     {currentCard.cardSide.toUpperCase()} • {DOCUMENT_TYPES.find((d) => d.id === currentCard.docType)?.name}
                     {currentCard.processedCanvas && ` • ${currentCard.processedCanvas.width}×${currentCard.processedCanvas.height}px`}
                   </div>
                 </div>
 
-                {/* 1-Click Direct Rotation & Orientation Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                    <span>Card Orientation:</span>
-                    <span className="text-[10px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                      {currentCard.processedCanvas && currentCard.processedCanvas.width >= currentCard.processedCanvas.height
-                        ? 'Landscape (Horizontal)'
-                        : 'Portrait (Vertical)'}
-                      {currentCard.adjustments.rotation ? ` • ${currentCard.adjustments.rotation}°` : ''}
+                {/* 1. ORIENTATION & TILT DESKEW (CLEAN & COMPACT) */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-2.5 shadow-2xs">
+                  {/* Rotation Buttons */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <RotateCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Orientation:</span>
                     </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleRotateOutput(-90)}
-                      className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-white text-xs font-medium border border-slate-200 flex items-center gap-1 transition-all"
-                      title="Rotate Deskewed Card 90° CCW"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-cyan-600" />
-                      <span>-90°</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleRotateOutput(90)}
-                      className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
-                      title="Rotate Deskewed Card 90° CW"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                      <span>+90°</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleRotateOutput(180)}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all"
-                      title="Flip Deskewed Card 180° (Upright)"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Flip 180°</span>
-                    </button>
-
-                    <button
-                      onClick={handleToggleOrientation}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        currentCard.aspectMode === 'standard'
-                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
-                          : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-white'
-                      }`}
-                      title="Switch between Horizontal Landscape (Standard ID) and Vertical Portrait"
-                    >
-                      {currentCard.aspectMode === 'standard' ? 'Flip to Portrait' : 'Make Horizontal (ID)'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Aspect Ratio Lock Mode */}
-                <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200">
-                  <span className="text-slate-500">Aspect Ratio:</span>
-                  <div className="flex items-center gap-1">
-                    {(['standard', 'portrait', 'free'] as const).map((mode) => (
+                    <div className="flex items-center gap-1.5">
                       <button
-                        key={mode}
-                        onClick={() => updateCurrentCard((c) => ({ ...c, aspectMode: mode }))}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
-                          currentCard.aspectMode === mode
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-500 hover:text-white'
-                        }`}
+                        type="button"
+                        onClick={() => handleRotateOutput(-90)}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
+                        title="Rotate -90° CCW"
                       >
-                        {mode === 'standard' ? 'Standard Card' : mode === 'portrait' ? 'Portrait' : 'Free Quad'}
+                        -90°
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => handleRotateOutput(90)}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
+                        title="Rotate +90° CW"
+                      >
+                        +90°
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRotateOutput(180)}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs"
+                        title="Flip 180°"
+                      >
+                        Flip 180°
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleToggleOrientation}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-bold border border-blue-200 dark:border-blue-800 transition-all cursor-pointer"
+                        title="Toggle Landscape / Portrait format"
+                      >
+                        {currentCard.aspectMode === 'standard' ? 'Flip to Portrait' : 'Make Landscape (ID)'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fine Tilt Angle Slider */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">Tilt Deskew:</span>
+                    <button
+                      type="button"
+                      onClick={() => updateCurrentCard((c) => ({
+                        ...c,
+                        adjustments: { ...c.adjustments, fineAngle: Math.max(-25, Math.round(((c.adjustments.fineAngle || 0) - 1) * 10) / 10) }
+                      }))}
+                      className="px-1.5 py-0.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                      title="Tilt -1°"
+                    >
+                      -1°
+                    </button>
+                    <input
+                      type="range"
+                      min="-25"
+                      max="25"
+                      step="0.5"
+                      value={currentCard.adjustments.fineAngle || 0}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, fineAngle: val }
+                        }));
+                      }}
+                      className="flex-1 cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateCurrentCard((c) => ({
+                        ...c,
+                        adjustments: { ...c.adjustments, fineAngle: Math.min(25, Math.round(((c.adjustments.fineAngle || 0) + 1) * 10) / 10) }
+                      }))}
+                      className="px-1.5 py-0.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                      title="Tilt +1°"
+                    >
+                      +1°
+                    </button>
+                    <span className="text-xs font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 min-w-[45px] text-center">
+                      {(currentCard.adjustments.fineAngle || 0) > 0 
+                        ? `+${(currentCard.adjustments.fineAngle || 0).toFixed(1)}°` 
+                        : `${(currentCard.adjustments.fineAngle || 0).toFixed(1)}°`}
+                    </span>
+                    {(currentCard.adjustments.fineAngle || 0) !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, fineAngle: 0 }
+                        }))}
+                        className="px-1.5 py-0.5 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 cursor-pointer"
+                        title="Reset tilt to 0°"
+                      >
+                        0°
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Quick Filters */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Scan Filters & Modes</span>
-                  </label>
+                {/* 2. TONE SETTER & COLOR FILTERS (PROMINENT, CLEAN & HIGH CONTRAST) */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3 shadow-2xs">
+                  {/* Tone Setter Title & Reset */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Tone Setter & Filters</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleResetTone}
+                      className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Reset all tone adjustments back to normal defaults"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Reset Tones</span>
+                    </button>
+                  </div>
+
+                  {/* Filter Color Presets */}
                   <div className="grid grid-cols-5 gap-1.5">
                     {[
                       { id: 'none', label: 'Original' },
@@ -1352,71 +1757,185 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     ].map((f) => (
                       <button
                         key={f.id}
+                        type="button"
                         onClick={() => updateCurrentCard((c) => ({
                           ...c,
                           adjustments: { ...c.adjustments, filter: f.id as any }
                         }))}
-                        className={`py-1.5 px-1 rounded-lg text-[11px] font-medium transition-all text-center truncate ${
+                        className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all text-center cursor-pointer ${
                           currentCard.adjustments.filter === f.id
-                            ? 'bg-blue-600 text-white font-semibold shadow'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
                         }`}
                       >
                         {f.label}
                       </button>
                     ))}
                   </div>
+
+                  {/* 4 Tone Sliders (2x2 Grid) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Brightness Slider */}
+                    <div className="tone-slider-container">
+                      <div className="tone-slider-header">
+                        <span className="text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1">
+                          <Sun className="w-3.5 h-3.5 text-amber-500" /> Brightness
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-blue-700 dark:text-blue-400">
+                            {currentCard.adjustments.brightness > 0 ? `+${currentCard.adjustments.brightness}` : currentCard.adjustments.brightness}
+                          </span>
+                          {currentCard.adjustments.brightness !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => updateCurrentCard((c) => ({
+                                ...c,
+                                adjustments: { ...c.adjustments, brightness: 0 }
+                              }))}
+                              className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold px-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                              title="Reset brightness to 0"
+                            >
+                              0
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="-80"
+                        max="80"
+                        value={currentCard.adjustments.brightness}
+                        onChange={(e) => updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, brightness: Number(e.target.value) }
+                        }))}
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Contrast Slider */}
+                    <div className="tone-slider-container">
+                      <div className="tone-slider-header">
+                        <span className="text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1">
+                          <Contrast className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" /> Contrast
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-blue-700 dark:text-blue-400">
+                            {currentCard.adjustments.contrast > 0 ? `+${currentCard.adjustments.contrast}` : currentCard.adjustments.contrast}
+                          </span>
+                          {currentCard.adjustments.contrast !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => updateCurrentCard((c) => ({
+                                ...c,
+                                adjustments: { ...c.adjustments, contrast: 0 }
+                              }))}
+                              className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold px-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                              title="Reset contrast to 0"
+                            >
+                              0
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="-80"
+                        max="80"
+                        value={currentCard.adjustments.contrast}
+                        onChange={(e) => updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, contrast: Number(e.target.value) }
+                        }))}
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Exposure Slider */}
+                    <div className="tone-slider-container">
+                      <div className="tone-slider-header">
+                        <span className="text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1">
+                          <Sliders className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Exposure
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-blue-700 dark:text-blue-400">
+                            {(currentCard.adjustments.exposure || 0) > 0 ? `+${currentCard.adjustments.exposure}` : (currentCard.adjustments.exposure || 0)}
+                          </span>
+                          {(currentCard.adjustments.exposure || 0) !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => updateCurrentCard((c) => ({
+                                ...c,
+                                adjustments: { ...c.adjustments, exposure: 0 }
+                              }))}
+                              className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold px-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                              title="Reset exposure to 0"
+                            >
+                              0
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="-50"
+                        max="50"
+                        value={currentCard.adjustments.exposure || 0}
+                        onChange={(e) => updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, exposure: Number(e.target.value) }
+                        }))}
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Saturation Slider */}
+                    <div className="tone-slider-container">
+                      <div className="tone-slider-header">
+                        <span className="text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1">
+                          <Palette className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" /> Saturation
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-blue-700 dark:text-blue-400">
+                            {(currentCard.adjustments.saturation || 0) > 0 ? `+${currentCard.adjustments.saturation}` : (currentCard.adjustments.saturation || 0)}
+                          </span>
+                          {(currentCard.adjustments.saturation || 0) !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => updateCurrentCard((c) => ({
+                                ...c,
+                                adjustments: { ...c.adjustments, saturation: 0 }
+                              }))}
+                              className="text-[10px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold px-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                              title="Reset saturation to 0"
+                            >
+                              0
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="-50"
+                        max="50"
+                        value={currentCard.adjustments.saturation || 0}
+                        onChange={(e) => updateCurrentCard((c) => ({
+                          ...c,
+                          adjustments: { ...c.adjustments, saturation: Number(e.target.value) }
+                        }))}
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Brightness & Contrast Sliders */}
-                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-500 flex items-center gap-1">
-                        <Sun className="w-3 h-3 text-amber-600" /> Brightness
-                      </span>
-                      <span className="font-mono text-cyan-600">{currentCard.adjustments.brightness}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-80"
-                      max="80"
-                      value={currentCard.adjustments.brightness}
-                      onChange={(e) => updateCurrentCard((c) => ({
-                        ...c,
-                        adjustments: { ...c.adjustments, brightness: Number(e.target.value) }
-                      }))}
-                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-500 flex items-center gap-1">
-                        <Contrast className="w-3 h-3 text-cyan-600" /> Contrast
-                      </span>
-                      <span className="font-mono text-cyan-600">{currentCard.adjustments.contrast}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-80"
-                      max="80"
-                      value={currentCard.adjustments.contrast}
-                      onChange={(e) => updateCurrentCard((c) => ({
-                        ...c,
-                        adjustments: { ...c.adjustments, contrast: Number(e.target.value) }
-                      }))}
-                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                </div>
-
-                {/* ACTION BUTTONS */}
-                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  {/* Push Active Card */}
+                {/* 3. PRIMARY & SECONDARY ACTION BUTTONS */}
+                <div className="space-y-2.5 pt-1">
+                  {/* Primary CTA: Send to Print Studio */}
                   <button
-                    onClick={handlePushCurrentToPrint}
-                    className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-98"
+                    type="button"
+                    onClick={() => handlePushCurrentToPrint(false)}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer transform active:scale-98"
                   >
                     {copiedSuccess ? (
                       <>
@@ -1426,34 +1945,83 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     ) : (
                       <>
                         <Printer className="w-4 h-4" />
-                        <span>Send This Card to Print</span>
+                        <span>Send {currentCard.cardSide === 'front' ? 'Front Side' : currentCard.cardSide === 'back' ? 'Back Side' : 'Image'} to Print Studio →</span>
                       </>
                     )}
                   </button>
 
-                  {/* If multiple cards, also offer Send All */}
-                  {cards.length > 1 && (
-                    <button
-                      onClick={handlePushAllToPrint}
-                      className="py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all"
-                    >
-                      <Layers className="w-4 h-4" />
-                      <span>Send Both ({cards.length})</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleDownload}
-                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    title={isAuthenticated ? 'Download Single Image File' : 'Sign in required to download'}
-                  >
-                    {!isAuthenticated ? (
-                      <Lock className="w-4 h-4 text-amber-600" />
-                    ) : (
-                      <Download className="w-4 h-4" />
+                  {/* Secondary Actions Bar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Multi-card Prev / Next */}
+                    {cards.length > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => selectCard(activeCardIndex - 1)}
+                          disabled={activeCardIndex === 0}
+                          className="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>Prev</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => selectCard(activeCardIndex + 1)}
+                          disabled={activeCardIndex >= cards.length - 1}
+                          className="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>Next</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
-                    <span>Download</span>
-                  </button>
+
+                    {/* Download JPG or ZIP */}
+                    {cards.length > 1 && activeCardIndex === cards.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={handleDownloadZip}
+                        disabled={isZipping}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <Archive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{isZipping ? 'Zipping...' : `Download All (${cards.length}) .ZIP`}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleDownload}
+                        className="flex-1 py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>Download JPG</span>
+                      </button>
+                    )}
+
+                    {/* Immediate Print */}
+                    <button
+                      type="button"
+                      onClick={() => handlePushCurrentToPrint(true)}
+                      className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
+                      title="Send to Print Studio and open print dialog immediately"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print Now</span>
+                    </button>
+
+                    {/* Overwrite PC File if available */}
+                    {currentCard.fileHandle && (
+                      <button
+                        type="button"
+                        onClick={() => handleSaveOverwrite()}
+                        className="py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
+                        title="Directly overwrite source image on PC"
+                      >
+                        <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Overwrite</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1461,36 +2029,71 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         </div>
       )}
 
+      {/* CONFIRMATION MODAL: REFRESH / CLEAR SCAN SESSION */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 flex items-center justify-center shrink-0">
+                <RefreshCw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Start New Scan Session?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                  This will clear {cards.length} edited image{cards.length > 1 ? 's' : ''} in this session and return to the upload screen.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer border border-transparent dark:border-slate-700"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSession}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md shadow-rose-600/25 transition-all cursor-pointer"
+              >
+                Clear & Start New
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fullscreen High-Resolution Preview Modal */}
       {fullPreviewOpen && currentCard?.processedCanvas && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative max-w-4xl w-full bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="relative max-w-4xl w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-cyan-600" />
-                <h3 className="text-sm font-bold text-slate-900">Full Resolution Preview ({currentCard.name})</h3>
+                <Eye className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Full Resolution Preview ({currentCard.name})</h3>
               </div>
               <button
                 onClick={() => setFullPreviewOpen(false)}
-                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 p-6 overflow-auto flex items-center justify-center bg-slate-100">
+            <div className="flex-1 p-6 overflow-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
               <img
                 src={currentCard.processedCanvas.toDataURL()}
                 alt="Full Preview"
                 className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
               />
             </div>
-            <div className="p-3 border-t border-slate-200 flex items-center justify-between bg-white text-xs text-slate-500">
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
               <span>{currentCard.processedCanvas.width} × {currentCard.processedCanvas.height} px • High Resolution</span>
               <button
                 onClick={handleDownload}
                 className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 flex items-center gap-1.5 cursor-pointer"
               >
-                {!isAuthenticated ? <Lock className="w-3.5 h-3.5 text-amber-300" /> : <Download className="w-3.5 h-3.5" />}
+                <Download className="w-3.5 h-3.5" />
                 <span>Download Output</span>
               </button>
             </div>
