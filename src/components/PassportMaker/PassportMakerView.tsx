@@ -144,7 +144,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [showGuidelines, setShowGuidelines] = useState<boolean>(true);
+  const [showGuidelines, setShowGuidelines] = useState<boolean>(false);
 
   // Sheet configuration
   const [paperSize, setPaperSize] = useState<PaperSizeKey>('4x6');
