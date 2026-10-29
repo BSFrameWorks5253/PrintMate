@@ -1,11 +1,13 @@
 import type { DocumentTypeOption, PageDimension } from '../types';
 
 export const AUTHORIZED_ADMIN_EMAILS = [
+  'bs.framework52523@gmail.com',
   'bs.framework5253@gmail.com',
   'bs.framework5252@gmail.com',
+  'bsframeworks5253@gmail.com',
 ];
 
-export const AUTHORIZED_ADMIN_EMAIL = 'bs.framework5253@gmail.com';
+export const AUTHORIZED_ADMIN_EMAIL = 'bs.framework52523@gmail.com';
 
 export const isAuthorizedAdmin = (email?: string | null): boolean => {
   if (!email) return false;

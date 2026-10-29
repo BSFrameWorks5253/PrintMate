@@ -184,8 +184,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateTab })
     checkHealth();
     // Track admin page view
     analytics.trackPageView('admin', currentUser);
-    // Background sync check
-    analytics.syncFromSupabase().catch(() => {});
+    
+    // Immediate background sync check from Supabase cloud
+    analytics.syncFromSupabase().then(() => loadData()).catch(() => {});
+
+    // Live background polling so new signups from other devices show up automatically
+    const interval = setInterval(() => {
+      analytics.syncFromSupabase().then(() => loadData()).catch(() => {});
+      checkHealth();
+    }, 8000);
+
+    return () => clearInterval(interval);
   }, [isAdmin, loadData, currentUser]);
 
   const stats = useMemo(() => {

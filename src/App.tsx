@@ -56,6 +56,11 @@ const MainAppContent: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Track page views and user activity across all devices
+  useEffect(() => {
+    analytics.trackPageView(activeTab, user);
+  }, [activeTab, user]);
+
   // Sync tab with browser URL history
   const setActiveTab = useCallback((tab: AppTab) => {
     setExternalImage(null);
@@ -316,7 +321,7 @@ const MainAppContent: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1">
+      <main className="flex-1 pb-16 md:pb-0">
         <div className={`no-print ${activeTab === 'home' ? 'block' : 'hidden'}`}>
           <HomePage
             onNavigate={setActiveTab}

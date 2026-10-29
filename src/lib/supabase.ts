@@ -1,12 +1,20 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '';
+// Default project Supabase credentials (for production Vercel & client devices)
+const DEFAULT_SUPABASE_URL = 'https://bijmhruqlqovpniedmuu.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_VB00c99HQ_mf4cb8_rrQiw_x0D7LADp';
+
+const supabaseUrl =
+  import.meta.env.SUPABASE_URL ||
+  import.meta.env.VITE_SUPABASE_URL ||
+  DEFAULT_SUPABASE_URL;
+
 const supabaseAnonKey =
   import.meta.env.SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  '';
+  DEFAULT_SUPABASE_ANON_KEY;
 
 // Local storage keys for runtime configuration in the UI
 const STORAGE_URL_KEY = 'printmate_supabase_url';

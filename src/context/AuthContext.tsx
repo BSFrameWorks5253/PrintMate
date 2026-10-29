@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { getSupabase, getSupabaseConfig, setSupabaseConfig, resetSupabaseClient } from '../lib/supabase';
+import { analytics } from '../services/analyticsService';
 
 export interface UserProfile {
   id: string;
@@ -97,7 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setSession(session);
-        setUser(mapUser(session.user));
+        const mapped = mapUser(session.user);
+        setUser(mapped);
+        analytics.registerUser(mapped);
         setIsLoading(false);
         setIsAuthModalOpen(false);
         sanitizeAuthHashFromUrl();
@@ -106,7 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const localUser = localStorage.getItem('printmate_local_user');
           if (localUser) {
-            setUser(JSON.parse(localUser));
+            const parsed = JSON.parse(localUser);
+            setUser(parsed);
+            analytics.registerUser(parsed);
           } else {
             setUser(null);
           }
@@ -124,7 +129,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setSession(session);
-        setUser(mapUser(session.user));
+        const mapped = mapUser(session.user);
+        setUser(mapped);
+        analytics.registerUser(mapped);
         setIsLoading(false);
         setIsAuthModalOpen(false);
         sanitizeAuthHashFromUrl();
@@ -181,7 +188,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         if (error) throw error;
         if (data.user) {
-          setUser(mapUser(data.user));
+          const mapped = mapUser(data.user);
+          setUser(mapped);
+          analytics.registerUser(mapped);
           setIsAuthModalOpen(false);
         }
         return { error: null };
@@ -230,8 +239,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      if (data.session) {
-        setUser(data.user ? mapUser(data.user) : null);
+      if (data.session && data.user) {
+        const mapped = mapUser(data.user);
+        setUser(mapped);
+        analytics.registerUser(mapped);
         setIsAuthModalOpen(false);
         return { error: null, message: 'Account created and signed in successfully!' };
       } else {
@@ -265,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore
     }
     setUser(localUser);
+    analytics.registerUser(localUser);
     setIsAuthModalOpen(false);
   };
 

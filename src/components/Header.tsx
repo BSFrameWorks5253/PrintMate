@@ -19,7 +19,8 @@ import {
   HardDrive,
   Sun,
   Moon,
-  ExternalLink
+  ExternalLink,
+  Menu
 } from 'lucide-react';
 import type { PrintQueueItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSamplesOpen, setIsSamplesOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { canInstall, isInstalled, isOnline, isElectron, promptInstall } = usePwaInstall();
   const recentsCount = userStorageService.getRecents(user?.id).length;
 
@@ -108,8 +110,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+          {/* Navigation Tabs (Desktop & Tablet) */}
+          <nav className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setActiveTab('home')}
               style={{
@@ -256,17 +258,17 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Recent Documents Quick Button */}
+            {/* Recent Documents Quick Button (Visible on screens >= 768px) */}
             {onOpenRecents && (
               <button
                 type="button"
                 onClick={onOpenRecents}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all shadow-xs cursor-pointer"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all shadow-xs cursor-pointer"
                 title="View your saved recent documents & scans"
               >
                 <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span className="hidden sm:inline">Recent Documents</span>
-                <span className="sm:hidden">Recents</span>
+                <span className="hidden lg:inline">Recent Documents</span>
+                <span className="lg:hidden">Recents</span>
                 {recentsCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                     {recentsCount}
@@ -275,8 +277,8 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Demo Samples Dropdown */}
-            <div className="relative" ref={samplesRef}>
+            {/* Demo Samples Dropdown (Visible on screens >= 768px) */}
+            <div className="relative hidden md:block" ref={samplesRef}>
               <button 
                 type="button"
                 onClick={() => setIsSamplesOpen(!isSamplesOpen)}
@@ -398,15 +400,183 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => openAuthModal()}
                 style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl hover:bg-blue-500 text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl hover:bg-blue-500 text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95 shrink-0"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
               </button>
             )}
+
+            {/* Mobile Menu Toggle Button (Visible on screens < 768px) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs flex items-center justify-center shrink-0"
+              title="Toggle Menu"
+              aria-label="Toggle navigation menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-4 h-4 text-rose-500" />
+              ) : (
+                <div className="relative">
+                  <Menu className="w-4 h-4" />
+                  {queue.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500" />
+                  )}
+                </div>
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Drawer (When hamburger menu is tapped on phones/tablets) */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md px-4 py-3 space-y-3 animate-in slide-in-from-top-2 shadow-xl">
+          {/* Quick Action Links */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { handleInstallClick(); setIsMobileMenuOpen(false); }}
+              className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs shadow-xs cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-cyan-200" />
+              <span>Download App</span>
+            </button>
+
+            {onOpenRecents && (
+              <button
+                type="button"
+                onClick={() => { onOpenRecents(); setIsMobileMenuOpen(false); }}
+                className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs cursor-pointer"
+              >
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Recents ({recentsCount})</span>
+              </button>
+            )}
+          </div>
+
+          {/* 1-Click Samples on Mobile */}
+          <div className="pt-1">
+            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+              1-Click Demo Samples
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => { onLoadSample('id_front'); setActiveTab('scanner'); setIsMobileMenuOpen(false); }}
+                className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[11px] font-semibold text-center cursor-pointer"
+              >
+                ID Front
+              </button>
+              <button
+                type="button"
+                onClick={() => { onLoadSample('id_back'); setActiveTab('scanner'); setIsMobileMenuOpen(false); }}
+                className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold text-center cursor-pointer"
+              >
+                ID Back
+              </button>
+              <button
+                type="button"
+                onClick={() => { onLoadSample('paper'); setActiveTab('scanner'); setIsMobileMenuOpen(false); }}
+                className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-[11px] font-semibold text-center cursor-pointer"
+              >
+                Paper Doc
+              </button>
+            </div>
+          </div>
+
+          {/* Admin link on mobile if authorized */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => { setActiveTab('admin'); setIsMobileMenuOpen(false); }}
+              className="w-full p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-between cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-indigo-500" />
+                <span>Admin Analytics & Telemetry</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-indigo-600 text-white">PRO</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation Bar (Phones & Tablets < 768px) */}
+      <nav className="md:hidden no-print fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
+        <button
+          type="button"
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'home'
+              ? 'text-blue-600 dark:text-blue-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Home className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Home</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('scanner')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'scanner'
+              ? 'text-blue-600 dark:text-blue-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Crop className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Scan & Edit</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('print')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl relative transition-all cursor-pointer ${
+            activeTab === 'print'
+              ? 'text-blue-600 dark:text-blue-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Printer className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Print Studio</span>
+          {queue.length > 0 && (
+            <span className="absolute top-0 right-2 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500 text-white">
+              {queue.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('passport')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'passport'
+              ? 'text-blue-600 dark:text-blue-400 font-bold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <CreditCard className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Passport</span>
+        </button>
+
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'admin'
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Shield className="w-5 h-5 mb-0.5 text-indigo-500" />
+            <span className="text-[10px]">Admin</span>
+          </button>
+        )}
+      </nav>
 
       {/* Desktop & Offline App Download Modal */}
       {isInstallModalOpen && (
