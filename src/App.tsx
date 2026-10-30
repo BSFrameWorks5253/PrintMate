@@ -321,7 +321,7 @@ const MainAppContent: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1">
         <div className={`no-print ${activeTab === 'home' ? 'block' : 'hidden'}`}>
           <HomePage
             onNavigate={setActiveTab}

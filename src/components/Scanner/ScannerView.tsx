@@ -109,7 +109,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [fullPreviewOpen, setFullPreviewOpen] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  const [mobileTab, setMobileTab] = useState<'crop' | 'preview'>('crop');
 
   // Refs
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1469,45 +1468,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             </div>
           )}
 
-          {/* Mobile Step Selector (Phones & Tablets < 1024px) */}
-          {currentCard && (
-            <div className="lg:hidden flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setMobileTab('crop')}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  mobileTab === 'crop'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                }`}
-              >
-                <Crop className="w-3.5 h-3.5" />
-                <span>1. Crop & Corner Pins</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMobileTab('preview')}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  mobileTab === 'preview'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                }`}
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>2. Straighten & Print →</span>
-              </button>
-            </div>
-          )}
-
           {/* MAIN 2-COLUMN WORKSPACE: LEFT = CROP & PINS, RIGHT = STRAIGHTENED & TONE SETTER */}
           {currentCard && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* LEFT COLUMN: CROP & CORNER PIN DETECTOR */}
-              <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex-col space-y-3 shadow-xs ${mobileTab === 'crop' ? 'flex' : 'hidden lg:flex'}`}>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col space-y-3 shadow-xs">
                 {/* Header Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                    <Crop className="w-4 h-4 text-blue-500" />
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                       Crop & Corner Pins ({currentCard.cardSide.toUpperCase()})
                     </h4>
@@ -1604,31 +1573,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     {currentCard.sourceImage.naturalWidth} × {currentCard.sourceImage.naturalHeight} px
                   </span>
                 </div>
-
-                {/* Mobile Button to jump to Step 2 */}
-                <div className="lg:hidden pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab('preview')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/25 transition-all cursor-pointer"
-                  >
-                    <span>View Straightened Result & Print Studio →</span>
-                  </button>
-                </div>
               </div>
 
               {/* RIGHT COLUMN: STRAIGHTENED OUTPUT & TONE SETTER STUDIO */}
-              <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex-col space-y-4 shadow-xs ${mobileTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
-                {/* Mobile Return to Step 1 Button */}
-                <div className="lg:hidden pb-1 border-b border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab('crop')}
-                    className="w-full py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer"
-                  >
-                    <span>← Back to Adjust Crop & Corners</span>
-                  </button>
-                </div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col space-y-4 shadow-xs">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">

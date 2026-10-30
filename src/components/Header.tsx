@@ -110,8 +110,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs (Desktop & Tablet) */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+          {/* Navigation Tabs (Always Visible) */}
+          <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto shrink-0">
             <button
               onClick={() => setActiveTab('home')}
               style={{
@@ -502,81 +502,6 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       )}
-
-      {/* Mobile Bottom Navigation Bar (Phones & Tablets < 768px) */}
-      <nav className="md:hidden no-print fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
-        <button
-          type="button"
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'home'
-              ? 'text-blue-600 dark:text-blue-400 font-bold'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Home className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px]">Home</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('scanner')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'scanner'
-              ? 'text-blue-600 dark:text-blue-400 font-bold'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Crop className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px]">Scan & Edit</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('print')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl relative transition-all cursor-pointer ${
-            activeTab === 'print'
-              ? 'text-blue-600 dark:text-blue-400 font-bold'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Printer className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px]">Print Studio</span>
-          {queue.length > 0 && (
-            <span className="absolute top-0 right-2 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500 text-white">
-              {queue.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('passport')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'passport'
-              ? 'text-blue-600 dark:text-blue-400 font-bold'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <CreditCard className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px]">Passport</span>
-        </button>
-
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'admin'
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Shield className="w-5 h-5 mb-0.5 text-indigo-500" />
-            <span className="text-[10px]">Admin</span>
-          </button>
-        )}
-      </nav>
 
       {/* Desktop & Offline App Download Modal */}
       {isInstallModalOpen && (
