@@ -2,7 +2,7 @@ import DxfParser from 'dxf-parser';
 import { jsPDF } from 'jspdf';
 
 export interface CadStudioConfig {
-  theme: 'blueprint' | 'layers' | 'clean';
+  theme: 'blueprint' | 'monochrome' | 'layers' | 'clean';
   paperSize: 'a4' | 'a3' | 'a2' | 'a1' | 'letter';
   orientation: 'landscape' | 'portrait';
   scaleToFit: boolean;
