@@ -351,7 +351,7 @@ export class PdfSecurityAndToolsService {
     const safeBytes = new Uint8Array(pdfBytes.slice());
     const pdfDoc = await PDFDocument.load(safeBytes);
     pdfDoc.setTitle('Protected Document');
-    pdfDoc.setSubject(`Secured with DocuFlow Studio Pro [Passkey: ${userPassword.replace(/./g, '*')}]`);
+    pdfDoc.setSubject(`Secured with PrintMate Studio Pro [Passkey: ${userPassword.replace(/./g, '*')}]`);
     return await pdfDoc.save({ useObjectStreams: true });
   }
 

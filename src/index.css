@@ -289,3 +289,103 @@ html.dark input[type="range"]::-moz-range-thumb,
   border: 3px solid #60a5fa;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(96, 165, 250, 0.3);
 }
+
+/* ==========================================================================
+   Master Converter Studio Theme Matching (PrintMate Slate & Dark Palette)
+   ========================================================================== */
+.converter-workspace {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.dark .converter-workspace,
+[data-theme="dark"] .converter-workspace {
+  background-color: #020617;
+  color: #f8fafc;
+}
+
+/* Auto-adapt cards and white surfaces in converter workspace for dark mode */
+html.dark .converter-workspace .bg-white,
+[data-theme="dark"] .converter-workspace .bg-white {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+html.dark .converter-workspace .bg-\[\#F8FAFC\],
+[data-theme="dark"] .converter-workspace .bg-\[\#F8FAFC\] {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .converter-workspace .text-slate-900,
+[data-theme="dark"] .converter-workspace .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+html.dark .converter-workspace .text-slate-800,
+[data-theme="dark"] .converter-workspace .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .converter-workspace .text-slate-700,
+[data-theme="dark"] .converter-workspace .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .converter-workspace .text-slate-600,
+[data-theme="dark"] .converter-workspace .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .converter-workspace .text-slate-500,
+[data-theme="dark"] .converter-workspace .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .converter-workspace .border-slate-200,
+html.dark .converter-workspace .border-slate-200\/90,
+[data-theme="dark"] .converter-workspace .border-slate-200,
+[data-theme="dark"] .converter-workspace .border-slate-200\/90 {
+  border-color: #1e293b !important;
+}
+
+html.dark .converter-workspace .border-slate-300,
+[data-theme="dark"] .converter-workspace .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+html.dark .converter-workspace .bg-slate-100,
+[data-theme="dark"] .converter-workspace .bg-slate-100 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+html.dark .converter-workspace .bg-slate-50,
+html.dark .converter-workspace .bg-slate-50\/80,
+[data-theme="dark"] .converter-workspace .bg-slate-50,
+[data-theme="dark"] .converter-workspace .bg-slate-50\/80 {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .converter-workspace input[type="text"],
+html.dark .converter-workspace input[type="number"],
+html.dark .converter-workspace select,
+html.dark .converter-workspace textarea,
+[data-theme="dark"] .converter-workspace input[type="text"],
+[data-theme="dark"] .converter-workspace input[type="number"],
+[data-theme="dark"] .converter-workspace select,
+[data-theme="dark"] .converter-workspace textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+html.dark .converter-workspace select option,
+[data-theme="dark"] .converter-workspace select option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+

@@ -17,7 +17,7 @@ export const ConverterView: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('all-tools');
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#F8FAFC] dark:bg-slate-950 text-slate-800 dark:text-slate-100 select-none font-sans">
+    <div className="converter-workspace flex flex-col min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 select-none font-sans transition-colors duration-200">
       {/* 1. Master Converter Navigation Ribbon */}
       <NavigationRibbon 
         currentTab={currentTab}
@@ -25,7 +25,7 @@ export const ConverterView: React.FC = () => {
       />
 
       {/* 2. Main Studio Canvas Area */}
-      <div className="flex-1 overflow-auto relative">
+      <div className="converter-workspace flex-1 overflow-auto relative">
         {currentTab === 'all-tools' && (
           <PdfellaAllToolsHub
             onSelectTool={(tab) => setCurrentTab(tab)}

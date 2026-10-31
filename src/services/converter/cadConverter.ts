@@ -157,7 +157,7 @@ export class CadConverter {
     ctx.font = '16px sans-serif';
     ctx.fillStyle = isBlueprint ? '#7dd3fc' : isLayers ? '#38bdf8' : '#64748b';
     ctx.fillText(
-      `Extents: ${cadWidth.toFixed(1)} x ${cadHeight.toFixed(1)} mm | Entities: ${dxfData.entities.length} | Format: ${config.paperSize.toUpperCase()} | DocuFlow Studio Pro`,
+      `Extents: ${cadWidth.toFixed(1)} x ${cadHeight.toFixed(1)} mm | Entities: ${dxfData.entities.length} | Format: ${config.paperSize.toUpperCase()} | PrintMate Studio Pro`,
       70,
       105
     );

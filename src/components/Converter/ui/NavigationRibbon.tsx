@@ -13,10 +13,9 @@ import {
   FileDigit,
   ChevronDown,
   ArrowLeft,
-  Check,
-  Sparkles
+  Check
 } from 'lucide-react';
-import { NavigationTab } from '../../../types/converter';
+import type { NavigationTab } from '../../../types/converter';
 
 interface NavigationRibbonProps {
   currentTab: NavigationTab;
@@ -109,26 +108,30 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
   const isConvertActive = convertItems.some(item => item.id === currentTab);
   const activeConvertItem = convertItems.find(item => item.id === currentTab);
 
+  const getButtonClass = (isActive: boolean) => `
+    px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border
+    ${isActive
+      ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
+      : 'text-slate-600 dark:text-slate-300 border-transparent hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+    }
+  `;
+
   return (
     <div 
       ref={dropdownRef}
-      className="h-12 bg-white border-b border-slate-200/90 px-4 flex items-center justify-between select-none shadow-2xs shrink-0 relative z-40"
+      className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between select-none shadow-2xs shrink-0 relative z-40 transition-colors duration-200"
     >
-      {/* LEFT: PRIMARY HUBS & STREAMLINED TABS (FITS SCREEN WITHOUT OVERFLOW OR SCROLLBAR) */}
-      <div className="flex items-center gap-2 overflow-x-hidden no-scrollbar">
+      {/* LEFT: PRIMARY HUBS & STREAMLINED TABS */}
+      <div className="flex items-center gap-1.5 overflow-x-hidden no-scrollbar">
         {/* 1. All Tools Hub */}
         <button
           onClick={() => {
             onTabChange('all-tools');
             setOpenDropdown(null);
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            currentTab === 'all-tools'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
-              : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
-          }`}
+          className={getButtonClass(currentTab === 'all-tools')}
         >
-          <Grid className={`size-3.5 ${currentTab === 'all-tools' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <Grid className={`size-3.5 ${currentTab === 'all-tools' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
           <span>All Tools Hub</span>
         </button>
 
@@ -138,23 +141,19 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onTabChange('workspace');
             setOpenDropdown(null);
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            currentTab === 'workspace'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
-              : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
-          }`}
+          className={getButtonClass(currentTab === 'workspace')}
         >
-          <UploadCloud className={`size-3.5 ${currentTab === 'workspace' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <UploadCloud className={`size-3.5 ${currentTab === 'workspace' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
           <span>Smart Dropzone</span>
           <span className={`text-[9.5px] px-1 py-0.2 rounded font-mono font-bold uppercase ${
-            currentTab === 'workspace' ? 'bg-indigo-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            currentTab === 'workspace' ? 'bg-blue-700 text-white' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
           }`}>
             Auto
           </span>
         </button>
 
         {/* Elegant Subtle Divider */}
-        <div className="h-5 w-px bg-slate-200 mx-1 shrink-0" />
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-1 shrink-0" />
 
         {/* 3. Edit & Sign */}
         <button
@@ -162,13 +161,9 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onTabChange('pdf-editor');
             setOpenDropdown(null);
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            currentTab === 'pdf-editor'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
-              : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
-          }`}
+          className={getButtonClass(currentTab === 'pdf-editor')}
         >
-          <PenTool className={`size-3.5 ${currentTab === 'pdf-editor' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <PenTool className={`size-3.5 ${currentTab === 'pdf-editor' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
           <span>Edit & Sign</span>
         </button>
 
@@ -178,21 +173,21 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onClick={() => setOpenDropdown(openDropdown === 'organize' ? null : 'organize')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
               isOrganizeActive
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
                 : openDropdown === 'organize'
-                ? 'bg-slate-100 text-slate-900 border-slate-300'
-                : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-300 border-transparent hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            <Layers className={`size-3.5 ${isOrganizeActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+            <Layers className={`size-3.5 ${isOrganizeActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
             <span>{isOrganizeActive ? `Organize: ${activeOrganizeItem?.label}` : 'Organize'}</span>
             <ChevronDown className={`size-3 transition-transform ${openDropdown === 'organize' ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Organize Popover Menu */}
           {openDropdown === 'organize' && (
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="text-[10px] font-bold text-slate-400 px-3 py-1 uppercase tracking-wider">
+            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 px-3 py-1 uppercase tracking-wider">
                 Document Structure
               </div>
               {organizeItems.map((item) => {
@@ -207,21 +202,21 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
                     }}
                     className={`w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center gap-3 transition cursor-pointer ${
                       isSelected
-                        ? 'bg-indigo-50/80 text-indigo-950 font-bold border border-indigo-200/70'
-                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-950 dark:text-blue-100 font-bold border border-blue-200 dark:border-blue-800'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <div className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${
-                      isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
+                      isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}>
                       <ItemIcon className="size-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold flex items-center justify-between">
                         <span>{item.label}</span>
-                        {isSelected && <Check className="size-3.5 text-indigo-600" />}
+                        {isSelected && <Check className="size-3.5 text-blue-600 dark:text-blue-400" />}
                       </div>
-                      <p className="text-[11px] text-slate-400 font-normal truncate mt-0.5">
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 font-normal truncate mt-0.5">
                         {item.description}
                       </p>
                     </div>
@@ -238,18 +233,14 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onTabChange('cad-studio');
             setOpenDropdown(null);
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            currentTab === 'cad-studio'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
-              : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
-          }`}
+          className={getButtonClass(currentTab === 'cad-studio')}
         >
-          <Compass className={`size-3.5 ${currentTab === 'cad-studio' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <Compass className={`size-3.5 ${currentTab === 'cad-studio' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
           <span>CAD Blueprint</span>
           <span className={`text-[9.5px] px-1 py-0.2 rounded font-mono font-bold uppercase ${
-            currentTab === 'cad-studio' ? 'bg-indigo-600 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200'
+            currentTab === 'cad-studio' ? 'bg-blue-700 text-white' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
           }`}>
-            DWG
+            DXF
           </span>
         </button>
 
@@ -259,21 +250,21 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onClick={() => setOpenDropdown(openDropdown === 'convert' ? null : 'convert')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
               isConvertActive
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold'
                 : openDropdown === 'convert'
-                ? 'bg-slate-100 text-slate-900 border-slate-300'
-                : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-300 border-transparent hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            <RefreshCcw className={`size-3.5 ${isConvertActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+            <RefreshCcw className={`size-3.5 ${isConvertActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
             <span>{isConvertActive ? `Convert: ${activeConvertItem?.label}` : 'Convert & OCR'}</span>
             <ChevronDown className={`size-3 transition-transform ${openDropdown === 'convert' ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Convert Popover Menu */}
           {openDropdown === 'convert' && (
-            <div className="absolute top-full left-0 mt-2 w-76 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="text-[10px] font-bold text-slate-400 px-3 py-1 uppercase tracking-wider">
+            <div className="absolute top-full left-0 mt-2 w-76 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 px-3 py-1 uppercase tracking-wider">
                 Document Conversion & OCR
               </div>
               {convertItems.map((item) => {
@@ -288,21 +279,21 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
                     }}
                     className={`w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center gap-3 transition cursor-pointer ${
                       isSelected
-                        ? 'bg-indigo-50/80 text-indigo-950 font-bold border border-indigo-200/70'
-                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-950 dark:text-blue-100 font-bold border border-blue-200 dark:border-blue-800'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <div className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${
-                      isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
+                      isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}>
                       <ItemIcon className="size-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold flex items-center justify-between">
                         <span>{item.label}</span>
-                        {isSelected && <Check className="size-3.5 text-indigo-600" />}
+                        {isSelected && <Check className="size-3.5 text-blue-600 dark:text-blue-400" />}
                       </div>
-                      <p className="text-[11px] text-slate-400 font-normal truncate mt-0.5">
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 font-normal truncate mt-0.5">
                         {item.description}
                       </p>
                     </div>
@@ -319,13 +310,9 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
             onTabChange('pdf-security');
             setOpenDropdown(null);
           }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            currentTab === 'pdf-security'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-bold'
-              : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200/60'
-          }`}
+          className={getButtonClass(currentTab === 'pdf-security')}
         >
-          <ShieldCheck className={`size-3.5 ${currentTab === 'pdf-security' ? 'text-indigo-400' : 'text-slate-500'}`} />
+          <ShieldCheck className={`size-3.5 ${currentTab === 'pdf-security' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
           <span>Security & Stamp</span>
         </button>
       </div>
@@ -335,7 +322,7 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
         {currentTab !== 'all-tools' && (
           <button
             onClick={() => onTabChange('all-tools')}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 transition font-bold text-xs flex items-center gap-1.5 border border-slate-200/80 shadow-2xs cursor-pointer active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition font-bold text-xs flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer active:scale-95"
             title="Return to All Tools Hub"
           >
             <ArrowLeft className="size-3.5" />

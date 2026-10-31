@@ -903,7 +903,7 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
         setProgressStatus(`Fusing (${curr}/${tot}): ${name}...`);
       });
 
-      const name = `DocuFlow_Master_${new Date().toISOString().slice(0, 10)}.pdf`;
+      const name = `PrintMate_Master_${new Date().toISOString().slice(0, 10)}.pdf`;
 
       if (mode === 'preview') {
         setPreviewPdf({ bytes: fusedBytes, name });
@@ -952,7 +952,7 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
             {/* Studio Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700 animate-in fade-in duration-300">
               <span className="size-2 rounded-full bg-sky-500"></span>
-              <span className="font-bold text-slate-900">DocuFlow Studio Pro</span>
+              <span className="font-bold text-slate-900">PrintMate Studio Pro</span>
               <span className="text-slate-300">•</span>
               <span className="font-mono text-slate-500 text-[11px]">v26.10.30</span>
               <span className="text-slate-300">•</span>
@@ -965,7 +965,7 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
                 Precision Document Studio
               </h1>
               <p className="text-sm md:text-base text-slate-500 leading-relaxed">
-                Drop your files to begin. DocuFlow strictly preserves your <strong className="text-slate-800 font-semibold">exact selection order</strong> and displays <strong className="text-slate-800 font-semibold">only the relevant conversion tools</strong>.
+                Drop your files to begin. PrintMate strictly preserves your <strong className="text-slate-800 font-semibold">exact selection order</strong> and displays <strong className="text-slate-800 font-semibold">only the relevant conversion tools</strong>.
               </p>
             </div>
 

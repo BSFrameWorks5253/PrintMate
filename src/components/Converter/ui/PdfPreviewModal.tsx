@@ -142,7 +142,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-800 truncate max-w-sm">{displayTitle}</h3>
-            <p className="text-[11px] text-slate-500">DocuFlow Studio In-App Previewer</p>
+            <p className="text-[11px] text-slate-500">PrintMate Studio In-App Previewer</p>
           </div>
         </div>
 
