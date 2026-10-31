@@ -112,7 +112,7 @@
   /* Centered photo grid on physical paper - exact millimeter matching */
   .passport-print-grid {
     display: grid !important;
-    grid-template-columns: repeat(var(--grid-cols, 4), var(--photo-w-mm, 34mm)) !important;
+    grid-template-columns: repeat(var(--grid-cols, 4), var(--photo-w-mm, 35mm)) !important;
     grid-template-rows: repeat(var(--grid-rows, 2), var(--photo-h-mm, 45mm)) !important;
     gap: var(--gap-mm, 2mm) !important;
     justify-content: center !important;
@@ -122,7 +122,7 @@
   }
 
   .passport-photo-cell {
-    width: var(--photo-w-mm, 34mm) !important;
+    width: var(--photo-w-mm, 35mm) !important;
     height: var(--photo-h-mm, 45mm) !important;
     box-sizing: border-box !important;
     border: 1px solid #000000 !important;

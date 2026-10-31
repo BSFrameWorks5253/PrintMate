@@ -30,7 +30,7 @@ interface PassportMakerViewProps {
 
 export type BorderStyleType = 'studio_classic' | 'black_border' | 'white_margin' | 'borderless';
 export type PaperSizeKey = '5x7' | 'a4' | '4x6';
-export type PassportStandardKey = '34x45' | '35x45' | '51x51' | '30x40' | '33x48';
+export type PassportStandardKey = '35x45' | '51x51' | '30x40' | '33x48' | '34x45';
 
 export interface PassportStandardDef {
   id: PassportStandardKey;
@@ -43,21 +43,12 @@ export interface PassportStandardDef {
 }
 
 export const PASSPORT_STANDARDS: Record<PassportStandardKey, PassportStandardDef> = {
-  '34x45': {
-    id: '34x45',
-    name: '34 × 45 mm (Standard Studio)',
-    widthMm: 34,
-    heightMm: 45,
-    country: 'India Studio, Passport & Visa (With Crisp Borders)',
-    widthPx300Dpi: 402,
-    heightPx300Dpi: 531,
-  },
   '35x45': {
     id: '35x45',
-    name: '35 × 45 mm (Standard)',
+    name: '35 × 45 mm (Standard Passport & Visa)',
     widthMm: 35,
     heightMm: 45,
-    country: 'India, UK, Europe, Schengen, Australia, Canada Visa',
+    country: 'India, UK, Europe, Schengen, Australia, Canada Visa, All Embassies',
     widthPx300Dpi: 413,
     heightPx300Dpi: 531,
   },
@@ -87,6 +78,15 @@ export const PASSPORT_STANDARDS: Record<PassportStandardKey, PassportStandardDef
     country: 'China Visa, East Asian Embassies',
     widthPx300Dpi: 390,
     heightPx300Dpi: 567,
+  },
+  '34x45': {
+    id: '34x45',
+    name: '34 × 45 mm (Legacy Compact)',
+    widthMm: 34,
+    heightMm: 45,
+    country: 'Legacy Studio Format',
+    widthPx300Dpi: 402,
+    heightPx300Dpi: 531,
   },
 };
 
@@ -134,8 +134,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const [photoName, setPhotoName] = useState<string>('Passport_Photo');
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
 
-  // Passport Standard Preset & Rotation
-  const [presetStandard, setPresetStandard] = useState<PassportStandardKey>('34x45');
+  // Passport Standard Preset & Rotation (35 × 45 mm Standard)
+  const [presetStandard, setPresetStandard] = useState<PassportStandardKey>('35x45');
   const [rotation, setRotation] = useState<number>(0);
   const [straightenAngle, setStraightenAngle] = useState<number>(0);
 
@@ -403,7 +403,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const maxCellW = availW / cols;
     const maxCellH = availH / rows;
 
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const standardW = std.widthMm;
     const standardH = std.heightMm;
     const passportRatio = standardW / standardH;
@@ -447,7 +447,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     includeBorders: boolean = true,
     includeGuidelines: boolean = keepGuidelinesInExport
   ): HTMLCanvasElement => {
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = document.createElement('canvas');
     const width = wPx || std.widthPx300Dpi;
     const height = hPx || std.heightPx300Dpi;
@@ -470,37 +470,21 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     ctx.fillStyle = bgFill;
     ctx.fillRect(0, 0, width, height);
 
-    let insetX = 0;
-    let insetY = 0;
-    let borderWidth = 0;
+    // The photo area is strictly the standard dimensions (e.g. full 35mm x 45mm)
+    const photoAreaW = width;
+    const photoAreaH = height;
 
-    if (includeBorders) {
-      if (borderStyle === 'studio_classic') {
-        insetX = Math.round(width * 0.05);
-        insetY = Math.round(height * 0.05);
-        borderWidth = Math.max(1, Math.round(width * 0.005));
-      } else if (borderStyle === 'black_border') {
-        borderWidth = Math.max(1, Math.round(width * 0.005));
-      } else if (borderStyle === 'white_margin') {
-        insetX = Math.round(width * 0.05);
-        insetY = Math.round(height * 0.05);
-      }
-    }
-
-    const photoAreaW = width - insetX * 2;
-    const photoAreaH = height - insetY * 2;
-
-    // Draw photo inside photoArea with rotation and pan/zoom
+    // Draw photo covering the full 35mm x 45mm area
     if (imageObj) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(insetX, insetY, photoAreaW, photoAreaH);
+      ctx.rect(0, 0, photoAreaW, photoAreaH);
       ctx.clip();
 
       ctx.filter = `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`;
 
-      const centerX = insetX + photoAreaW / 2 + (pan.x * photoAreaW);
-      const centerY = insetY + photoAreaH / 2 + (pan.y * photoAreaH);
+      const centerX = photoAreaW / 2 + (pan.x * photoAreaW);
+      const centerY = photoAreaH / 2 + (pan.y * photoAreaH);
 
       const effectiveRotation = rotation + straightenAngle;
 
@@ -578,32 +562,34 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.restore();
     }
 
-    // Draw borders over photo if requested
+    // Draw borders over the full 35mm x 45mm photo as requested:
+    // "the photo will be 35mm x 45 mm and then the borders will be added"
     if (includeBorders) {
       if (borderStyle === 'studio_classic') {
-        // 1. Clear outer margins to pure white FIRST so photo overflow is cut clean
-        ctx.fillStyle = '#ffffff';
-        // Top margin
-        ctx.fillRect(0, 0, width, insetY);
-        // Bottom margin
-        ctx.fillRect(0, height - insetY, width, insetY);
-        // Left margin
-        ctx.fillRect(0, 0, insetX, height);
-        // Right margin
-        ctx.fillRect(width - insetX, 0, insetX, height);
-
-        // 2. Draw crisp black rectangular border around the photo portrait area
+        // Studio Classic: Crisp black outline frame along the exact 35mm x 45mm photo perimeter
+        const bw = Math.max(1.5, Math.round(width * 0.006));
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = borderWidth;
-        ctx.strokeRect(insetX, insetY, photoAreaW, photoAreaH);
+        ctx.lineWidth = bw;
+        ctx.strokeRect(bw / 2, bw / 2, width - bw, height - bw);
+      } else if (borderStyle === 'black_border') {
+        // Thin black border
+        const bw = Math.max(1, Math.round(width * 0.004));
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = bw;
+        ctx.strokeRect(bw / 2, bw / 2, width - bw, height - bw);
+      } else if (borderStyle === 'white_margin') {
+        // White margin: clean 1.5mm white perimeter border with thin frame
+        const mw = Math.round(width * 0.035);
+        const mh = Math.round(height * 0.035);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, mh);
+        ctx.fillRect(0, height - mh, width, mh);
+        ctx.fillRect(0, 0, mw, height);
+        ctx.fillRect(width - mw, 0, mw, height);
 
-        // 3. Outer crisp bounding stroke around entire passport card
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-      } else if (borderStyle === 'black_border') {
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = borderWidth;
+        ctx.strokeRect(mw, mh, width - mw * 2, height - mh * 2);
         ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
       }
     }
@@ -618,7 +604,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const w = std.widthPx300Dpi;
     const h = std.heightPx300Dpi;
     canvas.width = w;
@@ -634,7 +620,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       setCleanSinglePhotoUrl('');
       return;
     }
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, keepGuidelinesInExport);
     setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
   }, [imageObj, presetStandard, keepGuidelinesInExport, renderSinglePassportCanvas]);
@@ -768,7 +754,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
   // 2. Download Single Passport Photo (Current Standard Preset)
   const handleDownloadSingle = () => {
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, keepGuidelinesInExport);
     const link = document.createElement('a');
     link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_300DPI.jpg`;
@@ -806,7 +792,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // 4. Send to Main Print Studio Queue
   const handleSendToPrintStudio = () => {
     if (!onSendToPrint) return;
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['34x45'];
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const single = renderSinglePassportCanvas(std.widthPx300Dpi, std.heightPx300Dpi, true, keepGuidelinesInExport);
     const singleDataUrl = single.toDataURL('image/jpeg', 0.98);
     const ratio = std.widthMm / std.heightMm;
@@ -1264,9 +1250,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       </label>
                       <div className="grid grid-cols-2 gap-1.5">
                         {[
-                          { id: 'studio_classic', label: 'Studio Classic', desc: 'White margin + thin frame' },
-                          { id: 'black_border', label: 'Thin Black Border', desc: 'Sharp single border' },
-                          { id: 'white_margin', label: 'White Margin', desc: 'Clean white inset' },
+                          { id: 'studio_classic', label: 'Studio Classic', desc: 'Crisp outline frame (35×45mm)' },
+                          { id: 'black_border', label: 'Thin Black Border', desc: 'Hairline outline border' },
+                          { id: 'white_margin', label: 'White Border Inset', desc: 'Clean white border + frame' },
                           { id: 'borderless', label: 'Borderless', desc: 'Full bleed edge' },
                         ].map((b) => (
                           <button
