@@ -5,6 +5,7 @@ import { PrintStudioView } from './components/PrintStudio/PrintStudioView';
 import { PassportMakerView } from './components/PassportMaker/PassportMakerView';
 import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { RecentImagesModal } from './components/Recents/RecentImagesModal';
+import { ConverterView } from './components/Converter/ConverterView';
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
@@ -20,7 +21,7 @@ import { isAuthorizedAdmin, AUTHORIZED_ADMIN_EMAIL } from './utils/constants';
 import { userStorageService } from './services/userStorageService';
 import './App.css';
 
-export type AppTab = 'home' | 'scanner' | 'print' | 'passport' | 'admin';
+export type AppTab = 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
 
 const getTabFromPath = (pathname: string): AppTab => {
   const clean = pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
@@ -29,6 +30,7 @@ const getTabFromPath = (pathname: string): AppTab => {
   if (clean === 'print' || clean === 'print-studio') return 'print';
   if (clean === 'passport' || clean === 'passport-maker') return 'passport';
   if (clean === 'admin' || clean === 'dashboard') return 'admin';
+  if (clean === 'converter' || clean === 'pdf') return 'converter';
   return 'home';
 };
 
@@ -46,10 +48,14 @@ const MainAppContent: React.FC = () => {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<boolean>(false);
   const [unreadResolved, setUnreadResolved] = useState<FeedbackItem[]>([]);
 
-  // Check for resolved tickets submitted on this device
+  // Check for resolved tickets submitted on this device & sync from Supabase cloud
   useEffect(() => {
     const checkResolved = () => {
-      setUnreadResolved(feedbackService.getMyUnreadResolvedTokens());
+      feedbackService.syncFromSupabase().then(() => {
+        setUnreadResolved(feedbackService.getMyUnreadResolvedTokens());
+      }).catch(() => {
+        setUnreadResolved(feedbackService.getMyUnreadResolvedTokens());
+      });
     };
     checkResolved();
     const interval = setInterval(checkResolved, 4000);
@@ -61,15 +67,27 @@ const MainAppContent: React.FC = () => {
     analytics.trackPageView(activeTab, user);
   }, [activeTab, user]);
 
-  // Sync tab with browser URL history
+  // Sync tab with browser URL history - Preserves session images across tabs
   const setActiveTab = useCallback((tab: AppTab) => {
-    setExternalImage(null);
     setActiveTabState(tab);
     const targetPath = getPathFromTab(tab);
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ tab }, '', targetPath);
     }
   }, []);
+
+  // Dedicated Session Refresh / Reset
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+
+  const handleRefreshSession = () => {
+    if (window.confirm("Start fresh? This will reset active working images in this session. (All your saved documents stay safe in Recents).")) {
+      setQueue([]);
+      setExternalImage(null);
+      userStorageService.setUserQueue(user?.id, []);
+      userStorageService.clearDraft();
+      setRefreshKey((k) => k + 1);
+    }
+  };
 
   // Browser Back & Forward buttons navigation support
   useEffect(() => {
@@ -291,6 +309,7 @@ const MainAppContent: React.FC = () => {
         queue={queue}
         onLoadSample={handleLoadSample}
         onOpenRecents={() => setIsRecentsOpen(true)}
+        onRefreshSession={handleRefreshSession}
       />
 
       {/* Real-time Notification Banner for Solved / Added Issues */}
@@ -331,6 +350,7 @@ const MainAppContent: React.FC = () => {
 
         <div className={`no-print ${activeTab === 'scanner' ? 'block' : 'hidden'}`}>
           <ScannerView
+            key={`scanner-${refreshKey}`}
             onSendToPrint={handleSendToPrint}
             onSendMultipleToPrint={handleSendMultipleToPrint}
             externalImage={externalImage}
@@ -341,6 +361,7 @@ const MainAppContent: React.FC = () => {
 
         <div className={activeTab === 'print' ? 'block' : 'hidden'}>
           <PrintStudioView
+            key={`print-${refreshKey}`}
             queue={queue}
             onAddItem={handleSendToPrint}
             onRemoveItem={handleRemoveItem}
@@ -355,6 +376,10 @@ const MainAppContent: React.FC = () => {
 
         <div className={`no-print ${activeTab === 'passport' ? 'block' : 'hidden'}`}>
           <PassportMakerView onSendToPrint={handleSendToPrint} />
+        </div>
+
+        <div className={`no-print ${activeTab === 'converter' ? 'block' : 'hidden'}`}>
+          <ConverterView />
         </div>
 
         {activeTab === 'admin' && (

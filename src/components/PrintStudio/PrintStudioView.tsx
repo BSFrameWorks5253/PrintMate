@@ -610,12 +610,12 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
       {/* If queue is empty */}
       {queue.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center max-w-2xl mx-auto space-y-4 shadow-xl">
-          <div className="w-16 h-16 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center mx-auto border border-cyan-200">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center max-w-2xl mx-auto space-y-4 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mx-auto border border-cyan-200 dark:border-cyan-800">
             <Printer className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900">Your Print Queue is Clean & Ready</h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Your Print Queue is Clean & Ready</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             Scan and straighten your ID card (Front & Back), or upload images directly to configure multi-up layouts, copies, and back-and-forth prints.
           </p>
           <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
@@ -628,7 +628,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-cyan-700 font-semibold text-sm border border-cyan-200 inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-700 dark:text-cyan-300 font-semibold text-sm border border-cyan-200 dark:border-cyan-800 inline-flex items-center gap-2 cursor-pointer"
             >
               <Upload className="w-4 h-4" />
               <span>Upload Image Directly</span>
@@ -637,9 +637,9 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
               <button
                 type="button"
                 onClick={onOpenRecents}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm border border-slate-200 inline-flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 inline-flex items-center gap-2 cursor-pointer"
               >
-                <Clock className="w-4 h-4 text-blue-600" />
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Pick from Recents</span>
               </button>
             )}
@@ -650,14 +650,14 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           {/* LEFT CONTROLS: 4 Cols with 3 Organised Tabs */}
           <div className="no-print lg:col-span-4 space-y-3">
             {/* TAB SELECTOR HEADER */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-xs flex items-center gap-1">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 shadow-xs flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setSidebarTab('layout')}
                 className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   sidebarTab === 'layout'
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
@@ -670,7 +670,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   sidebarTab === 'spacing'
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 <Sliders className="w-3.5 h-3.5" />
@@ -683,13 +683,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   sidebarTab === 'queue'
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>Queue</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  sidebarTab === 'queue' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
+                  sidebarTab === 'queue' ? 'bg-white/20 text-white' : 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
                 }`}>
                   {queue.length}
                 </span>
@@ -700,13 +700,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
             {sidebarTab === 'layout' && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 {/* 1. QUICK SETUP PRESETS (Instant 1-Click Configuration) */}
-                <div className="bg-gradient-to-br from-blue-50/70 via-indigo-50/50 to-white border border-blue-200/90 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                <div className="bg-gradient-to-br from-blue-50/70 via-indigo-50/50 to-white dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 border border-blue-200/90 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       <span>Quick Presets</span>
                     </h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                       1-Click
                     </span>
                   </div>
@@ -729,7 +729,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                         settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
+                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-0.5">
@@ -812,7 +812,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                         settings.layout === 'front_back_fold'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
+                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-0.5">
@@ -823,7 +823,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
                           settings.layout === 'front_back_fold'
                             ? 'bg-white/20 text-white'
-                            : 'bg-emerald-50 text-emerald-700'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                         }`}>
                           Pouch
                         </span>
@@ -831,7 +831,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       <span className={`text-[10px] leading-tight ${
                         settings.layout === 'front_back_fold'
                           ? 'text-blue-100'
-                          : 'text-slate-500'
+                          : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         Center fold line for pouch
                       </span>
@@ -853,7 +853,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                         settings.pageSize === '4x6' && settings.layout === '1_fit'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
+                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-0.5">
@@ -864,7 +864,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
                           settings.pageSize === '4x6' && settings.layout === '1_fit'
                             ? 'bg-white/20 text-white'
-                            : 'bg-amber-50 text-amber-700'
+                            : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
                         }`}>
                           Photo
                         </span>
@@ -872,7 +872,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       <span className={`text-[10px] leading-tight ${
                         settings.pageSize === '4x6' && settings.layout === '1_fit'
                           ? 'text-blue-100'
-                          : 'text-slate-500'
+                          : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         Glossy 4R sheet fit
                       </span>
@@ -881,20 +881,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 </div>
 
                 {/* 2. PAPER SIZE, ORIENTATION & PHYSICAL SCALE */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Paper & Orientation</span>
                     </h4>
-                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200">
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                       {pageWidthMm} × {pageHeightMm} mm
                     </span>
                   </div>
 
                   {/* Visual Paper Size Pills */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-600">Select Paper:</label>
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Select Paper:</label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                       {[
                         { id: 'a4', label: 'A4', desc: '210 × 297 mm' },
@@ -911,11 +911,11 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                             className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold ring-1 ring-blue-500/20'
-                                : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                : 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                             }`}
                           >
                             <div className="text-xs font-bold leading-tight">{p.label}</div>
-                            <div className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>{p.desc}</div>
+                            <div className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>{p.desc}</div>
                           </button>
                         );
                       })}
@@ -1038,19 +1038,19 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 </div>
 
                 {/* 3. MULTI-UP SHEET LAYOUTS */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Choose Sheet Layout</span>
                     </h4>
-                    <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                    <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full">
                       {PRINT_LAYOUT_OPTIONS.find((l) => l.id === settings.layout)?.name.split('(')[0].trim() || 'Selected'}
                     </span>
                   </div>
 
                   {/* Category Filter Tabs */}
-                  <div className="grid grid-cols-4 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-semibold gap-1">
+                  <div className="grid grid-cols-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold gap-1">
                     {[
                       { id: 'id_duo', label: '🪪 ID Duo' },
                       { id: 'multi', label: '📑 Grids' },
@@ -1063,8 +1063,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         onClick={() => setLayoutCategory(cat.id as any)}
                         className={`py-1.5 px-1.5 rounded-lg text-center transition-all truncate cursor-pointer ${
                           layoutCategory === cat.id
-                            ? 'bg-white text-slate-900 shadow-xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
                         {cat.label}
@@ -1083,23 +1083,23 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           onClick={() => setSettings((prev) => ({ ...prev, layout: layout.id as PrintLayoutType }))}
                           className={`text-left p-2.5 rounded-xl transition-all border flex items-start gap-2.5 cursor-pointer ${
                             isSelected
-                              ? 'bg-blue-50/90 border-blue-600 text-slate-900 shadow-sm ring-2 ring-blue-500/20'
-                              : 'bg-slate-50/70 border-slate-200 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
+                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                              : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                           }`}
                         >
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
-                            isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200'
+                            isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                           }`}>
                             {isSelected ? <Check className="w-4 h-4 text-white" /> : getLayoutIcon(layout.id)}
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
-                              <span className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
+                              <span className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900 dark:text-blue-300' : 'text-slate-900 dark:text-white'}`}>
                                 {layout.name.split('(')[0].trim()}
                               </span>
                               <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                                isSelected ? 'bg-blue-200 text-blue-900' : 'bg-slate-200/70 text-slate-600'
+                                isSelected ? 'bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-200' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                               }`}>
                                 {layout.slots} slot{layout.slots === 1 ? '' : 's'}
                               </span>
@@ -1222,13 +1222,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
             {sidebarTab === 'spacing' && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 {/* 1. COPIES CONTROLS */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <Copy className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Print Sheet Copies</span>
                     </h4>
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                       {settings.copies} {settings.copies === 1 ? 'Sheet' : 'Sheets'}
                     </span>
                   </div>
@@ -1237,7 +1237,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setSettings((s) => ({ ...s, copies: Math.max(1, s.copies - 1) }))}
-                      className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 hover:text-slate-950 font-black flex items-center justify-center border border-slate-300 transition-all text-lg shadow-xs active:scale-95 cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-black flex items-center justify-center border border-slate-300 dark:border-slate-700 transition-all text-lg shadow-xs active:scale-95 cursor-pointer"
                       title="Decrease copies"
                     >
                       -
@@ -1248,12 +1248,12 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       max="50"
                       value={settings.copies}
                       onChange={(e) => setSettings((s) => ({ ...s, copies: Math.max(1, parseInt(e.target.value) || 1) }))}
-                      className="w-16 h-10 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                      className="w-16 h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                     />
                     <button
                       type="button"
                       onClick={() => setSettings((s) => ({ ...s, copies: s.copies + 1 }))}
-                      className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 hover:text-slate-950 font-black flex items-center justify-center border border-slate-300 transition-all text-lg shadow-xs active:scale-95 cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-black flex items-center justify-center border border-slate-300 dark:border-slate-700 transition-all text-lg shadow-xs active:scale-95 cursor-pointer"
                       title="Increase copies"
                     >
                       +
@@ -1268,7 +1268,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             settings.copies === c
                               ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
                           {c}x
@@ -1279,11 +1279,11 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 </div>
 
                 {/* 2. MARGINS & GAP SLIDERS */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4 shadow-sm">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-slate-700">Page Margin (Outer Border):</span>
-                      <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">Page Margin (Outer Border):</span>
+                      <span className="font-mono text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                         {settings.marginMm} mm
                       </span>
                     </div>
@@ -1296,7 +1296,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
                             settings.marginMm === m
                               ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                           }`}
                         >
                           {m}mm
@@ -1309,14 +1309,14 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       max="30"
                       value={settings.marginMm}
                       onChange={(e) => setSettings((s) => ({ ...s, marginMm: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-slate-700">Card Gap (Between Items):</span>
-                      <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">Card Gap (Between Items):</span>
+                      <span className="font-mono text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                         {settings.spacingMm} mm
                       </span>
                     </div>
@@ -1333,7 +1333,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           className={`flex-1 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
                             settings.spacingMm === g.val
                               ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                           }`}
                         >
                           {g.label}
@@ -1346,13 +1346,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       max="25"
                       value={settings.spacingMm}
                       onChange={(e) => setSettings((s) => ({ ...s, spacingMm: Number(e.target.value) }))}
-                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                   </div>
                 </div>
 
                 {/* 3. CUTTING & CROP MARKS (GUILLOTINE-READY) */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                       <Scissors className="w-4 h-4 text-emerald-600" />
@@ -1444,14 +1444,14 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
             {/* TAB 3: QUEUE ITEMS & ACTIONS */}
             {sidebarTab === 'queue' && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-sm animate-in fade-in duration-200">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-sm animate-in fade-in duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Layers className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Print Queue ({queue.length} item{queue.length !== 1 ? 's' : ''})</span>
                     </h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                       Produces {totalSheets} physical sheet{totalSheets !== 1 ? 's' : ''} at {settings.copies} copy
                     </p>
                   </div>
@@ -1461,7 +1461,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       <button
                         type="button"
                         onClick={onOpenRecents}
-                        className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer"
                         title="Load image from your recent documents"
                       >
                         <Clock className="w-3.5 h-3.5" />
@@ -1470,7 +1470,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     )}
                     <button
                       onClick={onClearQueue}
-                      className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                      className="text-[11px] text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Clear</span>
@@ -1482,13 +1482,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   {queue.map((item, idx) => (
                     <div
                       key={item.id}
-                      className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 transition-colors"
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-3 transition-colors"
                     >
                       <div className="relative shrink-0">
                         <img
                           src={item.dataUrl}
                           alt={item.name}
-                          className="w-14 h-9 object-cover rounded-lg bg-black border border-slate-300 shadow-2xs"
+                          className="w-14 h-9 object-cover rounded-lg bg-black border border-slate-300 dark:border-slate-700 shadow-2xs"
                         />
                         <span className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">
                           {idx + 1}
@@ -1496,14 +1496,14 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">{item.name}</div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.name}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={`text-[9px] uppercase font-bold px-1.5 py-0.2 rounded ${
                             item.cardSide === 'front'
-                              ? 'bg-blue-100 text-blue-800'
+                              ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
                               : item.cardSide === 'back'
-                              ? 'bg-indigo-100 text-indigo-800'
-                              : 'bg-slate-200 text-slate-700'
+                              ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                              : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                           }`}>
                             {item.cardSide || 'single'}
                           </span>
@@ -1515,23 +1515,23 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
                       <div className="flex items-center gap-1">
                         {/* Individual Page/Card Count Stepper */}
-                        <div className="flex items-center bg-white border border-slate-300 rounded-lg shadow-2xs px-1.5 py-0.5 gap-1 shrink-0" title="Copies of this particular page">
+                        <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg shadow-2xs px-1.5 py-0.5 gap-1 shrink-0" title="Copies of this particular page">
                           <button
                             type="button"
                             onClick={() => onUpdateItemCopies && onUpdateItemCopies(item.id, -1)}
                             disabled={(item.copies || 1) <= 1}
-                            className="w-5 h-5 rounded flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold transition-all cursor-pointer"
+                            className="w-5 h-5 rounded flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold transition-all cursor-pointer"
                             title="Decrease copies"
                           >
                             -
                           </button>
-                          <span className="text-xs font-black text-blue-700 min-w-3 text-center">
+                          <span className="text-xs font-black text-blue-700 dark:text-blue-400 min-w-3 text-center">
                             {item.copies || 1}
                           </span>
                           <button
                             type="button"
                             onClick={() => onUpdateItemCopies && onUpdateItemCopies(item.id, 1)}
-                            className="w-5 h-5 rounded flex items-center justify-center text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer"
+                            className="w-5 h-5 rounded flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-all cursor-pointer"
                             title="Increase copies"
                           >
                             +
@@ -1589,51 +1589,51 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           {/* RIGHT: PAPER CANVAS PREVIEW & PRINT ACTION: 8 Cols */}
           <div className="lg:col-span-8 space-y-4">
             {/* Top Toolbar */}
-            <div className="no-print bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     Print Sheet Preview
                   </h3>
-                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full">
                     {selectedPageDef.name.split('(')[0]} • {pageWidthMm} × {pageHeightMm} mm
                   </span>
                   {settings.scaleMode === 'exact_id' && (
-                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                       <span>✓ 100% Real ID (CR80)</span>
                     </span>
                   )}
                   {settings.printCutMarks ? (
-                    <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 px-2.5 py-0.5 rounded-full">
                       Crop Marks: ON
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
                       Clean Output
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {settings.printCutMarks ? 'Hairline corner ticks will be printed on physical paper for cutters' : 'Zero guides or marks on paper • 100% clean images only'}
                 </p>
               </div>
 
               {/* Actions & Zoom Controls */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
                   <button
                     type="button"
                     onClick={() => setPreviewZoom((z) => Math.max(50, z - 15))}
-                    className="p-1.5 text-slate-600 hover:text-slate-950 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                     title="Zoom Out Preview"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-[11px] font-mono px-2 text-slate-800 font-bold">{previewZoom}%</span>
+                  <span className="text-[11px] font-mono px-2 text-slate-800 dark:text-slate-200 font-bold">{previewZoom}%</span>
                   <button
                     type="button"
                     onClick={() => setPreviewZoom((z) => Math.min(150, z + 15))}
-                    className="p-1.5 text-slate-600 hover:text-slate-950 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                     title="Zoom In Preview"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
@@ -1687,12 +1687,12 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
             {/* MULTI-SHEET NAVIGATION TOOLBAR (When queue has multiple sheets) */}
             {totalSheets > 1 && (
-              <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+              <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-800">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                     Sheet {currentSheetIndex + 1} of {totalSheets}
                   </span>
-                  <span className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-medium">
                     ({expandedQueue.length} card{expandedQueue.length !== 1 ? 's' : ''} total)
                   </span>
                 </div>
@@ -1702,7 +1702,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     type="button"
                     onClick={() => setActivePreviewSheet((p) => Math.max(0, p - 1))}
                     disabled={currentSheetIndex === 0}
-                    className="px-2.5 py-1 text-xs rounded-lg font-medium border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    className="px-2.5 py-1 text-xs rounded-lg font-medium border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
                   >
                     Previous
                   </button>
@@ -1716,7 +1716,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         className={`w-7 h-7 text-xs rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center ${
                           idx === currentSheetIndex
                             ? 'bg-blue-600 text-white shadow-xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
                         {idx + 1}
@@ -2179,14 +2179,14 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
       {/* SLOT ASSIGNMENT MODAL (Click slot to choose which card appears there) */}
       {activeSlotModal !== null && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Choose Card for Slot {activeSlotModal + 1}
               </h3>
               <button
                 onClick={() => setActiveSlotModal(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 ✕
               </button>
@@ -2200,7 +2200,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     setSlotOverrides((prev) => ({ ...prev, [activeSlotModal]: item.id }));
                     setActiveSlotModal(null);
                   }}
-                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-blue-600/20 border border-slate-200 hover:border-blue-500 cursor-pointer flex items-center gap-3 transition-all"
+                  className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-600/20 dark:hover:bg-blue-600/30 border border-slate-200 dark:border-slate-700 hover:border-blue-500 cursor-pointer flex items-center gap-3 transition-all"
                 >
                   <img
                     src={item.dataUrl}
@@ -2208,8 +2208,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     className="w-14 h-9 object-cover rounded bg-black"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-slate-900 truncate">{item.name}</div>
-                    <div className="text-[10px] text-cyan-600 font-bold uppercase">{item.cardSide}</div>
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{item.name}</div>
+                    <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold uppercase">{item.cardSide}</div>
                   </div>
                 </div>
               ))}

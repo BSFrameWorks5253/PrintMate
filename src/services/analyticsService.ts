@@ -15,6 +15,7 @@ export interface UserAnalytics {
     print: number;
     passport: number;
     admin: number;
+    converter?: number;
   };
   printCount: number;
   downloadCount: number;
@@ -27,7 +28,7 @@ export interface AnalyticsEvent {
   userId: string;
   userEmail: string;
   userName: string;
-  page: 'home' | 'scanner' | 'print' | 'passport' | 'admin';
+  page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
   meta?: Record<string, any>;
   timestamp: number;
 }
@@ -343,7 +344,7 @@ class AnalyticsService {
 
   // --- Public Tracking Methods ---
 
-  public trackPageView(page: 'home' | 'scanner' | 'print' | 'passport' | 'admin', user?: UserProfile | null): void {
+  public trackPageView(page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter', user?: UserProfile | null): void {
     const info = this.resolveUserInfo(user);
     this.updateOrCreateUser(info, (u) => {
       u.pageViews[page] = (u.pageViews[page] || 0) + 1;
@@ -763,6 +764,28 @@ ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 -- Allow logging and viewing analytics events
 CREATE POLICY "Allow public read analytics" ON public.analytics_events FOR SELECT USING (true);
 CREATE POLICY "Allow public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
+
+-- 3. Create feedback & issues table (Address an Issue & Request Tracking)
+CREATE TABLE IF NOT EXISTS public.feedback (
+  token TEXT PRIMARY KEY,
+  type TEXT NOT NULL DEFAULT 'feature',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  email TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  admin_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ,
+  viewed_by_reporter BOOLEAN DEFAULT FALSE
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+
+-- Allow reading, inserting, and updating feedback
+CREATE POLICY "Allow public read feedback" ON public.feedback FOR SELECT USING (true);
+CREATE POLICY "Allow public insert feedback" ON public.feedback FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update feedback" ON public.feedback FOR UPDATE USING (true);
 `;
   }
 }

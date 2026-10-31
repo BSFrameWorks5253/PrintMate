@@ -99,6 +99,6 @@ export interface ActiveDraftState {
   queue: PrintQueueItem[];
   scannerImage: string | null;
   passportPhotoUrl: string | null;
-  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin';
+  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
   updatedAt: number;
 }

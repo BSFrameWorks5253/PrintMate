@@ -20,7 +20,8 @@ import {
   Sun,
   Moon,
   ExternalLink,
-  Menu
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import type { PrintQueueItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -30,11 +31,12 @@ import { userStorageService } from '../services/userStorageService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
-  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin';
-  setActiveTab: (tab: 'home' | 'scanner' | 'print' | 'passport' | 'admin') => void;
+  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
+  setActiveTab: (tab: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter') => void;
   queue: PrintQueueItem[];
   onLoadSample: (type: 'id_front' | 'id_back' | 'paper') => void;
   onOpenRecents?: () => void;
+  onRefreshSession?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   queue,
   onLoadSample,
   onOpenRecents,
+  onRefreshSession,
 }) => {
   const { user, openAuthModal, logout } = useAuth();
   const { toggleTheme, isDark } = useTheme();
@@ -184,6 +187,23 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="sm:hidden">Passport</span>
             </button>
 
+            <button
+              onClick={() => setActiveTab('converter')}
+              style={{
+                backgroundColor: activeTab === 'converter' ? '#2563eb' : 'transparent',
+                color: activeTab === 'converter' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
+              }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'converter'
+                  ? 'shadow-sm'
+                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+              }`}
+            >
+              <FileText className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Converter</span>
+              <span className="sm:hidden">Convert</span>
+            </button>
+
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('admin')}
@@ -240,6 +260,19 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden lg:inline">Download App</span>
                 <span className="lg:hidden hidden sm:inline">Download</span>
                 <span className="sm:hidden">App</span>
+              </button>
+            )}
+
+            {/* Refresh Session Button */}
+            {onRefreshSession && (
+              <button
+                type="button"
+                onClick={onRefreshSession}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-200 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-800 text-xs font-semibold transition-all cursor-pointer shadow-2xs group shrink-0"
+                title="Refresh and start a new session (Clears active working draft; saved items stay in Recents)"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-rose-500 group-hover:rotate-180 transition-transform" />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             )}
 

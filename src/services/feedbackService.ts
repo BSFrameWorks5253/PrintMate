@@ -1,3 +1,5 @@
+import { getSupabase } from '../lib/supabase';
+
 export interface FeedbackItem {
   token: string; // e.g. "PM-74291"
   type: 'bug' | 'feature';
@@ -120,6 +122,23 @@ class FeedbackService {
       this.saveMyTokens(myTokens);
     }
 
+    // Cloud sync with Supabase if configured
+    const supabase = getSupabase();
+    if (supabase) {
+      Promise.resolve(
+        supabase.from('feedback').insert({
+          token: newItem.token,
+          type: newItem.type,
+          title: newItem.title,
+          description: newItem.description,
+          email: newItem.email,
+          status: newItem.status,
+          created_at: newItem.createdAt,
+          viewed_by_reporter: false,
+        })
+      ).catch(() => {});
+    }
+
     return newItem;
   }
 
@@ -133,17 +152,72 @@ class FeedbackService {
     if (index === -1) return null;
 
     const isResolved = status === 'solved' || status === 'added';
+    const resolvedAt = isResolved ? new Date().toISOString() : items[index].resolvedAt;
 
     items[index] = {
       ...items[index],
       status,
       adminNote: adminNote?.trim() || items[index].adminNote,
-      resolvedAt: isResolved ? new Date().toISOString() : items[index].resolvedAt,
+      resolvedAt,
       viewedByReporter: false, // Reset so user receives active notification
     };
 
     this.saveStorage(items);
+
+    // Sync status change to Supabase cloud
+    const supabase = getSupabase();
+    if (supabase) {
+      Promise.resolve(
+        supabase.from('feedback').update({
+          status,
+          admin_note: adminNote?.trim() || items[index].adminNote,
+          resolved_at: resolvedAt,
+        }).eq('token', token)
+      ).catch(() => {});
+    }
+
     return items[index];
+  }
+
+  public async syncFromSupabase(): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (!error && data && data.length > 0) {
+        const local = this.getStorage();
+        data.forEach((row: any) => {
+          const existingIdx = local.findIndex((i) => i.token === row.token);
+          const mapped: FeedbackItem = {
+            token: row.token,
+            type: row.type || 'feature',
+            title: row.title,
+            description: row.description,
+            email: row.email,
+            createdAt: row.created_at,
+            status: row.status,
+            adminNote: row.admin_note,
+            resolvedAt: row.resolved_at,
+            viewedByReporter: row.viewed_by_reporter ?? false,
+          };
+
+          if (existingIdx >= 0) {
+            // Keep local viewedByReporter state for local user if they marked it viewed
+            mapped.viewedByReporter = local[existingIdx].viewedByReporter;
+            local[existingIdx] = mapped;
+          } else {
+            local.unshift(mapped);
+          }
+        });
+        this.saveStorage(local);
+      }
+    } catch {}
   }
 
   public getMyUnreadResolvedTokens(): FeedbackItem[] {
