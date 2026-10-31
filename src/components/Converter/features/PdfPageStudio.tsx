@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Scissors, 
   RotateCw, 
@@ -21,6 +21,9 @@ import { PdfPreviewModal } from '../ui/PdfPreviewModal';
 export const PdfPageStudio: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<{ name: string; bytes: Uint8Array } | null>(null);
   const [pages, setPages] = useState<PageThumbnail[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const draggedIndexRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [rangeInput, setRangeInput] = useState('');
@@ -101,11 +104,35 @@ export const PdfPageStudio: React.FC = () => {
 
   const movePage = (index: number, direction: 'left' | 'right') => {
     const targetIdx = direction === 'left' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= pages.length) return;
-    const newPages = [...pages];
-    const [moved] = newPages.splice(index, 1);
-    newPages.splice(targetIdx, 0, moved);
-    setPages(newPages);
+    setPages((prev) => {
+      if (targetIdx < 0 || targetIdx >= prev.length || index < 0 || index >= prev.length) return prev;
+      const newPages = [...prev];
+      const [moved] = newPages.splice(index, 1);
+      newPages.splice(targetIdx, 0, moved);
+      return newPages;
+    });
+  };
+
+  const handleDropPage = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fromIdx = draggedIndexRef.current ?? draggedIndex;
+    setDraggedIndex(null);
+    draggedIndexRef.current = null;
+    setDragOverIndex(null);
+
+    if (fromIdx === null || fromIdx === targetIndex) return;
+
+    setPages((prev) => {
+      if (fromIdx < 0 || fromIdx >= prev.length || targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+      const newPages = [...prev];
+      const [moved] = newPages.splice(fromIdx, 1);
+      newPages.splice(targetIndex, 0, moved);
+      return newPages;
+    });
   };
 
   const rotateAll = (deg: number) => {
@@ -376,23 +403,52 @@ export const PdfPageStudio: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 pb-12">
-                {pages.map((p, index) => (
-                  <div
-                    key={p.pageNum}
-                    className={`relative flex flex-col rounded-xl border transition-all overflow-hidden bg-slate-900 group ${
-                      p.isDeleted
-                        ? 'opacity-40 border-rose-900/50 bg-rose-950/10 grayscale'
-                        : 'border-slate-800 hover:border-slate-700 shadow-lg'
-                    }`}
-                  >
-                    {/* Page Thumbnail */}
-                    <div className="relative aspect-[3/4] bg-slate-950 p-2 flex items-center justify-center overflow-hidden">
-                      <img
-                        src={p.thumbnailUrl}
-                        alt={`Page ${p.pageNum}`}
-                        style={{ transform: `rotate(${p.rotation}deg)` }}
-                        className="max-h-full max-w-full object-contain shadow rounded transition-transform duration-200"
-                      />
+                {pages.map((p, index) => {
+                  const isBeingDragged = draggedIndex === index;
+                  const isDropTarget = dragOverIndex === index;
+
+                  return (
+                    <div
+                      key={`page-${p.pageNum}-${index}`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(index));
+                        setDraggedIndex(index);
+                        draggedIndexRef.current = index;
+                      }}
+                      onDragEnd={() => {
+                        setDraggedIndex(null);
+                        draggedIndexRef.current = null;
+                        setDragOverIndex(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverIndex(index);
+                      }}
+                      onDrop={(e) => handleDropPage(e, index)}
+                      className={`relative flex flex-col rounded-xl border transition-all overflow-hidden bg-slate-900 group cursor-grab active:cursor-grabbing select-none ${
+                        isBeingDragged
+                          ? 'opacity-40 scale-95 border-rose-500 ring-2 ring-rose-400'
+                          : isDropTarget
+                          ? 'border-rose-400 ring-2 ring-rose-400/60 scale-102 shadow-xl'
+                          : p.isDeleted
+                          ? 'opacity-40 border-rose-900/50 bg-rose-950/10 grayscale'
+                          : 'border-slate-800 hover:border-slate-700 shadow-lg'
+                      }`}
+                    >
+                      {/* Page Thumbnail */}
+                      <div className="relative aspect-[3/4] bg-slate-950 p-2 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={p.thumbnailUrl}
+                          alt={`Page ${p.pageNum}`}
+                          draggable={false}
+                          style={{ transform: `rotate(${p.rotation}deg)` }}
+                          className="max-h-full max-w-full object-contain shadow rounded pointer-events-none select-none transition-transform duration-200"
+                        />
 
                       {/* Deleted Overlay Banner */}
                       {p.isDeleted && (
@@ -450,7 +506,8 @@ export const PdfPageStudio: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>

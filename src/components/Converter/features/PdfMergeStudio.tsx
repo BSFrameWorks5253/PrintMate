@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Layers,
   UploadCloud,
@@ -35,6 +35,9 @@ export const PdfMergeStudio: React.FC<{ initialFiles?: Array<{ name: string; byt
     }))
   );
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const draggedIndexRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [mergedPdf, setMergedPdf] = useState<{ bytes: Uint8Array; name: string } | null>(null);
@@ -90,11 +93,35 @@ export const PdfMergeStudio: React.FC<{ initialFiles?: Array<{ name: string; byt
 
   const moveItem = (index: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= items.length) return;
-    const newItems = [...items];
-    const [moved] = newItems.splice(index, 1);
-    newItems.splice(targetIdx, 0, moved);
-    setItems(newItems);
+    setItems((prev) => {
+      if (targetIdx < 0 || targetIdx >= prev.length || index < 0 || index >= prev.length) return prev;
+      const newItems = [...prev];
+      const [moved] = newItems.splice(index, 1);
+      newItems.splice(targetIdx, 0, moved);
+      return newItems;
+    });
+  };
+
+  const handleDropMergeItem = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fromIdx = draggedIndexRef.current ?? draggedIndex;
+    setDraggedIndex(null);
+    draggedIndexRef.current = null;
+    setDragOverIndex(null);
+
+    if (fromIdx === null || fromIdx === targetIndex) return;
+
+    setItems((prev) => {
+      if (fromIdx < 0 || fromIdx >= prev.length || targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+      const newItems = [...prev];
+      const [moved] = newItems.splice(fromIdx, 1);
+      newItems.splice(targetIndex, 0, moved);
+      return newItems;
+    });
   };
 
   const removeItem = (id: string) => {
@@ -235,49 +262,80 @@ export const PdfMergeStudio: React.FC<{ initialFiles?: Array<{ name: string; byt
 
             {/* List of PDFs */}
             <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar p-1">
-              {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-3 hover:border-slate-300 transition"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="size-7 rounded-lg bg-slate-800 text-white font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <FileText className="size-5 text-rose-500 shrink-0" />
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-slate-900 block truncate">{item.name}</span>
-                      <span className="text-[11px] text-slate-400 block">{formatSize(item.size)}</span>
+              {items.map((item, idx) => {
+                const isBeingDragged = draggedIndex === idx;
+                const isDropTarget = dragOverIndex === idx;
+
+                return (
+                  <div
+                    key={item.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', String(idx));
+                      setDraggedIndex(idx);
+                      draggedIndexRef.current = idx;
+                    }}
+                    onDragEnd={() => {
+                      setDraggedIndex(null);
+                      draggedIndexRef.current = null;
+                      setDragOverIndex(null);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverIndex(idx);
+                    }}
+                    onDrop={(e) => handleDropMergeItem(e, idx)}
+                    className={`p-3 rounded-2xl flex items-center justify-between gap-3 transition cursor-grab active:cursor-grabbing select-none ${
+                      isBeingDragged
+                        ? 'opacity-40 scale-98 border-sky-500 bg-sky-50 ring-2 ring-sky-400'
+                        : isDropTarget
+                        ? 'border-sky-500 bg-sky-50 scale-101 ring-2 ring-sky-300 shadow-md'
+                        : 'bg-slate-50 border border-slate-200/90 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="size-7 rounded-lg bg-slate-800 text-white font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <FileText className="size-5 text-rose-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-900 block truncate">{item.name}</span>
+                        <span className="text-[11px] text-slate-400 block">{formatSize(item.size)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        disabled={idx === 0}
+                        onClick={() => moveItem(idx, 'up')}
+                        className="p-1.5 text-slate-500 hover:text-slate-800 disabled:opacity-20 hover:bg-white rounded-lg transition"
+                        title="Move Up"
+                      >
+                        <ArrowUp className="size-4" />
+                      </button>
+                      <button
+                        disabled={idx === items.length - 1}
+                        onClick={() => moveItem(idx, 'down')}
+                        className="p-1.5 text-slate-500 hover:text-slate-800 disabled:opacity-20 hover:bg-white rounded-lg transition"
+                        title="Move Down"
+                      >
+                        <ArrowDown className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        title="Remove"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      disabled={idx === 0}
-                      onClick={() => moveItem(idx, 'up')}
-                      className="p-1.5 text-slate-500 hover:text-slate-800 disabled:opacity-20 hover:bg-white rounded-lg transition"
-                      title="Move Up"
-                    >
-                      <ArrowUp className="size-4" />
-                    </button>
-                    <button
-                      disabled={idx === items.length - 1}
-                      onClick={() => moveItem(idx, 'down')}
-                      className="p-1.5 text-slate-500 hover:text-slate-800 disabled:opacity-20 hover:bg-white rounded-lg transition"
-                      title="Move Down"
-                    >
-                      <ArrowDown className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                      title="Remove"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Action Bar */}

@@ -87,15 +87,19 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
   const [layoutDirection, setLayoutDirection] = useState<'horizontal' | 'vertical'>('horizontal');
   const filesContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Drag-and-drop reorder state
+  // Drag-and-drop reorder state (main file cards)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const draggedIndexRef = useRef<number | null>(null);
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
   const rafRef = useRef<number | null>(null);
   const currentPdfIdRef = useRef<string | null>(null);
 
   // PDF Page Studio state (when a single PDF is selected)
   const [pdfPages, setPdfPages] = useState<PageThumbnail[]>([]);
+  const [draggedPdfPageIndex, setDraggedPdfPageIndex] = useState<number | null>(null);
+  const [dragOverPdfPageIndex, setDragOverPdfPageIndex] = useState<number | null>(null);
+  const draggedPdfPageRef = useRef<number | null>(null);
   const [pdfRangeInput, setPdfRangeInput] = useState('');
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [showPdfPageStudio, setShowPdfPageStudio] = useState(false);
@@ -169,6 +173,8 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
     let dragCounter = 0;
     const handleDragEnter = (e: DragEvent) => {
       e.preventDefault();
+      // If internal reorder is active, ignore global drag
+      if (draggedIndexRef.current !== null || draggedPdfPageRef.current !== null) return;
       dragCounter++;
       if (e.dataTransfer?.types?.includes('Files')) {
         setIsGlobalDragging(true);
@@ -176,6 +182,7 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
     };
     const handleDragLeave = (e: DragEvent) => {
       e.preventDefault();
+      if (draggedIndexRef.current !== null || draggedPdfPageRef.current !== null) return;
       dragCounter--;
       if (dragCounter <= 0) {
         setIsGlobalDragging(false);
@@ -184,6 +191,8 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
     };
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
+      // If internal reorder drag, do not trigger copy cursor or file ingestion dropzone
+      if (draggedIndexRef.current !== null || draggedPdfPageRef.current !== null) return;
       if (e.dataTransfer) {
         e.dataTransfer.dropEffect = 'copy';
       }
@@ -192,6 +201,18 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
       e.preventDefault();
       dragCounter = 0;
       setIsGlobalDragging(false);
+
+      // CRITICAL BUG FIX: If an internal card or page is being rearranged via drag-and-drop,
+      // strictly ignore this event so the browser's drop doesn't re-ingest it as a duplicate file!
+      if (
+        draggedIndexRef.current !== null ||
+        draggedPdfPageRef.current !== null ||
+        e.dataTransfer?.types.includes('application/x-printmate-internal-reorder') ||
+        e.dataTransfer?.types.includes('application/x-printmate-page-reorder')
+      ) {
+        return;
+      }
+
       if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
         handleIngestFiles(e.dataTransfer.files);
       }
@@ -413,22 +434,26 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
   // -------------------------------------------------------------
   const moveItem = (index: number, direction: 'prev' | 'next') => {
     const targetIdx = direction === 'prev' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= files.length) return;
-    const newFiles = [...files];
-    const [moved] = newFiles.splice(index, 1);
-    newFiles.splice(targetIdx, 0, moved);
-    setFiles(newFiles);
+    setFiles((prev) => {
+      if (targetIdx < 0 || targetIdx >= prev.length || index < 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
     setSelectedFileIndex(targetIdx);
   };
 
   const moveToPosition = (fromIndex: number, targetPosition1Based: number) => {
-    const targetIdx = Math.max(0, Math.min(files.length - 1, targetPosition1Based - 1));
-    if (fromIndex === targetIdx) return;
-    const newFiles = [...files];
-    const [moved] = newFiles.splice(fromIndex, 1);
-    newFiles.splice(targetIdx, 0, moved);
-    setFiles(newFiles);
-    setSelectedFileIndex(targetIdx);
+    setFiles((prev) => {
+      const targetIdx = Math.max(0, Math.min(prev.length - 1, targetPosition1Based - 1));
+      if (fromIndex === targetIdx || fromIndex < 0 || fromIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
+    setSelectedFileIndex(Math.max(0, targetPosition1Based - 1));
   };
 
   const moveToFirst = (index: number) => moveToPosition(index, 1);
@@ -453,19 +478,27 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
     setSelectedFileIndex(null);
   };
 
-  const handleDropToSlot = (targetIndex: number) => {
-    if (draggedIndex === null || draggedIndex === targetIndex) {
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-      return;
-    }
-    const newFiles = [...files];
-    const [moved] = newFiles.splice(draggedIndex, 1);
-    newFiles.splice(targetIndex, 0, moved);
-    setFiles(newFiles);
-    setSelectedFileIndex(targetIndex);
+  const handleDropToSlot = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fromIdx = draggedIndexRef.current ?? draggedIndex;
     setDraggedIndex(null);
+    draggedIndexRef.current = null;
     setDragOverIndex(null);
+
+    if (fromIdx === null || fromIdx === targetIndex) return;
+
+    setFiles((prev) => {
+      if (fromIdx < 0 || fromIdx >= prev.length || targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+    setSelectedFileIndex(targetIndex);
   };
 
   const rotateImageItem = (index: number) => {
@@ -512,23 +545,49 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
     }
   }, [files, isAllPdfs]);
 
-  // PDF Page Studio Reordering
+  // PDF Page Studio Reordering (functional, atomic, duplicate-free)
   const movePdfPageItem = (index: number, direction: 'prev' | 'next') => {
     const targetIdx = direction === 'prev' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= pdfPages.length) return;
-    const newPages = [...pdfPages];
-    const [moved] = newPages.splice(index, 1);
-    newPages.splice(targetIdx, 0, moved);
-    setPdfPages(newPages);
+    setPdfPages((prev) => {
+      if (targetIdx < 0 || targetIdx >= prev.length || index < 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
   };
 
   const movePdfPageToPosition = (fromIndex: number, targetPos: number) => {
-    const targetIdx = Math.max(0, Math.min(pdfPages.length - 1, targetPos - 1));
-    if (fromIndex === targetIdx) return;
-    const newPages = [...pdfPages];
-    const [moved] = newPages.splice(fromIndex, 1);
-    newPages.splice(targetIdx, 0, moved);
-    setPdfPages(newPages);
+    setPdfPages((prev) => {
+      const targetIdx = Math.max(0, Math.min(prev.length - 1, targetPos - 1));
+      if (fromIndex === targetIdx || fromIndex < 0 || fromIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
+  };
+
+  const handleDropPdfPageToSlot = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fromIdx = draggedPdfPageRef.current ?? draggedPdfPageIndex;
+    setDraggedPdfPageIndex(null);
+    draggedPdfPageRef.current = null;
+    setDragOverPdfPageIndex(null);
+
+    if (fromIdx === null || fromIdx === targetIndex) return;
+
+    setPdfPages((prev) => {
+      if (fromIdx < 0 || fromIdx >= prev.length || targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
   };
 
   const reversePdfPages = () => {
@@ -978,8 +1037,12 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
               onDragLeave={() => setIsGlobalDragging(false)}
               onDrop={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 setIsGlobalDragging(false);
-                handleIngestFiles(e.dataTransfer.files);
+                if (draggedIndexRef.current !== null || draggedPdfPageRef.current !== null) return;
+                if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                  handleIngestFiles(e.dataTransfer.files);
+                }
               }}
               onClick={handleBrowseFiles}
               className={`w-full p-10 md:p-12 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group shadow-sm hover:shadow-xl ${
@@ -1180,9 +1243,11 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
                     key={slotIdx}
                     onDragOver={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
+                      e.dataTransfer.dropEffect = 'move';
                       handleDragOverThrottled(slotIdx);
                     }}
-                    onDrop={() => handleDropToSlot(slotIdx)}
+                    onDrop={(e) => handleDropToSlot(e, slotIdx)}
                     className={`size-8 rounded-xl text-xs font-mono font-bold flex items-center justify-center shrink-0 transition-all ${
                       dragOverIndex === slotIdx
                         ? 'bg-sky-600 text-white scale-110 shadow-md ring-2 ring-sky-300'
@@ -1215,13 +1280,25 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
                   <div
                     key={file.id}
                     draggable
-                    onDragStart={() => setDraggedIndex(idx)}
-                    onDragEnd={() => { setDraggedIndex(null); setDragOverIndex(null); }}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('application/x-printmate-internal-reorder', String(idx));
+                      e.dataTransfer.setData('text/plain', String(idx));
+                      setDraggedIndex(idx);
+                      draggedIndexRef.current = idx;
+                    }}
+                    onDragEnd={() => {
+                      setDraggedIndex(null);
+                      draggedIndexRef.current = null;
+                      setDragOverIndex(null);
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
+                      e.dataTransfer.dropEffect = 'move';
                       handleDragOverThrottled(idx);
                     }}
-                    onDrop={() => handleDropToSlot(idx)}
+                    onDrop={(e) => handleDropToSlot(e, idx)}
                     onClick={() => setSelectedFileIndex(idx)}
                     tabIndex={0}
                     className={`group relative rounded-2xl border p-2.5 cursor-grab active:cursor-grabbing transition-all select-none hardware-accelerated flex flex-col justify-between ${
@@ -1274,8 +1351,9 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
                         <img
                           src={file.previewUrl}
                           alt={file.name}
+                          draggable={false}
                           style={{ transform: `rotate(${file.rotation || 0}deg)` }}
-                          className="h-full w-full object-contain transition-transform duration-200"
+                          className="h-full w-full object-contain pointer-events-none select-none transition-transform duration-200"
                         />
                       ) : file.type === 'pdf' ? (
                         <div className="flex flex-col items-center gap-2 text-rose-500">
@@ -1713,73 +1791,106 @@ export const ContextSmartWorkspace: React.FC<ContextSmartWorkspaceProps> = ({ on
                     </div>
 
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-48 overflow-y-auto p-1 custom-scrollbar">
-                      {pdfPages.map((page, idx) => (
-                        <div
-                          key={page.pageNum}
-                          className={`rounded-xl border p-1.5 flex flex-col justify-between ${
-                            page.isDeleted ? 'opacity-30 bg-rose-50 border-rose-300' : 'bg-white border-slate-200 shadow-2xs'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="font-mono font-bold bg-slate-800 text-white px-1.5 py-0.2 rounded">
-                              P.{idx + 1}
-                            </span>
-                            <button
-                              onClick={() => {
-                                setPdfPages((prev) =>
-                                  prev.map((p, pIdx) => (pIdx === idx ? { ...p, isDeleted: !p.isDeleted } : p))
-                                );
-                              }}
-                              className="text-slate-400 hover:text-rose-600"
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          </div>
+                      {pdfPages.map((page, idx) => {
+                        const isPageDragged = draggedPdfPageIndex === idx;
+                        const isPageDropTarget = dragOverPdfPageIndex === idx;
 
-                          <div className="h-20 w-full flex items-center justify-center overflow-hidden my-1">
-                            {page.thumbnailUrl ? (
-                              <img
-                                src={page.thumbnailUrl}
-                                alt={`Page ${page.pageNum}`}
-                                style={{ transform: `rotate(${page.rotation || 0}deg)` }}
-                                className="h-full w-full object-contain"
-                              />
-                            ) : (
-                              <FileText className="size-6 text-slate-300" />
-                            )}
-                          </div>
+                        return (
+                          <div
+                            key={`pdf-page-${page.pageNum}-${idx}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              e.dataTransfer.effectAllowed = 'move';
+                              e.dataTransfer.setData('application/x-printmate-page-reorder', String(idx));
+                              e.dataTransfer.setData('text/plain', String(idx));
+                              setDraggedPdfPageIndex(idx);
+                              draggedPdfPageRef.current = idx;
+                            }}
+                            onDragEnd={() => {
+                              setDraggedPdfPageIndex(null);
+                              draggedPdfPageRef.current = null;
+                              setDragOverPdfPageIndex(null);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDragOverPdfPageIndex(idx);
+                            }}
+                            onDrop={(e) => handleDropPdfPageToSlot(e, idx)}
+                            className={`rounded-xl border p-1.5 flex flex-col justify-between cursor-grab active:cursor-grabbing transition-all select-none ${
+                              isPageDragged
+                                ? 'opacity-40 scale-95 border-sky-500 bg-sky-50 ring-2 ring-sky-400'
+                                : isPageDropTarget
+                                ? 'border-sky-500 bg-sky-50 scale-102 ring-2 ring-sky-300'
+                                : page.isDeleted
+                                ? 'opacity-30 bg-rose-50 border-rose-300'
+                                : 'bg-white border-slate-200 shadow-2xs hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-mono font-bold bg-slate-800 text-white px-1.5 py-0.2 rounded">
+                                P.{idx + 1}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setPdfPages((prev) =>
+                                    prev.map((p, pIdx) => (pIdx === idx ? { ...p, isDeleted: !p.isDeleted } : p))
+                                  );
+                                }}
+                                className="text-slate-400 hover:text-rose-600"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            </div>
 
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                            <button
-                              disabled={idx === 0}
-                              onClick={() => movePdfPageItem(idx, 'prev')}
-                              className="text-slate-500 disabled:opacity-20"
-                            >
-                              <ChevronLeft className="size-3" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setPdfPages((prev) =>
-                                  prev.map((p, pIdx) =>
-                                    pIdx === idx ? { ...p, rotation: ((p.rotation || 0) + 90) % 360 } : p
-                                  )
-                                );
-                              }}
-                              className="text-slate-500 hover:text-amber-600"
-                              title="Rotate 90°"
-                            >
-                              <RotateCw className="size-3" />
-                            </button>
-                            <button
-                              disabled={idx === pdfPages.length - 1}
-                              onClick={() => movePdfPageItem(idx, 'next')}
-                              className="text-slate-500 disabled:opacity-20"
-                            >
-                              <ChevronRight className="size-3" />
-                            </button>
+                            <div className="h-20 w-full flex items-center justify-center overflow-hidden my-1">
+                              {page.thumbnailUrl ? (
+                                <img
+                                  src={page.thumbnailUrl}
+                                  alt={`Page ${page.pageNum}`}
+                                  draggable={false}
+                                  style={{ transform: `rotate(${page.rotation || 0}deg)` }}
+                                  className="h-full w-full object-contain pointer-events-none select-none"
+                                />
+                              ) : (
+                                <FileText className="size-6 text-slate-300" />
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <button
+                                disabled={idx === 0}
+                                onClick={() => movePdfPageItem(idx, 'prev')}
+                                className="text-slate-500 disabled:opacity-20"
+                              >
+                                <ChevronLeft className="size-3" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPdfPages((prev) =>
+                                    prev.map((p, pIdx) =>
+                                      pIdx === idx ? { ...p, rotation: ((p.rotation || 0) + 90) % 360 } : p
+                                    )
+                                  );
+                                }}
+                                className="text-slate-500 hover:text-amber-600"
+                                title="Rotate 90°"
+                              >
+                                <RotateCw className="size-3" />
+                              </button>
+                              <button
+                                disabled={idx === pdfPages.length - 1}
+                                onClick={() => movePdfPageItem(idx, 'next')}
+                                className="text-slate-500 disabled:opacity-20"
+                              >
+                                <ChevronRight className="size-3" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
