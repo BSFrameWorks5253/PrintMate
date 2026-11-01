@@ -130,8 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* Navigation Tabs (Always Visible with Active Label & Hover Tooltips) */}
-          <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto shrink-0">
+          {/* Navigation Tabs (Active Label Always Visible, Smooth Label Expand & Crisp Tooltip on Hover) */}
+          <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0 relative">
             {[
               { id: 'home' as const, label: 'Home', shortLabel: 'Home', icon: Home, desc: 'Overview & Studio Tools' },
               { id: 'scanner' as const, label: 'Scan & Crop', shortLabel: 'Scan', icon: Crop, desc: 'Perspective Unwarp & Straighten' },
@@ -151,33 +151,40 @@ export const Header: React.FC<HeaderProps> = ({
                       backgroundColor: isActive ? '#2563eb' : 'transparent',
                       color: isActive ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer relative ${
+                    className={`flex items-center px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer relative select-none ${
                       isActive
                         ? 'shadow-sm shadow-blue-500/25 ring-1 ring-white/20'
                         : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
                     }`}
-                    title={item.desc}
+                    title={item.label}
+                    aria-label={item.label}
                   >
                     <IconComp className="w-4 h-4 shrink-0" />
-                    {/* Active page name is ALWAYS fully visible; Inactive tabs show short/full or reveal on hover */}
-                    <span className={`${isActive ? 'inline-block font-bold' : 'hidden sm:inline font-medium'}`}>
-                      {isActive ? item.label : item.shortLabel}
+                    
+                    {/* Active page name is ALWAYS fully visible. Inactive tabs smoothly expand and reveal page name on hover! */}
+                    <span 
+                      className={`inline-block whitespace-nowrap transition-all duration-200 overflow-hidden ${
+                        isActive
+                          ? 'max-w-[160px] opacity-100 ml-1.5 font-bold text-white'
+                          : 'max-w-0 opacity-0 group-hover:max-w-[160px] group-hover:opacity-100 group-hover:ml-1.5 font-medium'
+                      }`}
+                    >
+                      {item.label}
                     </span>
-                    {isActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse ml-0.5" />
-                    )}
+
+                    {/* Count badge for print queue if any */}
                     {typeof item.count === 'number' && item.count > 0 && (
-                      <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                      <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white shrink-0">
                         {item.count}
                       </span>
                     )}
                   </button>
 
-                  {/* Clean Hover Name Tooltip */}
-                  <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-slate-950 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-slate-800 scale-95 group-hover:scale-100">
-                    <span className="text-cyan-400 mr-1">•</span>
+                  {/* Clean High-Contrast Hover Tooltip (Never clipped) */}
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-slate-950 text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-slate-700/60 transform -translate-y-1 group-hover:translate-y-0">
+                    <span className="text-blue-400 mr-1.5 font-bold">●</span>
                     <span>{item.label}</span>
-                    <span className="text-slate-400 font-normal ml-1">({item.desc})</span>
+                    <span className="text-slate-400 font-normal ml-1.5 text-[10px]">({item.desc})</span>
                   </div>
                 </div>
               );

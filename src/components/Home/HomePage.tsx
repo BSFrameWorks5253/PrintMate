@@ -20,7 +20,8 @@ import {
   Building2,
   Award,
   Layers,
-  FileCheck
+  FileCheck,
+  ArrowUp
 } from 'lucide-react';
 
 interface HomePageProps {
@@ -187,6 +188,75 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       
+      {/* Parallax Blueprint Isometric Grid Layer (Layer 0) */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-0 opacity-[0.035] dark:opacity-[0.06] transition-transform duration-100 ease-linear"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1.2px, transparent 0)`,
+          backgroundSize: '28px 28px',
+          transform: `translate3d(0, ${scrollY * 0.08}px, 0)`,
+        }}
+      />
+
+      {/* Parallax Floating Spatial Badges (Midground Layer 1) */}
+      <div className="relative max-w-7xl mx-auto pointer-events-none">
+        {/* Floating Badge 1 - Top Left */}
+        <div 
+          className="hidden xl:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl absolute -left-4 top-28 z-20 transition-transform duration-75 ease-out"
+          style={{ transform: `translate3d(0, ${-scrollY * 0.22}px, 0)` }}
+        >
+          <div className="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-xs shadow-2xs">
+            📐
+          </div>
+          <div>
+            <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">300 DPI Studio Output</div>
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">Zero Blur Deskew</div>
+          </div>
+        </div>
+
+        {/* Floating Badge 2 - Top Right */}
+        <div 
+          className="hidden xl:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl absolute -right-4 top-40 z-20 transition-transform duration-75 ease-out"
+          style={{ transform: `translate3d(0, ${-scrollY * 0.3}px, 0)` }}
+        >
+          <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs shadow-2xs">
+            💳
+          </div>
+          <div>
+            <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">CR80 85.6 × 54 mm</div>
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">1:1 Physical Millimeter</div>
+          </div>
+        </div>
+
+        {/* Floating Badge 3 - Mid-Page Left (Near Carousel) */}
+        <div 
+          className="hidden xl:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl absolute left-2 top-[620px] z-20 transition-transform duration-75 ease-out"
+          style={{ transform: `translate3d(0, ${scrollY * 0.12 - 40}px, 0)` }}
+        >
+          <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs shadow-2xs">
+            ⚡
+          </div>
+          <div>
+            <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">Portal Size Clamping</div>
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">20 KB - 50 KB Binary Search</div>
+          </div>
+        </div>
+
+        {/* Floating Badge 4 - Lower Right (Near SMB Xerox) */}
+        <div 
+          className="hidden xl:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xl absolute right-2 top-[980px] z-20 transition-transform duration-75 ease-out"
+          style={{ transform: `translate3d(0, ${-scrollY * 0.16 + 140}px, 0)` }}
+        >
+          <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center font-black text-xs shadow-2xs">
+            🏪
+          </div>
+          <div>
+            <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">SMB Xerox Partner</div>
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">Opp. JJ Hospital Mumbai</div>
+          </div>
+        </div>
+      </div>
+
       {/* HERO SECTION WITH PARALLAX DEPTH */}
       <section 
         ref={heroRef}
@@ -198,17 +268,20 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
         <div 
           className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/15 dark:bg-blue-600/20 rounded-full blur-3xl pointer-events-none transition-transform duration-500 ease-out"
           style={{
-            transform: `translate3d(${mouseOffset.x * 40}px, ${scrollY * 0.15 + mouseOffset.y * 30}px, 0)`,
+            transform: `translate3d(${mouseOffset.x * 40}px, ${scrollY * 0.18 + mouseOffset.y * 30}px, 0)`,
           }}
         />
         <div 
           className="absolute top-20 right-1/4 w-96 h-96 bg-purple-500/15 dark:bg-purple-600/20 rounded-full blur-3xl pointer-events-none transition-transform duration-500 ease-out"
           style={{
-            transform: `translate3d(${-mouseOffset.x * 50}px, ${scrollY * 0.25 - mouseOffset.y * 35}px, 0)`,
+            transform: `translate3d(${-mouseOffset.x * 50}px, ${scrollY * 0.28 - mouseOffset.y * 35}px, 0)`,
           }}
         />
         <div 
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-cyan-500/10 dark:bg-cyan-600/15 rounded-full blur-3xl pointer-events-none"
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-cyan-500/10 dark:bg-cyan-600/15 rounded-full blur-3xl pointer-events-none transition-transform duration-500 ease-out"
+          style={{
+            transform: `translate3d(-50%, ${scrollY * 0.1}px, 0)`,
+          }}
         />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -969,6 +1042,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
           </div>
         </div>
       </section>
+
+      {/* Floating Smooth Parallax Scroll-to-Top Button */}
+      {scrollY > 300 && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 p-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white shadow-2xl border border-blue-400/40 z-40 transition-all transform hover:scale-110 active:scale-95 cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+          title="Scroll to Top"
+        >
+          <ArrowUp className="w-4 h-4" />
+          <span className="hidden sm:inline">Top</span>
+        </button>
+      )}
 
     </div>
   );
