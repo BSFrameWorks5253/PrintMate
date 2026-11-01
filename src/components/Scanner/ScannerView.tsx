@@ -24,7 +24,9 @@ import {
   ChevronRight,
   Save,
   Archive,
-  Crop
+  Crop,
+  IdCard,
+  ArrowRight
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { useAuth } from '../../context/AuthContext';
@@ -186,14 +188,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const createCardFromImage = (
     img: HTMLImageElement, 
     name: string, 
-    side: 'front' | 'back' | 'single' = 'front',
-    docType: DocumentTypeId = 'id_standard',
+    side: 'front' | 'back' | 'single' = 'single',
+    docType: DocumentTypeId = 'paper_a4',
     rawFileName?: string,
     fileHandle?: any
   ): ScannedCardItem => {
     const detected = autoDetectDocumentCorners(img, 'auto');
     const docDef = DOCUMENT_TYPES.find((d) => d.id === docType);
-    const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+    const targetRatio = docDef?.aspectRatio || 210 / 297;
 
     let processed: HTMLCanvasElement | null = null;
     let dataUrl: string | undefined = undefined;
@@ -290,10 +292,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         if (event.target?.result) {
           const img = new Image();
           img.onload = () => {
-            const totalExisting = cards.length + newCards.length;
-            const side: 'front' | 'back' | 'single' = 
-              totalExisting === 0 ? 'front' : (totalExisting === 1 ? 'back' : 'single');
-            const card = createCardFromImage(img, file.name, side, 'id_standard', file.name, (file as any).handle);
+            const card = createCardFromImage(img, file.name, 'single', 'paper_a4', file.name, (file as any).handle);
             newCards.push(card);
             processedCount++;
 
@@ -341,10 +340,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             image.onload = () => res(image);
             image.src = dataUrl;
           });
-          const totalExisting = cards.length + newCards.length;
-          const side: 'front' | 'back' | 'single' = 
-            totalExisting === 0 ? 'front' : (totalExisting === 1 ? 'back' : 'single');
-          const card = createCardFromImage(img, file.name, side, 'id_standard', file.name, handle);
+          const card = createCardFromImage(img, file.name, 'single', 'paper_a4', file.name, handle);
           newCards.push(card);
         }
         if (newCards.length > 0) {
@@ -1377,11 +1373,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       {idx + 1}
                     </span>
                     <span className="font-bold">
-                      {card.cardSide === 'front' 
-                        ? '🪪 Front' 
-                        : card.cardSide === 'back' 
-                        ? '🪪 Back' 
-                        : `Side ${idx + 1}`}
+                      📄 Doc {idx + 1}
                     </span>
                     {cards.length > 1 && (
                       <button
@@ -1406,10 +1398,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 type="button"
                 onClick={() => addMoreFileInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all text-xs font-semibold shrink-0 cursor-pointer shadow-2xs"
-                title="Add second image (e.g. Back side of ID card)"
+                title="Add another document or page"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add {cards.length === 1 ? 'Back Side' : 'Image'}</span>
+                <span>+ Add Page / Document</span>
               </button>
             </div>
 
@@ -1418,7 +1410,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               {/* Document Standard Type Pills */}
               {currentCard && (
                 <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                  {DOCUMENT_TYPES.slice(0, 3).map((dt) => (
+                  {DOCUMENT_TYPES.filter((d) => d.category !== 'id').map((dt) => (
                     <button
                       key={dt.id}
                       onClick={() => updateCurrentCard((c) => ({ ...c, docType: dt.id }))}
@@ -1429,7 +1421,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       }`}
                       title={dt.description}
                     >
-                      {dt.name.replace('Standard ', '')}
+                      {dt.name.split('/')[0].trim()}
                     </button>
                   ))}
                 </div>
@@ -1443,7 +1435,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Send Both ({cards.length}) to Print</span>
+                  <span>Send All ({cards.length}) to Print</span>
                 </button>
               )}
 
@@ -1458,6 +1450,37 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <span>Refresh / New Scan</span>
               </button>
             </div>
+          </div>
+
+          {/* ID Card Separation Callout Banner */}
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <IdCard className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Working with an ID Card or PVC Sheet?</span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 uppercase">Dedicated Tool</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Use the separate <strong>ID & PVC Studio</strong> for password-protected e-Aadhaar PDFs, PAN cards, and dual Front & Back ISO CR80 (85.6 × 54mm) layouts.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.history.pushState({ tab: 'idcard' }, '', '/idcard');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shrink-0 shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <span>Go to ID Studio</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* Toast Notification */}
@@ -1478,7 +1501,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <div className="flex items-center gap-2">
                     <Crop className="w-4 h-4 text-blue-500" />
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Crop & Corner Pins ({currentCard.cardSide.toUpperCase()})
+                      Crop & Corner Pins (Doc {activeCardIndex + 1})
                     </h4>
                   </div>
 
@@ -1582,7 +1605,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <div className="flex items-center gap-2">
                     <FileCheck className="w-4 h-4 text-emerald-500" />
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Deskewed Result ({currentCard.cardSide.toUpperCase()})
+                      Deskewed Result (Doc {activeCardIndex + 1})
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1946,7 +1969,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     ) : (
                       <>
                         <Printer className="w-4 h-4" />
-                        <span>Send {currentCard.cardSide === 'front' ? 'Front Side' : currentCard.cardSide === 'back' ? 'Back Side' : 'Image'} to Print Studio →</span>
+                        <span>Send Document {activeCardIndex + 1} to Print Studio →</span>
                       </>
                     )}
                   </button>

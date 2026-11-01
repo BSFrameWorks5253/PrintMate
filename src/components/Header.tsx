@@ -115,130 +115,73 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs (Always Visible) */}
+          {/* Active Page Indicator Pill (Visible on large screens) */}
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-xs shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0" />
+            <span className="text-slate-400 dark:text-slate-500 font-medium">Active:</span>
+            <span className="font-black text-blue-600 dark:text-blue-400">
+              {activeTab === 'home' ? 'Home Overview' :
+               activeTab === 'scanner' ? 'Scan & Crop Studio' :
+               activeTab === 'print' ? 'Multi-Card Print Studio' :
+               activeTab === 'passport' ? 'Passport Maker' :
+               activeTab === 'idcard' ? 'ID & PVC Studio' :
+               activeTab === 'sizereducer' ? 'Govt Size Reducer' :
+               activeTab === 'converter' ? 'Master Converter' : 'Admin'}
+            </span>
+          </div>
+
+          {/* Navigation Tabs (Always Visible with Active Label & Hover Tooltips) */}
           <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto shrink-0">
-            <button
-              onClick={() => setActiveTab('home')}
-              style={{
-                backgroundColor: activeTab === 'home' ? '#2563eb' : 'transparent',
-                color: activeTab === 'home' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'home'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <Home className="w-4 h-4 shrink-0" />
-              <span>Home</span>
-            </button>
+            {[
+              { id: 'home' as const, label: 'Home', shortLabel: 'Home', icon: Home, desc: 'Overview & Studio Tools' },
+              { id: 'scanner' as const, label: 'Scan & Crop', shortLabel: 'Scan', icon: Crop, desc: 'Perspective Unwarp & Straighten' },
+              { id: 'print' as const, label: 'Print Studio', shortLabel: 'Print', icon: Printer, desc: '1:1 Millimeter Scale Printing', count: queue.length },
+              { id: 'passport' as const, label: 'Passport Maker', shortLabel: 'Passport', icon: CreditCard, desc: 'ICAO/ISO Passport Photo Grid' },
+              { id: 'idcard' as const, label: 'ID & PVC Studio', shortLabel: 'PVC ID', icon: IdCard, desc: 'e-Aadhaar, PAN & ISO CR80 PVC' },
+              { id: 'sizereducer' as const, label: 'Size Reducer', shortLabel: 'Reducer', icon: SlidersHorizontal, desc: 'UPSC, SSC, NEET Portal Size Clamping' },
+              { id: 'converter' as const, label: 'Converter', shortLabel: 'Convert', icon: FileText, desc: 'PDF Tools, Merge, Split & CAD' },
+            ].map((item) => {
+              const isActive = activeTab === item.id;
+              const IconComp = item.icon;
+              return (
+                <div key={item.id} className="relative group">
+                  <button
+                    onClick={() => setActiveTab(item.id)}
+                    style={{
+                      backgroundColor: isActive ? '#2563eb' : 'transparent',
+                      color: isActive ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer relative ${
+                      isActive
+                        ? 'shadow-sm shadow-blue-500/25 ring-1 ring-white/20'
+                        : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+                    }`}
+                    title={item.desc}
+                  >
+                    <IconComp className="w-4 h-4 shrink-0" />
+                    {/* Active page name is ALWAYS fully visible; Inactive tabs show short/full or reveal on hover */}
+                    <span className={`${isActive ? 'inline-block font-bold' : 'hidden sm:inline font-medium'}`}>
+                      {isActive ? item.label : item.shortLabel}
+                    </span>
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse ml-0.5" />
+                    )}
+                    {typeof item.count === 'number' && item.count > 0 && (
+                      <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
 
-            <button
-              onClick={() => setActiveTab('scanner')}
-              style={{
-                backgroundColor: activeTab === 'scanner' ? '#2563eb' : 'transparent',
-                color: activeTab === 'scanner' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'scanner'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <Crop className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Scan & Edit</span>
-              <span className="sm:hidden">Edit</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('print')}
-              style={{
-                backgroundColor: activeTab === 'print' ? '#2563eb' : 'transparent',
-                color: activeTab === 'print' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${
-                activeTab === 'print'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <Printer className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Print Studio</span>
-              <span className="sm:hidden">Print</span>
-              {queue.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                  {queue.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('passport')}
-              style={{
-                backgroundColor: activeTab === 'passport' ? '#2563eb' : 'transparent',
-                color: activeTab === 'passport' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'passport'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <CreditCard className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Passport Maker</span>
-              <span className="sm:hidden">Passport</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('idcard')}
-              style={{
-                backgroundColor: activeTab === 'idcard' ? '#2563eb' : 'transparent',
-                color: activeTab === 'idcard' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'idcard'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <IdCard className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">ID / PVC Studio</span>
-              <span className="sm:hidden">PVC ID</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('sizereducer')}
-              style={{
-                backgroundColor: activeTab === 'sizereducer' ? '#2563eb' : 'transparent',
-                color: activeTab === 'sizereducer' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'sizereducer'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <SlidersHorizontal className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Size Reducer</span>
-              <span className="sm:hidden">Reducer</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('converter')}
-              style={{
-                backgroundColor: activeTab === 'converter' ? '#2563eb' : 'transparent',
-                color: activeTab === 'converter' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
-              }}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'converter'
-                  ? 'shadow-sm'
-                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
-              }`}
-            >
-              <FileText className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Converter</span>
-              <span className="sm:hidden">Convert</span>
-            </button>
+                  {/* Clean Hover Name Tooltip */}
+                  <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-slate-950 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all duration-150 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-slate-800 scale-95 group-hover:scale-100">
+                    <span className="text-cyan-400 mr-1">•</span>
+                    <span>{item.label}</span>
+                    <span className="text-slate-400 font-normal ml-1">({item.desc})</span>
+                  </div>
+                </div>
+              );
+            })}
 
             {isAdmin && (
               <button
