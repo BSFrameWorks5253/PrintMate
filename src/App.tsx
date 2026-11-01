@@ -6,6 +6,8 @@ import { PassportMakerView } from './components/PassportMaker/PassportMakerView'
 import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { RecentImagesModal } from './components/Recents/RecentImagesModal';
 import { ConverterView } from './components/Converter/ConverterView';
+import { IdCardStudioView } from './components/IdCardStudio/IdCardStudioView';
+import { SizeReducerStudio } from './components/SizeReducer/SizeReducerStudio';
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
@@ -21,7 +23,7 @@ import { isAuthorizedAdmin, AUTHORIZED_ADMIN_EMAIL } from './utils/constants';
 import { userStorageService } from './services/userStorageService';
 import './App.css';
 
-export type AppTab = 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
+export type AppTab = 'home' | 'scanner' | 'print' | 'passport' | 'idcard' | 'sizereducer' | 'admin' | 'converter';
 
 const getTabFromPath = (pathname: string): AppTab => {
   const clean = pathname.toLowerCase().replace(/^\/+|\/+$/g, '');
@@ -29,6 +31,8 @@ const getTabFromPath = (pathname: string): AppTab => {
   if (clean === 'scanner' || clean === 'scan') return 'scanner';
   if (clean === 'print' || clean === 'print-studio') return 'print';
   if (clean === 'passport' || clean === 'passport-maker') return 'passport';
+  if (clean === 'idcard' || clean === 'pvc' || clean === 'id-card') return 'idcard';
+  if (clean === 'sizereducer' || clean === 'size-reducer' || clean === 'compress') return 'sizereducer';
   if (clean === 'admin' || clean === 'dashboard') return 'admin';
   if (clean === 'converter' || clean === 'pdf') return 'converter';
   return 'home';
@@ -380,6 +384,19 @@ const MainAppContent: React.FC = () => {
 
         <div className={`no-print ${activeTab === 'converter' ? 'block' : 'hidden'}`}>
           <ConverterView />
+        </div>
+
+        <div className={`no-print ${activeTab === 'idcard' ? 'block' : 'hidden'}`}>
+          <IdCardStudioView
+            onSendToPrintStudio={(items) => {
+              setQueue((prev) => [...prev, ...items]);
+              setActiveTab('print');
+            }}
+          />
+        </div>
+
+        <div className={`no-print ${activeTab === 'sizereducer' ? 'block' : 'hidden'}`}>
+          <SizeReducerStudio />
         </div>
 
         {activeTab === 'admin' && (

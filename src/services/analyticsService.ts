@@ -16,6 +16,8 @@ export interface UserAnalytics {
     passport: number;
     admin: number;
     converter?: number;
+    idcard?: number;
+    sizereducer?: number;
   };
   printCount: number;
   downloadCount: number;
@@ -28,7 +30,7 @@ export interface AnalyticsEvent {
   userId: string;
   userEmail: string;
   userName: string;
-  page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
+  page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter' | 'idcard' | 'sizereducer';
   meta?: Record<string, any>;
   timestamp: number;
 }
@@ -344,7 +346,7 @@ class AnalyticsService {
 
   // --- Public Tracking Methods ---
 
-  public trackPageView(page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter', user?: UserProfile | null): void {
+  public trackPageView(page: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter' | 'idcard' | 'sizereducer', user?: UserProfile | null): void {
     const info = this.resolveUserInfo(user);
     this.updateOrCreateUser(info, (u) => {
       u.pageViews[page] = (u.pageViews[page] || 0) + 1;

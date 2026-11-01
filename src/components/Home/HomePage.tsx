@@ -7,11 +7,13 @@ import {
   CheckCircle2, 
   ArrowRight, 
   ShieldCheck,
-  FileText
+  FileText,
+  SlidersHorizontal,
+  IdCard
 } from 'lucide-react';
 
 interface HomePageProps {
-  onNavigate: (tab: 'scanner' | 'print' | 'passport' | 'admin' | 'converter') => void;
+  onNavigate: (tab: 'scanner' | 'print' | 'passport' | 'idcard' | 'sizereducer' | 'admin' | 'converter') => void;
   onOpenSample: (type: 'id_front' | 'id_back' | 'paper') => void;
 }
 
@@ -66,6 +68,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
               >
                 <CreditCard className="w-5 h-5 text-indigo-600" />
                 <span>Passport Photo Maker</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('idcard')}
+                className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-sm sm:text-base border border-slate-300/80 dark:border-slate-700 shadow-md hover:shadow-lg flex items-center gap-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              >
+                <IdCard className="w-5 h-5 text-blue-600" />
+                <span>ID & PVC Studio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('sizereducer')}
+                className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-sm sm:text-base border border-slate-300/80 dark:border-slate-700 shadow-md hover:shadow-lg flex items-center gap-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              >
+                <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
+                <span>Govt Size Reducer</span>
               </button>
 
               <button
@@ -152,7 +172,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
         </div>
       </section>
 
-      {/* 3 Core Studio Suites */}
+      {/* Core Studio Suites */}
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
           <span className="text-xs font-extrabold text-blue-600 uppercase tracking-widest">
@@ -162,11 +182,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
             Engineered for Photographers, Cyber Cafes & Everyday Users
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-            Four dedicated, powerhouse modules built into a unified browser workspace.
+            Six dedicated, powerhouse modules built into a unified browser workspace.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           
           {/* Card 1: Scanner */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-lg hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-700 transition-all flex flex-col justify-between group">
@@ -328,6 +348,88 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
               className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
             >
               <span>Open Master Converter</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Card 5: ID Card & PVC Studio */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-lg hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-600 transition-all flex flex-col justify-between group">
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
+                <IdCard className="w-7 h-7" />
+              </div>
+              <div className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 mb-3">
+                ISO CR80 PVC MAKER
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-2">
+                ID Card & PVC Studio
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                1-Click conversion of e-Aadhaar, PAN, Voter ID, Ayushman Bharat, and Driving Licenses to exact 85.6 × 53.98mm PVC card layouts with password unlock and 4×6 photo sheet printing.
+              </p>
+              
+              <ul className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Built-in e-Aadhaar PDF password unlocker</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Dual interactive Front & Back CR80 crops</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>4×6" photo paper, A4, or PVC tray layouts</span>
+                </li>
+              </ul>
+            </div>
+
+            <button
+              onClick={() => onNavigate('idcard')}
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+            >
+              <span>Open PVC ID Studio</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Card 6: Govt Form Size Reducer */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-lg hover:shadow-xl hover:border-indigo-400 dark:hover:border-indigo-600 transition-all flex flex-col justify-between group">
+            <div>
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
+                <SlidersHorizontal className="w-7 h-7" />
+              </div>
+              <div className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200 mb-3">
+                GOVT EXAM PORTALS
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-2">
+                Govt Form Size Reducer
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                Guaranteed file size clamping for UPSC, SSC, NEET, JEE, and PAN Card uploads. Includes 1-click cyber-cafe background whitener and ink darkener for signatures.
+              </p>
+              
+              <ul className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Binary search algorithm: exact target KB guarantee</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>1-click dirty background signature cleaner</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Presets for UPSC, SSC, NTA, PAN & Passport Seva</span>
+                </li>
+              </ul>
+            </div>
+
+            <button
+              onClick={() => onNavigate('sizereducer')}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+            >
+              <span>Open Size Reducer</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

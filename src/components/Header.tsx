@@ -21,7 +21,9 @@ import {
   Moon,
   ExternalLink,
   Menu,
-  RefreshCw
+  RefreshCw,
+  SlidersHorizontal,
+  IdCard
 } from 'lucide-react';
 import type { PrintQueueItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -31,8 +33,8 @@ import { userStorageService } from '../services/userStorageService';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
-  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter';
-  setActiveTab: (tab: 'home' | 'scanner' | 'print' | 'passport' | 'admin' | 'converter') => void;
+  activeTab: 'home' | 'scanner' | 'print' | 'passport' | 'idcard' | 'sizereducer' | 'admin' | 'converter';
+  setActiveTab: (tab: 'home' | 'scanner' | 'print' | 'passport' | 'idcard' | 'sizereducer' | 'admin' | 'converter') => void;
   queue: PrintQueueItem[];
   onLoadSample: (type: 'id_front' | 'id_back' | 'paper') => void;
   onOpenRecents?: () => void;
@@ -185,6 +187,40 @@ export const Header: React.FC<HeaderProps> = ({
               <CreditCard className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Passport Maker</span>
               <span className="sm:hidden">Passport</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('idcard')}
+              style={{
+                backgroundColor: activeTab === 'idcard' ? '#2563eb' : 'transparent',
+                color: activeTab === 'idcard' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
+              }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'idcard'
+                  ? 'shadow-sm'
+                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+              }`}
+            >
+              <IdCard className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">ID / PVC Studio</span>
+              <span className="sm:hidden">PVC ID</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('sizereducer')}
+              style={{
+                backgroundColor: activeTab === 'sizereducer' ? '#2563eb' : 'transparent',
+                color: activeTab === 'sizereducer' ? '#ffffff' : isDark ? '#e2e8f0' : '#334155',
+              }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'sizereducer'
+                  ? 'shadow-sm'
+                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Size Reducer</span>
+              <span className="sm:hidden">Reducer</span>
             </button>
 
             <button
