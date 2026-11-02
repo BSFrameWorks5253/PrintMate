@@ -62,26 +62,13 @@
         if (btn) btn.style.display = 'inline-block';
       }, 7000);
 
-      // Automatically unregister stale service workers and wipe cache on local/dev hosts
-      if (
-        window.location.port === '5173' ||
-        window.location.hostname.includes('localhost') ||
-        window.location.hostname.includes('192.168.')
-      ) {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for (var i = 0; i < registrations.length; i++) {
-              registrations[i].unregister();
-            }
-          });
-        }
-        if ('caches' in window) {
-          caches.keys().then(function(keys) {
-            for (var j = 0; j < keys.length; j++) {
-              caches.delete(keys[j]);
-            }
-          });
-        }
+      // Unregister any stale service workers and clear old caches across ALL environments (Vercel, LAN, Localhost)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>

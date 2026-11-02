@@ -2,9 +2,11 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+const isElectron = process.env.ELECTRON === 'true' || process.env.BUILD_TARGET === 'electron';
+
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: isElectron ? './' : '/',
   plugins: [tailwindcss(), react()],
   envPrefix: ['VITE_', 'SUPABASE_'],
   server: {
