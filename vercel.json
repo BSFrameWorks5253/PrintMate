@@ -13,15 +13,6 @@
       ]
     },
     {
-      "source": "/sw.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
-    {
       "source": "/assets/(.*)",
       "headers": [
         {
@@ -33,7 +24,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|favicon|logo|manifest|sw\\.js|pdf\\.worker).*)$",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
