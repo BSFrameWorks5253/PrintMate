@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
 import { ScannerView } from './components/Scanner/ScannerView';
 import { PrintStudioView } from './components/PrintStudio/PrintStudioView';
-import { PassportMakerView } from './components/PassportMaker/PassportMakerView';
-import { AdminDashboard } from './components/Admin/AdminDashboard';
 import { RecentImagesModal } from './components/Recents/RecentImagesModal';
-import { ConverterView } from './components/Converter/ConverterView';
 import { IdCardStudioView } from './components/IdCardStudio/IdCardStudioView';
-import { SizeReducerStudio } from './components/SizeReducer/SizeReducerStudio';
+
+// Lazily load heavier studio modules so the main page bundle is ultra-fast and lightweight
+const ConverterView = lazy(() => import('./components/Converter/ConverterView').then(m => ({ default: m.ConverterView })));
+const PassportMakerView = lazy(() => import('./components/PassportMaker/PassportMakerView').then(m => ({ default: m.PassportMakerView })));
+const SizeReducerStudio = lazy(() => import('./components/SizeReducer/SizeReducerStudio').then(m => ({ default: m.SizeReducerStudio })));
+const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
@@ -22,6 +24,13 @@ import { HomePage } from './components/Home/HomePage';
 import { isAuthorizedAdmin, AUTHORIZED_ADMIN_EMAIL } from './utils/constants';
 import { userStorageService } from './services/userStorageService';
 import './App.css';
+
+const ViewLoadingFallback: React.FC<{ label?: string }> = ({ label = 'Loading Studio Module...' }) => (
+  <div className="flex flex-col items-center justify-center min-h-[40vh] py-16 text-slate-500 dark:text-slate-400">
+    <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</span>
+  </div>
+);
 
 export type AppTab = 'home' | 'scanner' | 'print' | 'passport' | 'idcard' | 'sizereducer' | 'admin' | 'converter';
 
@@ -379,11 +388,19 @@ const MainAppContent: React.FC = () => {
         </div>
 
         <div className={`no-print ${activeTab === 'passport' ? 'block' : 'hidden'}`}>
-          <PassportMakerView onSendToPrint={handleSendToPrint} />
+          {activeTab === 'passport' && (
+            <Suspense fallback={<ViewLoadingFallback label="Loading Passport Photo Studio..." />}>
+              <PassportMakerView onSendToPrint={handleSendToPrint} />
+            </Suspense>
+          )}
         </div>
 
         <div className={`no-print ${activeTab === 'converter' ? 'block' : 'hidden'}`}>
-          <ConverterView />
+          {activeTab === 'converter' && (
+            <Suspense fallback={<ViewLoadingFallback label="Loading Document Converter Studio..." />}>
+              <ConverterView />
+            </Suspense>
+          )}
         </div>
 
         <div className={`no-print ${activeTab === 'idcard' ? 'block' : 'hidden'}`}>
@@ -396,12 +413,18 @@ const MainAppContent: React.FC = () => {
         </div>
 
         <div className={`no-print ${activeTab === 'sizereducer' ? 'block' : 'hidden'}`}>
-          <SizeReducerStudio />
+          {activeTab === 'sizereducer' && (
+            <Suspense fallback={<ViewLoadingFallback label="Loading File Size Reducer..." />}>
+              <SizeReducerStudio />
+            </Suspense>
+          )}
         </div>
 
         {activeTab === 'admin' && (
           isAuthorizedAdmin(user?.email) ? (
-            <AdminDashboard onNavigateTab={setActiveTab} />
+            <Suspense fallback={<ViewLoadingFallback label="Loading Admin Console..." />}>
+              <AdminDashboard onNavigateTab={setActiveTab} />
+            </Suspense>
           ) : (
             <div className="max-w-xl mx-auto my-16 px-4">
               <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl text-center">

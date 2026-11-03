@@ -13,8 +13,88 @@
     <link rel="manifest" href="/manifest.json" />
     <title>PrintMate - ID Card & Document Border Detection, Deskew & Print Studio</title>
     <meta name="description" content="Auto-detect borders, crop background, straighten slanted ID cards and documents, adjust brightness & contrast, and print in multi-up A4/A3 layouts." />
+    <!-- Global Legacy Browser Polyfills (Chrome 80-109, Firefox 78-115 on Windows 7/8/10) -->
     <script>
       (function() {
+        // 1. Promise.withResolvers (Used by PDF.js v4+ & modern build targets)
+        if (typeof Promise !== 'undefined' && typeof Promise.withResolvers === 'undefined') {
+          Promise.withResolvers = function() {
+            var resolve, reject;
+            var promise = new Promise(function(res, rej) {
+              resolve = res;
+              reject = rej;
+            });
+            return { promise: promise, resolve: resolve, reject: reject };
+          };
+        }
+
+        // 2. Object.hasOwn
+        if (typeof Object !== 'undefined' && typeof Object.hasOwn === 'undefined') {
+          Object.hasOwn = function(object, property) {
+            if (object == null) {
+              throw new TypeError('Cannot convert undefined or null to object');
+            }
+            return Object.prototype.hasOwnProperty.call(Object(object), property);
+          };
+        }
+
+        // 3. Array.prototype methods
+        if (typeof Array !== 'undefined' && Array.prototype) {
+          if (!Array.prototype.at) {
+            Array.prototype.at = function(n) {
+              n = Math.trunc(n) || 0;
+              if (n < 0) n += this.length;
+              if (n < 0 || n >= this.length) return undefined;
+              return this[n];
+            };
+          }
+          if (!Array.prototype.findLast) {
+            Array.prototype.findLast = function(predicate, thisArg) {
+              for (var i = this.length - 1; i >= 0; i--) {
+                if (predicate.call(thisArg, this[i], i, this)) return this[i];
+              }
+              return undefined;
+            };
+          }
+          if (!Array.prototype.findLastIndex) {
+            Array.prototype.findLastIndex = function(predicate, thisArg) {
+              for (var j = this.length - 1; j >= 0; j--) {
+                if (predicate.call(thisArg, this[j], j, this)) return j;
+              }
+              return -1;
+            };
+          }
+        }
+
+        // 4. crypto.randomUUID fallback
+        if (typeof window !== 'undefined') {
+          if (!window.crypto) {
+            window.crypto = {};
+          }
+          if (!window.crypto.randomUUID) {
+            window.crypto.randomUUID = function() {
+              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = (Math.random() * 16) | 0;
+                var v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+              });
+            };
+          }
+        }
+
+        // 5. structuredClone
+        if (typeof globalThis !== 'undefined' && typeof globalThis.structuredClone === 'undefined') {
+          globalThis.structuredClone = function(val) {
+            if (val === undefined) return undefined;
+            try {
+              return JSON.parse(JSON.stringify(val));
+            } catch (e) {
+              return val;
+            }
+          };
+        }
+
+        // Theme init
         try {
           var saved = localStorage.getItem('printmate_theme');
           var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -36,7 +116,8 @@
       <div id="app-initial-loader" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 20px;">
         <div style="width: 48px; height: 48px; border: 3px solid rgba(59, 130, 246, 0.2); border-top-color: #3b82f6; border-radius: 50%; animation: pm-spin 0.8s linear infinite; margin-bottom: 16px;"></div>
         <div style="font-weight: 700; font-size: 16px; letter-spacing: -0.02em;">Loading PrintMate Studio...</div>
-        <div style="color: #64748b; font-size: 12px; margin-top: 6px;">Setting up offline processing engine</div>
+        <div id="pm-loader-status" style="color: #64748b; font-size: 12px; margin-top: 6px;">Setting up offline processing engine</div>
+        <div id="pm-error-details" style="display: none; margin-top: 12px; max-width: 420px; padding: 10px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; color: #fca5a5; font-size: 11px; text-align: left; font-family: monospace; word-break: break-all;"></div>
         <button id="pm-force-reload-btn" onclick="window.pmClearAndReload()" style="display: none; margin-top: 18px; padding: 8px 16px; background: #2563eb; color: #ffffff; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer;">
           Taking long? Click to Reload & Clear Cache
         </button>
@@ -52,17 +133,35 @@
             return Promise.all(keys.map(function(k) { return caches.delete(k); }));
           }).then(function() {
             window.location.reload();
+          }).catch(function() {
+            window.location.reload();
           });
         } else {
           window.location.reload();
         }
       };
+
+      // Show reload button after 3 seconds if app hasn't mounted
       setTimeout(function() {
         var btn = document.getElementById('pm-force-reload-btn');
         if (btn) btn.style.display = 'inline-block';
-      }, 4000);
+      }, 3000);
 
-      // Unregister any stale service workers and immediately clear old caches across ALL environments (Vercel, LAN, Localhost)
+      // Listen for early bootstrap script errors
+      window.addEventListener('error', function(e) {
+        var errBox = document.getElementById('pm-error-details');
+        var status = document.getElementById('pm-loader-status');
+        var btn = document.getElementById('pm-force-reload-btn');
+        if (errBox && e) {
+          var errorMsg = e.message || (e.error && e.error.message) || 'Script execution error';
+          errBox.textContent = 'Startup error: ' + errorMsg;
+          errBox.style.display = 'block';
+          if (status) status.textContent = 'Encountered an issue loading application modules';
+          if (btn) btn.style.display = 'inline-block';
+        }
+      });
+
+      // Unregister any stale service workers and clear old caches
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for (var i = 0; i < registrations.length; i++) {
