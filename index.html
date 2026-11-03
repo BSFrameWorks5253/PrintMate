@@ -60,13 +60,20 @@
       setTimeout(function() {
         var btn = document.getElementById('pm-force-reload-btn');
         if (btn) btn.style.display = 'inline-block';
-      }, 7000);
+      }, 4000);
 
-      // Unregister any stale service workers and clear old caches across ALL environments (Vercel, LAN, Localhost)
+      // Unregister any stale service workers and immediately clear old caches across ALL environments (Vercel, LAN, Localhost)
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for (var i = 0; i < registrations.length; i++) {
             registrations[i].unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(keys) {
+          for (var j = 0; j < keys.length; j++) {
+            caches.delete(keys[j]);
           }
         });
       }
