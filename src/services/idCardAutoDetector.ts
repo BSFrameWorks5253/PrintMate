@@ -1,14 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Ensure pdf.js worker is properly configured
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
-}
-
 export type SupportedIdCardType =
   | 'aadhaar'
   | 'pan'
@@ -116,6 +105,14 @@ export class IdCardAutoDetectorService {
     password?: string,
     scale: number = 2.5
   ): Promise<{ canvas: HTMLCanvasElement; detectedText: string; isEncrypted: boolean }> {
+    const pdfjsLib = await import('pdfjs-dist');
+    if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
+      } catch {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      }
+    }
     try {
       const loadingTask = pdfjsLib.getDocument({
         data: bytes.slice(),

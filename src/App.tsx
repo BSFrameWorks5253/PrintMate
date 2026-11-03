@@ -3,9 +3,8 @@ import { Header } from './components/Header';
 import { ScannerView } from './components/Scanner/ScannerView';
 import { PrintStudioView } from './components/PrintStudio/PrintStudioView';
 import { RecentImagesModal } from './components/Recents/RecentImagesModal';
-import { IdCardStudioView } from './components/IdCardStudio/IdCardStudioView';
-
 // Lazily load heavier studio modules so the main page bundle is ultra-fast and lightweight
+const IdCardStudioView = lazy(() => import('./components/IdCardStudio/IdCardStudioView').then(m => ({ default: m.IdCardStudioView })));
 const ConverterView = lazy(() => import('./components/Converter/ConverterView').then(m => ({ default: m.ConverterView })));
 const PassportMakerView = lazy(() => import('./components/PassportMaker/PassportMakerView').then(m => ({ default: m.PassportMakerView })));
 const SizeReducerStudio = lazy(() => import('./components/SizeReducer/SizeReducerStudio').then(m => ({ default: m.SizeReducerStudio })));
@@ -404,12 +403,16 @@ const MainAppContent: React.FC = () => {
         </div>
 
         <div className={`no-print ${activeTab === 'idcard' ? 'block' : 'hidden'}`}>
-          <IdCardStudioView
-            onSendToPrintStudio={(items) => {
-              setQueue((prev) => [...prev, ...items]);
-              setActiveTab('print');
-            }}
-          />
+          {activeTab === 'idcard' && (
+            <Suspense fallback={<ViewLoadingFallback label="Loading PVC ID Card Studio..." />}>
+              <IdCardStudioView
+                onSendToPrintStudio={(items) => {
+                  setQueue((prev) => [...prev, ...items]);
+                  setActiveTab('print');
+                }}
+              />
+            </Suspense>
+          )}
         </div>
 
         <div className={`no-print ${activeTab === 'sizereducer' ? 'block' : 'hidden'}`}>
