@@ -10,13 +10,13 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder --win"
+    "electron:build": "cross-env BUILD_TARGET=electron npm run build && electron-builder --win"
   },
   "build": {
     "appId": "com.printmate.studio",
     "productName": "PrintMate Studio",
     "directories": {
-      "output": "C:/temp/printmate-release"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
@@ -27,8 +27,20 @@
     "compression": "maximum",
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PrintMate Studio"
     }
   },
   "dependencies": {
