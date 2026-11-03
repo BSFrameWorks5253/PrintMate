@@ -15,6 +15,7 @@
   "build": {
     "appId": "com.printmate.studio",
     "productName": "PrintMate Studio",
+    "electronVersion": "22.3.27",
     "directories": {
       "output": "release"
     },
