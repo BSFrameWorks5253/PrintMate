@@ -1,3 +1,41 @@
+/* PrintMate Worker Compatibility Polyfill */
+if (typeof self !== 'undefined') {
+  if (typeof self.Promise !== 'undefined' && typeof self.Promise.withResolvers === 'undefined') {
+    self.Promise.withResolvers = function() {
+      var resolve, reject;
+      var promise = new Promise(function(res, rej) {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise: promise, resolve: resolve, reject: reject };
+    };
+  }
+  if (typeof self.Object !== 'undefined' && typeof self.Object.hasOwn === 'undefined') {
+    self.Object.hasOwn = function(object, property) {
+      if (object == null) throw new TypeError('Cannot convert undefined or null to object');
+      return Object.prototype.hasOwnProperty.call(Object(object), property);
+    };
+  }
+  if (typeof self.Array !== 'undefined' && self.Array.prototype) {
+    if (!self.Array.prototype.at) {
+      self.Array.prototype.at = function(n) {
+        n = Math.trunc(n) || 0;
+        if (n < 0) n += this.length;
+        if (n < 0 || n >= this.length) return undefined;
+        return this[n];
+      };
+    }
+    if (!self.Array.prototype.findLast) {
+      self.Array.prototype.findLast = function(predicate, thisArg) {
+        for (var i = this.length - 1; i >= 0; i--) {
+          if (predicate.call(thisArg, this[i], i, this)) return this[i];
+        }
+        return undefined;
+      };
+    }
+  }
+}
+
 /**
  * @licstart The following is the entire license notice for the
  * JavaScript code in this page

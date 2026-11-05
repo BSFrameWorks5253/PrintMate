@@ -141,9 +141,17 @@ export const PRINT_LAYOUT_OPTIONS = [
   {
     id: '1_fit',
     name: '1 Image (Full Page Fit)',
-    description: 'Maximizes image to fill the paper margins',
+    description: 'Scales to full page margins while preserving aspect ratio',
     slots: 1,
     icon: 'FileText',
+    category: 'single',
+  },
+  {
+    id: '1_fill',
+    name: '1 Image (Full Page Fill / Borderless)',
+    description: 'Fills the entire sheet edge-to-edge with zero white borders',
+    slots: 1,
+    icon: 'Maximize2',
     category: 'single',
   },
   {

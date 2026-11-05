@@ -1,14 +1,5 @@
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Initialize PDF.js worker for web
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
-}
+import { pdfjsLib, getSafePdfDocument } from './pdfInit';
 
 export interface TextWatermarkConfig {
   type: 'text';
@@ -243,11 +234,7 @@ export class PdfSecurityAndToolsService {
     onProgress?: (current: number, total: number) => void
   ): Promise<Uint8Array> {
     const safeBytes = new Uint8Array(pdfBytes.slice());
-    const loadingTask = pdfjsLib.getDocument({
-      data: safeBytes,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true
-    });
+    const loadingTask = getSafePdfDocument({ data: safeBytes });
     const srcDoc = await loadingTask.promise;
     const newDoc = await PDFDocument.create();
 

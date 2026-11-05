@@ -121,8 +121,8 @@ export const NavigationRibbon: React.FC<NavigationRibbonProps> = ({
       ref={dropdownRef}
       className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between select-none shadow-2xs shrink-0 relative z-40 transition-colors duration-200"
     >
-      {/* LEFT: PRIMARY HUBS & STREAMLINED TABS */}
-      <div className="flex items-center gap-1.5 overflow-x-hidden no-scrollbar">
+      {/* LEFT: PRIMARY HUBS & STREAMLINED TABS (Scrollable on smaller/older screens) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-1">
         {/* 1. All Tools Hub */}
         <button
           onClick={() => {

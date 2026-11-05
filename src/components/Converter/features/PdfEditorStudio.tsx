@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, getSafePdfDocument } from '../../../services/converter/pdfInit';
 import {
   Type,
   PenTool,
@@ -171,11 +171,7 @@ export const PdfEditorStudio: React.FC<PdfEditorStudioProps> = ({
     const loadPdf = async () => {
       try {
         const safeBytes = new Uint8Array(currentFile.bytes.slice());
-        const loadingTask = pdfjsLib.getDocument({
-          data: safeBytes,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-          cMapPacked: true
-        });
+        const loadingTask = getSafePdfDocument({ data: safeBytes });
         const doc = await loadingTask.promise;
         if (isMounted) {
           setPdfDocProxy(doc);

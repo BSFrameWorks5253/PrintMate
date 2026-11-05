@@ -62,6 +62,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const [settings, setSettings] = useState<PrintSettings>({
     pageSize: 'a4',
     orientation: 'portrait',
+    autoOrientation: true,
     layout: '2_vertical',
     showCutLines: false, // Default: clean preview without clutter
     printCutMarks: false, // Default: zero marks on printed paper! Pure clean image
@@ -81,6 +82,21 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const [activePreviewSheet, setActivePreviewSheet] = useState<number>(0);
   const [layoutCategory, setLayoutCategory] = useState<'id_duo' | 'multi' | 'single' | 'all'>('id_duo');
   const [sidebarTab, setSidebarTab] = useState<'layout' | 'spacing' | 'queue'>('layout');
+
+  // Auto-adapt page orientation to matching image aspect ratio
+  useEffect(() => {
+    if (settings.autoOrientation && queue.length > 0) {
+      const primaryItem = queue[0];
+      if (primaryItem && primaryItem.aspectRatio) {
+        // If image is wider than tall, set landscape; if taller than wide, set portrait
+        const isLandscapeImage = primaryItem.aspectRatio > 1.05;
+        const targetOrientation = isLandscapeImage ? 'landscape' : 'portrait';
+        if (settings.orientation !== targetOrientation) {
+          setSettings((prev) => ({ ...prev, orientation: targetOrientation }));
+        }
+      }
+    }
+  }, [queue, settings.autoOrientation]);
 
   const filteredLayouts = PRINT_LAYOUT_OPTIONS.filter((l) => {
     if (layoutCategory === 'all') return true;
@@ -104,6 +120,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
         return <Maximize2 className="w-4 h-4 text-blue-600" />;
       case '1_fit':
         return <FileText className="w-4 h-4 text-slate-600" />;
+      case '1_fill':
+        return <Maximize2 className="w-4 h-4 text-emerald-600" />;
       case '4_grid':
         return <Grid2X2 className="w-4 h-4 text-amber-600" />;
       case '6_grid':
@@ -234,6 +252,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const getSlotCount = (layout: PrintLayoutType): number => {
     switch (layout) {
       case '1_fit':
+      case '1_fill':
       case '1_real_size':
         return 1;
       case '2_vertical':
@@ -265,6 +284,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const getGridDimensions = (layout: PrintLayoutType, landscape: boolean): { cols: number; rows: number } => {
     switch (layout) {
       case '1_fit':
+      case '1_fill':
       case '1_real_size':
       case 'front_back_duplex':
         return { cols: 1, rows: 1 };
@@ -391,7 +411,34 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
         ctx.restore();
       };
 
-      if (settings.layout === '2_vertical') {
+      if (settings.layout === '1_fill') {
+        // 1. FULL PAGE FILL / BORDERLESS COVER
+        const img = loadedImgs[0];
+        if (img) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+      } else if (settings.layout === '1_fit') {
+        // 2. FULL PAGE FIT (Maximizes printable area within margins, maintaining true aspect ratio)
+        const img = loadedImgs[0];
+        if (img) {
+          const marginPx = settings.marginMm * pxPerMm;
+          const availW = canvas.width - (marginPx * 2);
+          const availH = canvas.height - (marginPx * 2);
+          const imgRatio = img.naturalWidth / img.naturalHeight;
+          const availRatio = availW / availH;
+          let drawW = availW;
+          let drawH = availH;
+          if (imgRatio > availRatio) {
+            drawH = availW / imgRatio;
+          } else {
+            drawW = availH * imgRatio;
+          }
+          const x = marginPx + (availW - drawW) / 2;
+          const y = marginPx + (availH - drawH) / 2;
+          ctx.drawImage(img, x, y, drawW, drawH);
+          drawCropCornerMarks(x, y, drawW, drawH);
+        }
+      } else if (settings.layout === '2_vertical') {
         const topY1 = canvas.height * 0.18;
         let currY = topY1;
 
@@ -400,10 +447,21 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           const isImgPortrait = img.naturalWidth < img.naturalHeight;
           const cardPxW = (isImgPortrait ? cardHMm : cardWMm) * pxPerMm;
           const cardPxH = (isImgPortrait ? cardWMm : cardHMm) * pxPerMm;
-          const x = (canvas.width - cardPxW) / 2;
-          ctx.drawImage(img, x, currY, cardPxW, cardPxH);
-          drawCropCornerMarks(x, currY, cardPxW, cardPxH);
-          currY += cardPxH + (settings.spacingMm * pxPerMm);
+          let drawW = cardPxW;
+          let drawH = cardPxH;
+          const imgRatio = img.naturalWidth / img.naturalHeight;
+          const boxRatio = cardPxW / cardPxH;
+          if (settings.scaleMode !== 'exact_id' || Math.abs(imgRatio - boxRatio) > 0.05) {
+            if (imgRatio > boxRatio) {
+              drawH = cardPxW / imgRatio;
+            } else {
+              drawW = cardPxH * imgRatio;
+            }
+          }
+          const x = (canvas.width - drawW) / 2;
+          ctx.drawImage(img, x, currY, drawW, drawH);
+          drawCropCornerMarks(x, currY, drawW, drawH);
+          currY += drawH + (settings.spacingMm * pxPerMm);
         });
       } else if (settings.layout === 'front_back_fold') {
         let totalW = 0;
@@ -445,8 +503,12 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           const cardPxW = (isImgPortrait ? cardHMm : cardWMm) * pxPerMm;
           const cardPxH = (isImgPortrait ? cardWMm : cardHMm) * pxPerMm;
 
-          const targetW = settings.scaleMode === 'exact_id' ? cardPxW : cellW;
-          const targetH = settings.scaleMode === 'exact_id' ? cardPxH : (cellW / (img.naturalWidth / img.naturalHeight));
+          let targetW = settings.scaleMode === 'exact_id' ? cardPxW : cellW;
+          let targetH = settings.scaleMode === 'exact_id' ? cardPxH : (cellW / (img.naturalWidth / img.naturalHeight));
+          if (targetH > cellH) {
+            targetH = cellH;
+            targetW = cellH * (img.naturalWidth / img.naturalHeight);
+          }
           
           const x = marginPx + c * (cellW + spacingPx) + (cellW - targetW) / 2;
           const y = marginPx + r * (cellH + spacingPx) + (cellH - targetH) / 2;
@@ -519,7 +581,34 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
         ctx.restore();
       };
 
-      if (settings.layout === '2_vertical') {
+      if (settings.layout === '1_fill') {
+        // 1. FULL PAGE FILL / BORDERLESS COVER
+        const img = loadedImgs[0];
+        if (img) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+      } else if (settings.layout === '1_fit') {
+        // 2. FULL PAGE FIT
+        const img = loadedImgs[0];
+        if (img) {
+          const marginPx = settings.marginMm * pxPerMm;
+          const availW = canvas.width - (marginPx * 2);
+          const availH = canvas.height - (marginPx * 2);
+          const imgRatio = img.naturalWidth / img.naturalHeight;
+          const availRatio = availW / availH;
+          let drawW = availW;
+          let drawH = availH;
+          if (imgRatio > availRatio) {
+            drawH = availW / imgRatio;
+          } else {
+            drawW = availH * imgRatio;
+          }
+          const x = marginPx + (availW - drawW) / 2;
+          const y = marginPx + (availH - drawH) / 2;
+          ctx.drawImage(img, x, y, drawW, drawH);
+          drawCropCornerMarks(x, y, drawW, drawH);
+        }
+      } else if (settings.layout === '2_vertical') {
         const topY1 = canvas.height * 0.18;
         let currY = topY1;
         loadedImgs.forEach((img) => {
@@ -527,10 +616,21 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
           const isImgPortrait = img.naturalWidth < img.naturalHeight;
           const cardPxW = (isImgPortrait ? cardHMm : cardWMm) * pxPerMm;
           const cardPxH = (isImgPortrait ? cardWMm : cardHMm) * pxPerMm;
-          const x = (canvas.width - cardPxW) / 2;
-          ctx.drawImage(img, x, currY, cardPxW, cardPxH);
-          drawCropCornerMarks(x, currY, cardPxW, cardPxH);
-          currY += cardPxH + (settings.spacingMm * pxPerMm);
+          let drawW = cardPxW;
+          let drawH = cardPxH;
+          const imgRatio = img.naturalWidth / img.naturalHeight;
+          const boxRatio = cardPxW / cardPxH;
+          if (settings.scaleMode !== 'exact_id' || Math.abs(imgRatio - boxRatio) > 0.05) {
+            if (imgRatio > boxRatio) {
+              drawH = cardPxW / imgRatio;
+            } else {
+              drawW = cardPxH * imgRatio;
+            }
+          }
+          const x = (canvas.width - drawW) / 2;
+          ctx.drawImage(img, x, currY, drawW, drawH);
+          drawCropCornerMarks(x, currY, drawW, drawH);
+          currY += drawH + (settings.spacingMm * pxPerMm);
         });
       } else if (settings.layout === 'front_back_fold') {
         let totalW = 0;
@@ -877,6 +977,90 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         Glossy 4R sheet fit
                       </span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
+                        setSettings((s) => ({
+                          ...s,
+                          layout: '1_fit',
+                          alignment: 'center',
+                          scaleMode: 'fit_cell',
+                          marginMm: 6,
+                          orientation: isItemLandscape ? 'landscape' : 'portrait',
+                          autoOrientation: true,
+                        }));
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        settings.layout === '1_fit'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
+                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          <span>Full Page Fit</span>
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                          settings.layout === '1_fit'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
+                        }`}>
+                          Fit
+                        </span>
+                      </div>
+                      <span className={`text-[10px] leading-tight ${
+                        settings.layout === '1_fit'
+                          ? 'text-blue-100'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        Auto ratio & margins
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
+                        setSettings((s) => ({
+                          ...s,
+                          layout: '1_fill',
+                          alignment: 'center',
+                          scaleMode: 'fit_cell',
+                          marginMm: 0,
+                          orientation: isItemLandscape ? 'landscape' : 'portrait',
+                          autoOrientation: true,
+                        }));
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        settings.layout === '1_fill'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
+                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold flex items-center gap-1">
+                          <Maximize2 className="w-3 h-3" />
+                          <span>Full Page Fill</span>
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                          settings.layout === '1_fill'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                        }`}>
+                          Fill
+                        </span>
+                      </div>
+                      <span className={`text-[10px] leading-tight ${
+                        settings.layout === '1_fill'
+                          ? 'text-blue-100'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        Borderless edge-to-edge
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -939,31 +1123,57 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   </div>
 
                   {/* Orientation & Placement Segmented Buttons */}
-                  <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-600">Orientation:</label>
-                      <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Orientation:</label>
+                        {settings.autoOrientation && (
+                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                            Auto Matching
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 gap-1">
                         <button
                           type="button"
-                          onClick={() => setSettings((s) => ({ ...s, orientation: 'portrait' }))}
+                          onClick={() => setSettings((s) => ({ ...s, orientation: 'portrait', autoOrientation: false }))}
                           className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
-                            settings.orientation === 'portrait'
+                            settings.orientation === 'portrait' && !settings.autoOrientation
                               ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-slate-900'
+                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
                           ▯ Portrait
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSettings((s) => ({ ...s, orientation: 'landscape' }))}
+                          onClick={() => setSettings((s) => ({ ...s, orientation: 'landscape', autoOrientation: false }))}
                           className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
-                            settings.orientation === 'landscape'
+                            settings.orientation === 'landscape' && !settings.autoOrientation
                               ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-slate-900'
+                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
                           ▭ Landscape
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
+                            setSettings((s) => ({
+                              ...s,
+                              autoOrientation: true,
+                              orientation: isItemLandscape ? 'landscape' : 'portrait'
+                            }));
+                          }}
+                          className={`px-2.5 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+                            settings.autoOrientation
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                          title="Automatically flips page orientation to match image aspect ratio"
+                        >
+                          ⚡ Auto
                         </button>
                       </div>
                     </div>
@@ -1763,17 +1973,17 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <div
                     key={sheetIdx}
                     ref={sheetIdx === 0 ? printSheetRef : undefined}
-                    className={`print-studio-sheet bg-white text-black shadow-2xl relative transition-all duration-300 ${
+                    className={`print-studio-sheet layout-${settings.layout} bg-white text-black shadow-2xl relative transition-all duration-300 ${
                       isCurrent ? 'block' : 'hidden'
                     }`}
                     style={{
                       '--print-sheet-width': `${pageWidthMm}mm`,
                       '--print-sheet-height': `${pageHeightMm}mm`,
-                      '--print-sheet-padding': `${settings.marginMm}mm`,
+                      '--print-sheet-padding': settings.layout === '1_fill' ? '0mm' : `${settings.marginMm}mm`,
                       width: `${pageWidthMm}mm`,
                       maxWidth: `${(isLandscape ? 680 : 480) * (previewZoom / 100)}px`,
                       aspectRatio: `${pageWidthMm} / ${pageHeightMm}`,
-                      padding: `${settings.marginMm}mm`,
+                      padding: settings.layout === '1_fill' ? '0mm' : `${settings.marginMm}mm`,
                       boxSizing: 'border-box',
                     } as React.CSSProperties}
                   >
@@ -2068,9 +2278,42 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           );
                         })}
                       </div>
+                    ) : settings.layout === '1_fill' ? (
+                      /* FULL PAGE FILL / BORDERLESS COVER */
+                      <div className="w-full h-full flex items-center justify-center p-0 m-0 overflow-hidden">
+                        {(() => {
+                          const item = getImageForSlot(0, sheetOffset);
+                          if (!item) return null;
+                          return (
+                            <div className="w-full h-full relative group flex items-center justify-center">
+                              <img
+                                src={item.dataUrl}
+                                alt="Full Page Fill"
+                                className="w-full h-full object-cover block"
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                              {onRotateItem && (
+                                <div 
+                                  className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1.5 rounded-lg transition-all shadow-lg"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => onRotateItem(item.id)}
+                                    className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1 shadow cursor-pointer"
+                                    title="Rotate 90° CW"
+                                  >
+                                    <RotateCw className="w-3.5 h-3.5" />
+                                    <span>Rotate</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     ) : settings.layout === '1_fit' || settings.layout === '1_real_size' ? (
-                      /* 5. LAYOUT: 1 IMAGE */
-                      <div className="h-full flex items-center justify-center">
+                      /* 5. LAYOUT: 1 IMAGE (FIT TO MARGINS OR REAL ID SIZE) */
+                      <div className="w-full h-full flex items-center justify-center p-1">
                         {(() => {
                           const item = getImageForSlot(0, sheetOffset);
                           if (!item) return null;
@@ -2082,24 +2325,55 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
                           return (
                             <div
-                              className={`${isRealSize ? "card-exact-id-slot" : ""} relative flex items-center justify-center ${
+                              className={`${isRealSize ? "card-exact-id-slot" : "w-full h-full"} relative flex items-center justify-center ${
                                 settings.showCutLines ? 'screen-cut-guide' : ''
                               } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                               style={{
-                                width: isRealSize ? screenW : '96%',
-                                aspectRatio: item.aspectRatio || 85.6 / 53.98,
                                 ...(isRealSize ? {
+                                  width: screenW,
+                                  aspectRatio: item.aspectRatio || 85.6 / 53.98,
                                   '--card-print-w': printW,
                                   '--card-print-h': printH,
-                                } : {}),
+                                } : {
+                                  width: '100%',
+                                  height: '100%',
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                }),
                               } as React.CSSProperties}
                             >
                               {renderCropTicks()}
                               <img
                                 src={item.dataUrl}
                                 alt="Single"
-                                className="card-exact-id w-full h-full object-contain block rounded-none"
+                                className={`card-exact-id block rounded-none ${
+                                  isRealSize ? 'w-full h-full object-contain' : 'max-w-full max-h-full object-contain'
+                                }`}
+                                style={{
+                                  objectFit: 'contain',
+                                  ...(isRealSize ? {} : {
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    width: 'auto',
+                                    height: 'auto',
+                                  })
+                                }}
                               />
+                              {onRotateItem && (
+                                <div 
+                                  className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-1 z-20 bg-black/85 backdrop-blur-md p-1 rounded-lg transition-all shadow-lg"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => onRotateItem(item.id)}
+                                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 shadow cursor-pointer"
+                                    title="Rotate 90° CW"
+                                  >
+                                    <RotateCw className="w-3 h-3" />
+                                    <span>Rotate</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

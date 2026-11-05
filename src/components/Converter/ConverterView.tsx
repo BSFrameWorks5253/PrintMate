@@ -11,6 +11,7 @@ import { ReverseConverterStudio } from './features/ReverseConverterStudio';
 import { ImageGalleryStudio } from './features/ImageGalleryStudio';
 import { OfficeConverterStudio } from './features/OfficeConverterStudio';
 import { CadToPdfStudio } from './features/CadToPdfStudio';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import type { NavigationTab } from '../../types/converter';
 
 export const ConverterView: React.FC = () => {
@@ -26,51 +27,53 @@ export const ConverterView: React.FC = () => {
 
       {/* 2. Main Studio Canvas Area */}
       <div className="converter-workspace flex-1 overflow-auto relative">
-        {currentTab === 'all-tools' && (
-          <PdfellaAllToolsHub
-            onSelectTool={(tab) => setCurrentTab(tab)}
-          />
-        )}
+        <ErrorBoundary>
+          {currentTab === 'all-tools' && (
+            <PdfellaAllToolsHub
+              onSelectTool={(tab) => setCurrentTab(tab)}
+            />
+          )}
 
-        {currentTab === 'workspace' && (
-          <ContextSmartWorkspace />
-        )}
+          {currentTab === 'workspace' && (
+            <ContextSmartWorkspace />
+          )}
 
-        {currentTab === 'pdf-editor' && (
-          <PdfEditorStudio />
-        )}
+          {currentTab === 'pdf-editor' && (
+            <PdfEditorStudio />
+          )}
 
-        {currentTab === 'pdf-merge' && (
-          <PdfMergeStudio />
-        )}
+          {currentTab === 'pdf-merge' && (
+            <PdfMergeStudio />
+          )}
 
-        {currentTab === 'pdf-split' && (
-          <PdfSplitStudio />
-        )}
+          {currentTab === 'pdf-split' && (
+            <PdfSplitStudio />
+          )}
 
-        {currentTab === 'pdf-organizer' && (
-          <PdfPageStudio />
-        )}
+          {currentTab === 'pdf-organizer' && (
+            <PdfPageStudio />
+          )}
 
-        {currentTab === 'pdf-security' && (
-          <PdfSecurityStudio />
-        )}
+          {currentTab === 'pdf-security' && (
+            <PdfSecurityStudio />
+          )}
 
-        {currentTab === 'reverse-suite' && (
-          <ReverseConverterStudio />
-        )}
+          {currentTab === 'reverse-suite' && (
+            <ReverseConverterStudio />
+          )}
 
-        {currentTab === 'image-gallery' && (
-          <ImageGalleryStudio />
-        )}
+          {currentTab === 'image-gallery' && (
+            <ImageGalleryStudio />
+          )}
 
-        {currentTab === 'office-suite' && (
-          <OfficeConverterStudio />
-        )}
+          {currentTab === 'office-suite' && (
+            <OfficeConverterStudio />
+          )}
 
-        {currentTab === 'cad-studio' && (
-          <CadToPdfStudio />
-        )}
+          {currentTab === 'cad-studio' && (
+            <CadToPdfStudio />
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   );

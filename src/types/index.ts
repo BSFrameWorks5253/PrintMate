@@ -56,6 +56,7 @@ export interface PageDimension {
 
 export type PrintLayoutType = 
   | '1_fit'
+  | '1_fill'
   | '1_real_size'
   | '2_vertical'
   | '2_horizontal'
@@ -72,6 +73,7 @@ export type PrintLayoutType =
 export interface PrintSettings {
   pageSize: PageSizeId;
   orientation: 'portrait' | 'landscape';
+  autoOrientation?: boolean;
   layout: PrintLayoutType;
   showCutLines: boolean; // Screen-only guideline overlay
   printCutMarks: boolean; // Optional subtle corner tick marks on print paper (default false)

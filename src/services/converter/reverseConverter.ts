@@ -1,15 +1,7 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, getSafePdfDocument } from './pdfInit';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
-
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
-}
 
 export class ReverseConverter {
   /**
@@ -18,11 +10,7 @@ export class ReverseConverter {
   static async loadPdf(bytes: Uint8Array): Promise<pdfjsLib.PDFDocumentProxy> {
     // ALWAYS clone the bytes so worker transfer does not detach caller's buffer!
     const safeBytes = new Uint8Array(bytes.slice());
-    const loadingTask = pdfjsLib.getDocument({
-      data: safeBytes,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true
-    });
+    const loadingTask = getSafePdfDocument({ data: safeBytes });
     return await loadingTask.promise;
   }
 

@@ -1,15 +1,6 @@
 import { PDFDocument, degrees } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, getSafePdfDocument } from './pdfInit';
 import JSZip from 'jszip';
-
-// Initialize PDF.js worker for web
-if (typeof window !== 'undefined') {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
-}
 
 export interface PageThumbnail {
   pageIndex: number;
@@ -32,11 +23,7 @@ export class PdfPageStudioService {
   ): Promise<PageThumbnail[]> {
     // ALWAYS clone the bytes so worker transfer does not detach caller's buffer!
     const safeBytes = new Uint8Array(pdfBytes.slice());
-    const loadingTask = pdfjsLib.getDocument({
-      data: safeBytes,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true
-    });
+    const loadingTask = getSafePdfDocument({ data: safeBytes });
     const pdfDoc = await loadingTask.promise;
     const thumbnails: PageThumbnail[] = [];
 
@@ -388,11 +375,7 @@ export class PdfPageStudioService {
     onProgress?: (current: number, total: number) => void
   ): Promise<{ bytes: Uint8Array; name: string; isZip: boolean }> {
     const safeBytes = new Uint8Array(originalBytes.slice());
-    const loadingTask = pdfjsLib.getDocument({
-      data: safeBytes,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true
-    });
+    const loadingTask = getSafePdfDocument({ data: safeBytes });
     const pdfDoc = await loadingTask.promise;
     const totalDocPages = pdfDoc.numPages;
 

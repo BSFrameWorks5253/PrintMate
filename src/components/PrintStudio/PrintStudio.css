@@ -195,6 +195,27 @@
     max-height: var(--card-print-h, 53.98mm) !important;
   }
 
+  /* Full Page Fill Borderless Layout */
+  .print-studio-sheet.layout-1-fill {
+    padding: 0 !important;
+  }
+  .print-studio-sheet.layout-1-fill img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  /* Full Page Fit Layout */
+  .print-studio-sheet.layout-1-fit img {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
   .card-exact-id {
     max-width: 100% !important;
     max-height: 100% !important;

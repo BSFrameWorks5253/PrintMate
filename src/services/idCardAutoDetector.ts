@@ -105,20 +105,11 @@ export class IdCardAutoDetectorService {
     password?: string,
     scale: number = 2.5
   ): Promise<{ canvas: HTMLCanvasElement; detectedText: string; isEncrypted: boolean }> {
-    const pdfjsLib = await import('pdfjs-dist');
-    if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('/pdf.worker.min.mjs', window.location.href).href;
-      } catch {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-      }
-    }
+    const { getSafePdfDocument } = await import('./converter/pdfInit');
     try {
-      const loadingTask = pdfjsLib.getDocument({
+      const loadingTask = getSafePdfDocument({
         data: bytes.slice(),
         password: password || undefined,
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-        cMapPacked: true,
       });
 
       const pdf = await loadingTask.promise;

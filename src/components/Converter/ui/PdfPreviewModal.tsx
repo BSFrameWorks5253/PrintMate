@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsLib, getSafePdfDocument } from '../../../services/converter/pdfInit';
 import { 
   X, 
   ChevronLeft, 
@@ -45,11 +45,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
 
     const loadPdf = async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument({
-          data: pdfBytes,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-          cMapPacked: true
-        });
+        const loadingTask = getSafePdfDocument({ data: pdfBytes });
         const doc = await loadingTask.promise;
         if (!isCancelled) {
           setPdfDoc(doc);
