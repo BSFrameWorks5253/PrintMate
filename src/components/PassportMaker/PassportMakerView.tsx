@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import jsPDF from 'jspdf';
 import { 
   CreditCard, 
   Upload, 
@@ -399,26 +400,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       }
     }
 
-    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const borderMarginMm = getBorderMarginMm(borderStyle);
-    const cardStandardW = std.widthMm + (borderMarginMm * 2);
-    const cardStandardH = std.heightMm + (borderMarginMm * 2);
-    const cardRatio = cardStandardW / cardStandardH;
-
-    // For 8 photos on 4x6 paper, adapt margins so 4 columns of 35x45mm (plus studio borders) fit 100% without shrinking
-    let marginMm = count <= 8 ? 2.5 : 2.0;
-    let gapMm = count <= 8 ? 2.0 : 1.2;
-
-    if (paperSize === '4x6' && count <= 8) {
-      if (cardStandardW > 35) {
-        // We have outer studio borders (e.g. 37x47mm cards)
-        gapMm = 1.0;
-        marginMm = Math.max(0.5, (paperW - (cols * cardStandardW) - ((cols - 1) * gapMm)) / 2);
-      } else {
-        gapMm = 2.0;
-        marginMm = (paperW - (cols * cardStandardW) - ((cols - 1) * gapMm)) / 2;
-      }
-    }
+    const marginMm = count <= 8 ? 2.5 : 2.0;
+    const gapMm = count <= 8 ? 2.0 : 1.2;
 
     const availW = paperW - (marginMm * 2) - ((cols - 1) * gapMm);
     const availH = paperH - (marginMm * 2) - ((rows - 1) * gapMm);
@@ -426,36 +409,35 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const maxCellW = availW / cols;
     const maxCellH = availH / rows;
 
-    let finalCardW = cardStandardW;
-    let finalCardH = cardStandardH;
+    const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
+    const standardW = std.widthMm;
+    const standardH = std.heightMm;
+    const passportRatio = standardW / standardH;
+
+    // Fit strictly inside available cell bounds preserving standard ratio
+    const fitW = Math.min(maxCellW, maxCellH * passportRatio);
+    const fitH = fitW / passportRatio;
+
+    let finalPhotoW = standardW;
+    let finalPhotoH = standardH;
     let isShrunk = false;
 
-    // Check if card fits on sheet without expanding page
-    if (count <= 8 && maxCellW >= cardStandardW && maxCellH >= cardStandardH) {
-      finalCardW = cardStandardW;
-      finalCardH = cardStandardH;
+    // Check if standard fits on sheet without expanding page
+    if (count <= 8 && maxCellW >= standardW && maxCellH >= standardH) {
+      finalPhotoW = standardW;
+      finalPhotoH = standardH;
       isShrunk = false;
     } else {
-      const fitW = Math.min(maxCellW, maxCellH * cardRatio);
-      const fitH = fitW / cardRatio;
-      finalCardW = Math.round(fitW * 10) / 10;
-      finalCardH = Math.round(fitH * 10) / 10;
+      finalPhotoW = Math.round(fitW * 10) / 10;
+      finalPhotoH = Math.round(fitH * 10) / 10;
       isShrunk = true;
     }
-
-    const scale = finalCardW / cardStandardW;
-    const finalPhotoW = Math.round(std.widthMm * scale * 10) / 10;
-    const finalPhotoH = Math.round(std.heightMm * scale * 10) / 10;
-    const finalBorderMarginMm = Math.round(borderMarginMm * scale * 10) / 10;
 
     return {
       cols,
       rows,
-      cardWidthMm: finalCardW,
-      cardHeightMm: finalCardH,
       photoWidthMm: finalPhotoW,
       photoHeightMm: finalPhotoH,
-      borderMarginMm: finalBorderMarginMm,
       isShrunk,
       marginMm,
       gapMm,
@@ -464,70 +446,29 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
   const layout = computeGridLayout();
 
-  // Helper to determine the outer border margin for each style
-  const getBorderMarginMm = (style: BorderStyleType): number => {
-    switch (style) {
-      case 'studio_classic':
-        return 1.0; // 1.0mm white studio margin outside the 35x45mm portrait
-      case 'white_margin':
-        return 1.2; // 1.2mm white border outside the 35x45mm portrait
-      case 'black_border':
-      case 'borderless':
-      default:
-        return 0; // Pure perimeter border (0mm extra margin outside photo)
-    }
-  };
-
   // Draw the cropped/framed passport photo onto a canvas.
-  // The main person's image is strictly 35mm x 45mm (or current preset standard).
-  // Borders, white studio margins, and outer cutting frames are added outside/around it.
+  // The passport image size is strictly 35mm x 45mm (or current preset standard).
+  // The main person's image fills the 35mm x 45mm area.
+  // Borders (hairline frames, studio outlines, cutting boundaries) are layered on the 35mm x 45mm photo.
   const renderSinglePassportCanvas = useCallback((
-    targetCardW_px?: number, 
-    targetCardH_px?: number, 
+    wPx?: number, 
+    hPx?: number, 
     includeBorders: boolean = true,
-    includeGuidelines: boolean = keepGuidelinesInExport,
-    forcePure35x45: boolean = false
+    includeGuidelines: boolean = keepGuidelinesInExport
   ): HTMLCanvasElement => {
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = document.createElement('canvas');
 
-    const effectiveBorderStyle: BorderStyleType = forcePure35x45 ? 'borderless' : borderStyle;
-    const borderMarginMm = (includeBorders && !forcePure35x45) ? getBorderMarginMm(effectiveBorderStyle) : 0;
-    const cardWidthMm = std.widthMm + (borderMarginMm * 2);
-    const cardHeightMm = std.heightMm + (borderMarginMm * 2);
-
-    let width: number;
-    let height: number;
-    let marginPx: number;
-
-    if (targetCardW_px && targetCardH_px) {
-      width = targetCardW_px;
-      height = targetCardH_px;
-      const pxPerMm = width / cardWidthMm;
-      marginPx = Math.round(borderMarginMm * pxPerMm);
-    } else {
-      const pxPerMm = std.widthPx300Dpi / std.widthMm;
-      marginPx = Math.round(borderMarginMm * pxPerMm);
-      width = std.widthPx300Dpi + (marginPx * 2);
-      height = std.heightPx300Dpi + (marginPx * 2);
-    }
+    // Strict 35mm x 45mm (413 x 531 px at 300 DPI)
+    const width = wPx || std.widthPx300Dpi;
+    const height = hPx || std.heightPx300Dpi;
 
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return canvas;
 
-    // Fill entire card background with pure white (so outer margin is crisp white paper)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
-
-    // The main person's image area is strictly 35mm x 45mm inside the card margins:
-    const personAreaX = marginPx;
-    const personAreaY = marginPx;
-    const personAreaW = width - (marginPx * 2);
-    const personAreaH = height - (marginPx * 2);
-
-    // Background fill for the person's photo area (white, blue, grey, offwhite, etc.)
+    // Background fill (white, blue, grey, offwhite, etc.)
     const bgFill = backgroundColor === 'white' 
       ? '#ffffff' 
       : backgroundColor === 'blue' 
@@ -539,19 +480,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       : '#ffffff';
 
     ctx.fillStyle = bgFill;
-    ctx.fillRect(personAreaX, personAreaY, personAreaW, personAreaH);
+    ctx.fillRect(0, 0, width, height);
 
-    // Draw photo covering the full 35mm x 45mm person area
+    // Draw photo covering the full 35mm x 45mm area
     if (imageObj) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(personAreaX, personAreaY, personAreaW, personAreaH);
+      ctx.rect(0, 0, width, height);
       ctx.clip();
 
       ctx.filter = `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`;
 
-      const centerX = personAreaX + (personAreaW / 2) + (pan.x * personAreaW);
-      const centerY = personAreaY + (personAreaH / 2) + (pan.y * personAreaH);
+      const centerX = width / 2 + (pan.x * width);
+      const centerY = height / 2 + (pan.y * height);
 
       const effectiveRotation = rotation + straightenAngle;
 
@@ -567,7 +508,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       const effectiveW = imageObj.width * cos + imageObj.height * sin;
       const effectiveH = imageObj.width * sin + imageObj.height * cos;
 
-      const scale = Math.max(personAreaW / (effectiveW || 1), personAreaH / (effectiveH || 1)) * zoom;
+      const scale = Math.max(width / (effectiveW || 1), height / (effectiveH || 1)) * zoom;
       const drawW = imageObj.width * scale;
       const drawH = imageObj.height * scale;
 
@@ -575,90 +516,88 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.restore();
     }
 
-    // Biometric Face Guidelines directly inside the 35mm x 45mm person photo area
+    // Biometric Face Guidelines directly inside the 35mm x 45mm photo
     if (includeGuidelines) {
       ctx.save();
-      const guideScale = personAreaW / (std.widthPx300Dpi || 413);
-      ctx.lineWidth = Math.max(1.5, 2 * guideScale);
-      ctx.setLineDash([6 * guideScale, 4 * guideScale]);
+      const scale = width / (std.widthPx300Dpi || 413);
+      ctx.lineWidth = Math.max(1.5, 2 * scale);
+      ctx.setLineDash([6 * scale, 4 * scale]);
 
-      // Eye Level Line (~42% from top of 35x45mm area)
-      ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)'; // Vivid cyan
-      ctx.beginPath();
-      ctx.moveTo(personAreaX + 15 * guideScale, personAreaY + personAreaH * 0.42);
-      ctx.lineTo(personAreaX + personAreaW - 15 * guideScale, personAreaY + personAreaH * 0.42);
-      ctx.stroke();
-
-      // Chin Line (~80% from top of 35x45mm area)
+      // Eye Level Line (~42% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
       ctx.beginPath();
-      ctx.moveTo(personAreaX + 30 * guideScale, personAreaY + personAreaH * 0.80);
-      ctx.lineTo(personAreaX + personAreaW - 30 * guideScale, personAreaY + personAreaH * 0.80);
+      ctx.moveTo(15 * scale, height * 0.42);
+      ctx.lineTo(width - 15 * scale, height * 0.42);
       ctx.stroke();
 
-      // Crown / Top of head line (~15% from top of 35x45mm area)
+      // Chin Line (~80% from top)
+      ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(30 * scale, height * 0.80);
+      ctx.lineTo(width - 30 * scale, height * 0.80);
+      ctx.stroke();
+
+      // Crown / Top of head line (~15% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.8)';
       ctx.beginPath();
-      ctx.moveTo(personAreaX + 30 * guideScale, personAreaY + personAreaH * 0.15);
-      ctx.lineTo(personAreaX + personAreaW - 30 * guideScale, personAreaY + personAreaH * 0.15);
+      ctx.moveTo(30 * scale, height * 0.15);
+      ctx.lineTo(width - 30 * scale, height * 0.15);
       ctx.stroke();
 
-      // Face Oval Guide (centered inside the 35x45mm area)
-      ctx.setLineDash([6 * guideScale, 6 * guideScale]);
+      // Face Oval Guide
+      ctx.setLineDash([6 * scale, 6 * scale]);
       ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
       ctx.beginPath();
-      ctx.ellipse(
-        personAreaX + personAreaW / 2, 
-        personAreaY + personAreaH * 0.48, 
-        personAreaW * 0.30, 
-        personAreaH * 0.32, 
-        0, 0, Math.PI * 2
-      );
+      ctx.ellipse(width / 2, height * 0.48, width * 0.30, height * 0.32, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       // Center vertical guide
-      ctx.setLineDash([4 * guideScale, 6 * guideScale]);
+      ctx.setLineDash([4 * scale, 6 * scale]);
       ctx.strokeStyle = 'rgba(100, 116, 139, 0.7)';
       ctx.beginPath();
-      ctx.moveTo(personAreaX + personAreaW / 2, personAreaY + 10 * guideScale);
-      ctx.lineTo(personAreaX + personAreaW / 2, personAreaY + personAreaH - 10 * guideScale);
+      ctx.moveTo(width / 2, 10 * scale);
+      ctx.lineTo(width / 2, height - 10 * scale);
       ctx.stroke();
 
       // Text labels
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(2, 132, 199, 0.98)';
-      ctx.font = `bold ${Math.round(11 * guideScale)}px sans-serif`;
-      ctx.fillText('EYE LEVEL', personAreaX + 20 * guideScale, personAreaY + personAreaH * 0.40);
-      ctx.fillText('CHIN LINE', personAreaX + 35 * guideScale, personAreaY + personAreaH * 0.78);
-      ctx.fillText('CROWN', personAreaX + 35 * guideScale, personAreaY + personAreaH * 0.13);
+      ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
+      ctx.fillText('EYE LEVEL', 20 * scale, height * 0.40);
+      ctx.fillText('CHIN LINE', 35 * scale, height * 0.78);
+      ctx.fillText('CROWN', 35 * scale, height * 0.13);
 
       ctx.restore();
     }
 
-    // Draw borders outside / around the 35mm x 45mm person image
-    if (includeBorders && !forcePure35x45) {
-      if (effectiveBorderStyle === 'studio_classic') {
-        // 1. Crisp inner black hairline border directly outlining the 35mm x 45mm person photo
-        const innerBw = Math.max(1, Math.round(personAreaW * 0.0035));
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = innerBw;
-        ctx.strokeRect(personAreaX + innerBw / 2, personAreaY + innerBw / 2, personAreaW - innerBw, personAreaH - innerBw);
-
-        // 2. Outer hairline cutting border around the white studio margin
-        ctx.strokeStyle = '#64748b'; // Slate-500 hairline cutting guide
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-      } else if (effectiveBorderStyle === 'white_margin') {
-        // Outer hairline cutting border around the white margin
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-      } else if (effectiveBorderStyle === 'black_border') {
-        // Thin black border along the 35mm x 45mm perimeter
-        const bw = Math.max(1, Math.round(personAreaW * 0.0035));
+    // Borders along the exact 35mm x 45mm photo perimeter
+    if (includeBorders) {
+      if (borderStyle === 'studio_classic') {
+        // Studio Classic: Crisp hairline outline frame along the exact 35mm x 45mm photo perimeter
+        const bw = Math.max(1.5, Math.round(width * 0.005));
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = bw;
         ctx.strokeRect(bw / 2, bw / 2, width - bw, height - bw);
+      } else if (borderStyle === 'black_border') {
+        // Thin black border
+        const bw = Math.max(1, Math.round(width * 0.0035));
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = bw;
+        ctx.strokeRect(bw / 2, bw / 2, width - bw, height - bw);
+      } else if (borderStyle === 'white_margin') {
+        // White margin: clean 1.0mm white perimeter border with thin frame
+        const mw = Math.round(width * 0.028); // ~1mm
+        const mh = Math.round(height * 0.028);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, mh);
+        ctx.fillRect(0, height - mh, width, mh);
+        ctx.fillRect(0, 0, mw, height);
+        ctx.fillRect(width - mw, 0, mw, height);
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mw, mh, width - mw * 2, height - mh * 2);
+        ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
       }
     }
 
@@ -728,30 +667,30 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     ctx.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
 
     const pxPerMm = sheetCanvas.width / selectedPaper.widthMm;
-    const { cols, rows, cardWidthMm, cardHeightMm, gapMm } = layout;
+    const { cols, rows, photoWidthMm, photoHeightMm, gapMm } = layout;
 
-    const cardPxW = Math.round(cardWidthMm * pxPerMm);
-    const cardPxH = Math.round(cardHeightMm * pxPerMm);
+    const photoPxW = Math.round(photoWidthMm * pxPerMm);
+    const photoPxH = Math.round(photoHeightMm * pxPerMm);
     const gapPx = Math.round(gapMm * pxPerMm);
 
-    const totalGridW = (cols * cardPxW) + ((cols - 1) * gapPx);
-    const totalGridH = (rows * cardPxH) + ((rows - 1) * gapPx);
+    const totalGridW = (cols * photoPxW) + ((cols - 1) * gapPx);
+    const totalGridH = (rows * photoPxH) + ((rows - 1) * gapPx);
 
     const startX = Math.round((sheetCanvas.width - totalGridW) / 2);
     const startY = Math.round((sheetCanvas.height - totalGridH) / 2);
 
-    // Pre-render a single passport photo card at 300 DPI (with biometric guides if explicitly enabled)
-    const singlePhoto = renderSinglePassportCanvas(cardPxW, cardPxH, true, keepGuidelinesInExport);
+    // Pre-render a single passport photo card at 300 DPI strictly 35x45mm (with biometric guides if explicitly enabled)
+    const singlePhoto = renderSinglePassportCanvas(photoPxW, photoPxH, true, keepGuidelinesInExport);
 
     const count = Math.min(cols * rows, photoCount);
 
     for (let i = 0; i < count; i++) {
       const c = i % cols;
       const r = Math.floor(i / cols);
-      const x = startX + (c * (cardPxW + gapPx));
-      const y = startY + (r * (cardPxH + gapPx));
+      const x = startX + (c * (photoPxW + gapPx));
+      const y = startY + (r * (photoPxH + gapPx));
 
-      ctx.drawImage(singlePhoto, x, y, cardPxW, cardPxH);
+      ctx.drawImage(singlePhoto, x, y, photoPxW, photoPxH);
     }
 
     // Draw full-page dark slate dashed cutting guidelines across entire sheet
@@ -764,9 +703,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       // Vertical full-page cutting lines
       const vCutPositions = [startX - gapPx / 2];
       for (let c = 1; c < cols; c++) {
-        vCutPositions.push(startX + (c * (cardPxW + gapPx)) - gapPx / 2);
+        vCutPositions.push(startX + (c * (photoPxW + gapPx)) - gapPx / 2);
       }
-      vCutPositions.push(startX + (cols * (cardPxW + gapPx)) - gapPx / 2);
+      vCutPositions.push(startX + (cols * (photoPxW + gapPx)) - gapPx / 2);
 
       vCutPositions.forEach((vx) => {
         const xPos = Math.round(vx) + 0.5;
@@ -779,9 +718,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       // Horizontal full-page cutting lines
       const hCutPositions = [startY - gapPx / 2];
       for (let r = 1; r < rows; r++) {
-        hCutPositions.push(startY + (r * (cardPxH + gapPx)) - gapPx / 2);
+        hCutPositions.push(startY + (r * (photoPxH + gapPx)) - gapPx / 2);
       }
-      hCutPositions.push(startY + (rows * (cardPxH + gapPx)) - gapPx / 2);
+      hCutPositions.push(startY + (rows * (photoPxH + gapPx)) - gapPx / 2);
 
       hCutPositions.forEach((hy) => {
         const yPos = Math.round(hy) + 0.5;
@@ -797,17 +736,41 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     return sheetCanvas;
   };
 
-  // 1. Download 300 DPI Print Sheet
+  // 1. Download 300 DPI Print Sheet (JPG)
   const handleDownloadSheet = () => {
     const sheetCanvas = generate300DpiSheetCanvas();
     const link = document.createElement('a');
-    link.download = `Passport_${photoCount}up_${selectedPaper.id.toUpperCase()}_300DPI.jpg`;
+    link.download = `Passport_${photoCount}up_${selectedPaper.id.toUpperCase()}_35x45mm_300DPI.jpg`;
     link.href = sheetCanvas.toDataURL('image/jpeg', 0.98);
     link.click();
     confetti({ particleCount: 35, spread: 50, origin: { y: 0.8 } });
     try {
       analytics.trackDownload({
         type: `Passport Sheet (${photoCount}-up, ${selectedPaper.name})`,
+        page: 'passport',
+      });
+    } catch (e) {
+      console.warn('Analytics tracking failed', e);
+    }
+  };
+
+  // 1b. Download 100% True-to-Size PDF Sheet (Strict 35mm x 45mm at actual millimeter scale)
+  const handleDownloadPdf = () => {
+    const isLandscape = selectedPaper.id === '4x6' || selectedPaper.id === '5x7';
+    const doc = new jsPDF({
+      orientation: isLandscape ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: [selectedPaper.widthMm, selectedPaper.heightMm],
+    });
+
+    const sheetCanvas = generate300DpiSheetCanvas();
+    const imgData = sheetCanvas.toDataURL('image/jpeg', 0.98);
+    doc.addImage(imgData, 'JPEG', 0, 0, selectedPaper.widthMm, selectedPaper.heightMm);
+    doc.save(`Passport_${photoCount}up_${selectedPaper.id.toUpperCase()}_Exact_35x45mm.pdf`);
+    confetti({ particleCount: 40, spread: 55, origin: { y: 0.8 } });
+    try {
+      analytics.trackDownload({
+        type: `Passport Sheet PDF (${photoCount}-up, ${selectedPaper.name})`,
         page: 'passport',
       });
     } catch (e) {
@@ -837,7 +800,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // 2b. Download Pure 35x45mm (For Online Portals - Zero Borders, strictly 413x531 px at 300 DPI)
   const handleDownloadPureStandard = () => {
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const pure = renderSinglePassportCanvas(undefined, undefined, false, false, true);
+    const pure = renderSinglePassportCanvas(undefined, undefined, false, false);
     const link = document.createElement('a');
     link.download = `${photoName}_Pure_${std.widthMm}x${std.heightMm}mm_Online_Upload_300DPI.jpg`;
     link.href = pure.toDataURL('image/jpeg', 0.98);
@@ -1333,10 +1296,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       </label>
                       <div className="grid grid-cols-2 gap-1.5">
                         {[
-                          { id: 'studio_classic', label: 'Studio Classic', desc: '35×45mm Person + 1mm White Margin & Frame' },
-                          { id: 'black_border', label: 'Thin Black Border', desc: '35×45mm Person + Perimeter Hairline' },
-                          { id: 'white_margin', label: 'White Border', desc: '35×45mm Person + 1.2mm White Margin' },
-                          { id: 'borderless', label: 'Borderless', desc: '35×45mm Full Bleed Person Photo' },
+                          { id: 'studio_classic', label: 'Studio Classic', desc: 'Crisp Hairline Outline Frame' },
+                          { id: 'black_border', label: 'Thin Black Border', desc: '35×45mm Perimeter Hairline' },
+                          { id: 'white_margin', label: 'White Border', desc: '1.0mm White Perimeter Border' },
+                          { id: 'borderless', label: 'Borderless', desc: 'Pure 35×45mm Full Bleed' },
                         ].map((b) => (
                           <button
                             key={b.id}
@@ -1478,13 +1441,11 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                       </div>
                       <div className="text-right">
                         <span className="font-mono font-bold text-slate-900 dark:text-white block">
-                          Person Image: {layout.photoWidthMm.toFixed(1)} × {layout.photoHeightMm.toFixed(1)} mm
+                          Photo Size: {layout.photoWidthMm.toFixed(1)} × {layout.photoHeightMm.toFixed(1)} mm
                         </span>
-                        {layout.borderMarginMm > 0 && (
-                          <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 block">
-                            Card + Border: {layout.cardWidthMm.toFixed(1)} × {layout.cardHeightMm.toFixed(1)} mm
-                          </span>
-                        )}
+                        <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 block">
+                          300 DPI • True 35×45mm
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1678,12 +1639,21 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     </button>
 
                     <button
+                      onClick={handleDownloadPdf}
+                      className="px-3.5 py-2 rounded-xl bg-red-50 dark:bg-red-950/60 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                      title="Download 100% true-to-size PDF sheet (exact 35×45mm when printed at Actual Size)"
+                    >
+                      <Download className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      <span>PDF (100% Scale)</span>
+                    </button>
+
+                    <button
                       onClick={handleDownloadSheet}
                       className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-cyan-300 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
                       title="Download whole 300 DPI photo print sheet"
                     >
                       <Download className="w-4 h-4" />
-                      <span>Download Sheet</span>
+                      <span>Download JPG</span>
                     </button>
 
                     <button
@@ -1743,9 +1713,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   <div className="relative shadow-2xl rounded-lg overflow-hidden border-2 border-cyan-500/50 bg-white">
                     {(() => {
                       const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-                      const borderMarginMm = getBorderMarginMm(borderStyle);
-                      const cardW_mm = std.widthMm + (borderMarginMm * 2);
-                      const cardH_mm = std.heightMm + (borderMarginMm * 2);
+                      const cardW_mm = std.widthMm;
+                      const cardH_mm = std.heightMm;
                       const canvasW = 280;
                       const canvasH = Math.round(canvasW * (cardH_mm / cardW_mm));
                       return (
@@ -1835,8 +1804,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     const previewSheetH = Math.round(previewSheetW * (selectedPaper.heightMm / selectedPaper.widthMm));
                     const pxPerMm = previewSheetW / selectedPaper.widthMm;
 
-                    const previewCardW = Math.floor(layout.cardWidthMm * pxPerMm);
-                    const previewCardH = Math.floor(layout.cardHeightMm * pxPerMm);
+                    const previewPhotoW = Math.floor(layout.photoWidthMm * pxPerMm);
+                    const previewPhotoH = Math.floor(layout.photoHeightMm * pxPerMm);
                     const previewGapPx = Math.round(layout.gapMm * pxPerMm);
 
                     return (
@@ -1851,8 +1820,6 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           '--grid-rows': layout.rows,
                           '--photo-w-mm': `${layout.photoWidthMm}mm`,
                           '--photo-h-mm': `${layout.photoHeightMm}mm`,
-                          '--card-w-mm': `${layout.cardWidthMm}mm`,
-                          '--card-h-mm': `${layout.cardHeightMm}mm`,
                           '--gap-mm': `${layout.gapMm}mm`,
                           '--margin-mm': `${layout.marginMm}mm`,
                           width: `${previewSheetW}px`,
@@ -1872,8 +1839,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           className="passport-print-grid"
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: `repeat(${layout.cols}, ${previewCardW}px)`,
-                            gridTemplateRows: `repeat(${layout.rows}, ${previewCardH}px)`,
+                            gridTemplateColumns: `repeat(${layout.cols}, ${previewPhotoW}px)`,
+                            gridTemplateRows: `repeat(${layout.rows}, ${previewPhotoH}px)`,
                             gap: `${previewGapPx}px`,
                             justifyContent: 'center',
                             alignContent: 'center',
@@ -1886,8 +1853,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                               key={idx}
                               className="passport-photo-cell relative flex items-center justify-center overflow-hidden bg-white shadow-sm"
                               style={{
-                                width: `${previewCardW}px`,
-                                height: `${previewCardH}px`,
+                                width: `${previewPhotoW}px`,
+                                height: `${previewPhotoH}px`,
                                 boxSizing: 'border-box',
                               }}
                             >
@@ -1904,22 +1871,22 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                         {showCutDividers && (() => {
                           const paperW = selectedPaper.widthMm;
                           const paperH = selectedPaper.heightMm;
-                          const totalGridMmW = (layout.cols * layout.cardWidthMm) + ((layout.cols - 1) * layout.gapMm);
-                          const totalGridMmH = (layout.rows * layout.cardHeightMm) + ((layout.rows - 1) * layout.gapMm);
+                          const totalGridMmW = (layout.cols * layout.photoWidthMm) + ((layout.cols - 1) * layout.gapMm);
+                          const totalGridMmH = (layout.rows * layout.photoHeightMm) + ((layout.rows - 1) * layout.gapMm);
                           const startMmX = (paperW - totalGridMmW) / 2;
                           const startMmY = (paperH - totalGridMmH) / 2;
 
                           const vLinesMm = [startMmX - layout.gapMm / 2];
                           for (let c = 1; c < layout.cols; c++) {
-                            vLinesMm.push(startMmX + (c * (layout.cardWidthMm + layout.gapMm)) - layout.gapMm / 2);
+                            vLinesMm.push(startMmX + (c * (layout.photoWidthMm + layout.gapMm)) - layout.gapMm / 2);
                           }
-                          vLinesMm.push(startMmX + (layout.cols * (layout.cardWidthMm + layout.gapMm)) - layout.gapMm / 2);
+                          vLinesMm.push(startMmX + (layout.cols * (layout.photoWidthMm + layout.gapMm)) - layout.gapMm / 2);
 
                           const hLinesMm = [startMmY - layout.gapMm / 2];
                           for (let r = 1; r < layout.rows; r++) {
-                            hLinesMm.push(startMmY + (r * (layout.cardHeightMm + layout.gapMm)) - layout.gapMm / 2);
+                            hLinesMm.push(startMmY + (r * (layout.photoHeightMm + layout.gapMm)) - layout.gapMm / 2);
                           }
-                          hLinesMm.push(startMmY + (layout.rows * (layout.cardHeightMm + layout.gapMm)) - layout.gapMm / 2);
+                          hLinesMm.push(startMmY + (layout.rows * (layout.photoHeightMm + layout.gapMm)) - layout.gapMm / 2);
 
                           return (
                             <svg
