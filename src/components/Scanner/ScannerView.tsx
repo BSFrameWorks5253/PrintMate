@@ -195,12 +195,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   ): ScannedCardItem => {
     const detected = autoDetectDocumentCorners(img, 'auto');
     const docDef = DOCUMENT_TYPES.find((d) => d.id === docType);
-    const targetRatio = docDef?.aspectRatio || 210 / 297;
+    const isLandscape = img.naturalWidth >= img.naturalHeight;
+    const initialAspectMode: 'standard' | 'portrait' = isLandscape ? 'standard' : 'portrait';
+    let targetRatio = docDef?.aspectRatio || 210 / 297;
+    if (docDef?.category === 'paper') {
+      targetRatio = isLandscape ? Math.max(targetRatio, 1 / targetRatio) : Math.min(targetRatio, 1 / targetRatio);
+    }
 
     let processed: HTMLCanvasElement | null = null;
     let dataUrl: string | undefined = undefined;
     try {
-      const unwarped = warpPerspectiveCrop(img, detected, targetRatio, 2000, 'standard');
+      const unwarped = warpPerspectiveCrop(img, detected, targetRatio, 2000, initialAspectMode);
       processed = applyAdjustments(unwarped, defaultAdjustments);
       dataUrl = processed.toDataURL('image/jpeg', 0.94);
     } catch (e) {
@@ -217,7 +222,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       sourceImage: img,
       corners: detected,
       adjustments: { ...defaultAdjustments },
-      aspectMode: 'standard',
+      aspectMode: initialAspectMode,
       processedCanvas: processed,
       processedDataUrl: dataUrl,
     };
@@ -668,9 +673,16 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         if (currentAspectMode === 'free') {
           targetRatio = 0;
         } else if (currentAspectMode === 'portrait' && targetRatio > 0) {
-          targetRatio = 1 / Math.max(targetRatio, 1 / targetRatio);
+          targetRatio = Math.min(targetRatio, 1 / targetRatio);
         } else if (currentAspectMode === 'standard' && targetRatio > 0) {
-          targetRatio = Math.max(targetRatio, 1 / targetRatio);
+          if (docDef?.category === 'paper') {
+            const isLandscape = currentSourceImage.naturalWidth >= currentSourceImage.naturalHeight;
+            targetRatio = isLandscape
+              ? Math.max(targetRatio, 1 / targetRatio)
+              : Math.min(targetRatio, 1 / targetRatio);
+          } else {
+            targetRatio = Math.max(targetRatio, 1 / targetRatio);
+          }
         }
 
         const cornersKey = `${currentCorners.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('_')}`;
@@ -1558,7 +1570,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
-                    className="max-w-full max-h-full object-contain cursor-crosshair touch-none"
+                    className="cursor-crosshair touch-none block"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      aspectRatio: currentCard?.sourceImage
+                        ? `${currentCard.sourceImage.naturalWidth} / ${currentCard.sourceImage.naturalHeight}`
+                        : 'auto',
+                      objectFit: 'contain',
+                    }}
                   />
 
                   {/* 140px High-Precision Loupe Magnifier Bubble */}
