@@ -126,6 +126,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [cards, setCards] = useState<ScannedCardItem[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
   const [reviewZoom, setReviewZoom] = useState<number>(100);
+  const [fullPreviewZoom, setFullPreviewZoom] = useState<number>(100);
 
   // Interaction handles
   const [activeHandle, setActiveHandle] = useState<{ type: 'corner' | 'edge'; index: number } | null>(null);
@@ -323,7 +324,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         if (event.target?.result) {
           const img = new Image();
           img.onload = () => {
-            const card = createCardFromImage(img, file.name, 'single', 'paper_a4', file.name, (file as any).handle);
+            const card = createCardFromImage(img, file.name, 'single', 'custom', file.name, (file as any).handle);
             newCards.push(card);
             processedCount++;
 
@@ -371,7 +372,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             image.onload = () => res(image);
             image.src = dataUrl;
           });
-          const card = createCardFromImage(img, file.name, 'single', 'paper_a4', file.name, handle);
+          const card = createCardFromImage(img, file.name, 'single', 'custom', file.name, handle);
           newCards.push(card);
         }
         if (newCards.length > 0) {
@@ -1212,23 +1213,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Document Scanner & Straightener
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Auto-detect 4 corners, straighten slanted perspective, and balance lighting for crisp printing.
-          </p>
         </div>
-
-        {cards.length === 0 && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => loadSampleDirectly('id_front')}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Try Demo ID Card</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* If no images uploaded yet */}
@@ -1255,7 +1240,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 Upload ID Card or Document Images
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto mb-6 leading-relaxed">
-                Take a photo from your phone at any angle. PrintMate automatically detects the 4 corners, deskews slanted perspective, and adjusts scale for flawless printing.
+                Take a photo from your phone at any angle. PrintMate automatically detects the 4 corners,slanted perspective, and adjusts scale for flawless printing.
               </p>
 
               {/* Browse CTA Button */}
@@ -1291,7 +1276,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300">Slanted ID Front</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Angled on wooden desk</div>
                       </div>
                     </div>
                   </button>
@@ -1307,7 +1291,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-300">ID Back Side</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Barcode & details</div>
                       </div>
                     </div>
                   </button>
@@ -1323,7 +1306,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-amber-700 dark:group-hover:text-amber-300">Paper Document</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">A4 Certificate sheet</div>
                       </div>
                     </div>
                   </button>
@@ -1649,19 +1631,23 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
 
                 {/* Straightened Result Preview Canvas / Image */}
-                <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800 p-3">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800 p-2">
                   {currentCard.processedDataUrl || currentCard.processedCanvas ? (
                     <div className="w-full h-full flex items-center justify-center overflow-auto">
-                      <img
-                        src={currentCard.processedDataUrl || currentCard.processedCanvas?.toDataURL('image/jpeg', 0.94) || ''}
-                        alt="Review Straightened Result"
+                      <div
                         style={{
                           transform: `scale(${reviewZoom / 100})`,
-                          transformOrigin: 'center',
+                          transformOrigin: 'center center',
                           transition: 'transform 0.15s ease-out',
                         }}
-                        className="max-w-full max-h-full object-contain rounded-md shadow-lg"
-                      />
+                        className="flex items-center justify-center max-w-full max-h-full transition-transform"
+                      >
+                        <img
+                          src={currentCard.processedDataUrl || currentCard.processedCanvas?.toDataURL('image/jpeg', 0.94) || ''}
+                          alt="Review Straightened Result"
+                          className="max-w-full max-h-full object-contain rounded-md shadow-lg select-none"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5">
@@ -2090,19 +2076,57 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <Eye className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Full Resolution Preview ({currentCard.name})</h3>
               </div>
-              <button
-                onClick={() => setFullPreviewOpen(false)}
-                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Modal Zoom Controls */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setFullPreviewZoom((z) => Math.max(50, z - 25))}
+                    className="p-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFullPreviewZoom(100)}
+                    className="px-2 py-0.5 text-xs font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600"
+                    title="Reset 100% Zoom"
+                  >
+                    {fullPreviewZoom}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFullPreviewZoom((z) => Math.min(400, z + 25))}
+                    className="p-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setFullPreviewOpen(false); setFullPreviewZoom(100); }}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 p-6 overflow-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
-              <img
-                src={currentCard.processedCanvas.toDataURL()}
-                alt="Full Preview"
-                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
-              />
+              <div
+                style={{
+                  transform: `scale(${fullPreviewZoom / 100})`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.15s ease-out',
+                }}
+                className="flex items-center justify-center max-w-full max-h-full transition-transform"
+              >
+                <img
+                  src={currentCard.processedCanvas.toDataURL()}
+                  alt="Full Preview"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl select-none"
+                />
+              </div>
             </div>
             <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
               <span>{currentCard.processedCanvas.width} × {currentCard.processedCanvas.height} px • High Resolution</span>

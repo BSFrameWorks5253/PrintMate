@@ -831,117 +831,120 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     </h4>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* 1. ID CARD PRESET (100% SCALE) */}
-                    {(() => {
-                      const isIdActive = settings.scaleMode === 'exact_id' && (settings.layout === '2_vertical' || settings.layout === '1_real_size');
-                      return (
-                        <div
-                          onClick={() => {
-                            setSettings((s) => ({
-                              ...s,
-                              layout: s.layout === '1_real_size' ? '1_real_size' : '2_vertical',
-                              pageSize: 'a4',
-                              orientation: 'portrait',
-                              alignment: s.layout === '1_real_size' ? 'center' : 'top_center',
-                              scaleMode: 'exact_id',
-                              marginMm: 10,
-                              spacingMm: 5,
-                            }));
-                            setLayoutCategory('id_duo');
-                          }}
-                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
-                            isIdActive
-                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
-                              : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <CreditCard className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                              <span>ID Card</span>
-                            </span>
-                          </div>
+                  {(() => {
+                    const isPassportMode = queue.some((q) => q.name.toLowerCase().includes('passport') || q.docType === 'passport_page' || (q as any).isPassportPhoto) || settings.layout.startsWith('grid_');
+                    return (
+                      <div className={`grid grid-cols-1 ${isPassportMode ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2`}>
+                        {/* 1. ID CARD PRESET (100% SCALE) */}
+                        {(() => {
+                          const isIdActive = settings.scaleMode === 'exact_id' && (settings.layout === '2_vertical' || settings.layout === '1_real_size');
+                          return (
+                            <div
+                              onClick={() => {
+                                setSettings((s) => ({
+                                  ...s,
+                                  layout: s.layout === '1_real_size' ? '1_real_size' : '2_vertical',
+                                  pageSize: 'a4',
+                                  orientation: 'portrait',
+                                  alignment: s.layout === '1_real_size' ? 'center' : 'top_center',
+                                  scaleMode: 'exact_id',
+                                  marginMm: 10,
+                                  spacingMm: 5,
+                                }));
+                                setLayoutCategory('id_duo');
+                              }}
+                              className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
+                                isIdActive
+                                  ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                                  : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold flex items-center gap-1.5">
+                                  <CreditCard className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                  <span>ID Card</span>
+                                </span>
+                              </div>
 
-                          {/* Duo vs Single Option (only shown when ID Card preset is selected) */}
-                          {isIdActive && (
-                            <div className="flex items-center gap-1 mt-2 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 animate-in fade-in">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSettings((s) => ({
-                                    ...s,
-                                    layout: '2_vertical',
-                                    scaleMode: 'exact_id',
-                                    alignment: 'top_center',
-                                  }));
-                                }}
-                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
-                                  settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
-                                    ? 'bg-blue-600 text-white shadow-xs'
-                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-                                }`}
-                              >
-                                Duo
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSettings((s) => ({
-                                    ...s,
-                                    layout: '1_real_size',
-                                    scaleMode: 'exact_id',
-                                    alignment: 'center',
-                                  }));
-                                }}
-                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
-                                  settings.layout === '1_real_size'
-                                    ? 'bg-blue-600 text-white shadow-xs'
-                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-                                }`}
-                              >
-                                Single
-                              </button>
+                              {/* Duo vs Single Option (only shown when ID Card preset is selected) */}
+                              {isIdActive && (
+                                <div className="flex items-center gap-1 mt-2 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 animate-in fade-in">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSettings((s) => ({
+                                        ...s,
+                                        layout: '2_vertical',
+                                        scaleMode: 'exact_id',
+                                        alignment: 'top_center',
+                                      }));
+                                    }}
+                                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                      settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    Duo
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSettings((s) => ({
+                                        ...s,
+                                        layout: '1_real_size',
+                                        scaleMode: 'exact_id',
+                                        alignment: 'center',
+                                      }));
+                                    }}
+                                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                      settings.layout === '1_real_size'
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    Single
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                          );
+                        })()}
 
-                    {/* 2. 4 × 6" PHOTO PRESET */}
-                    {(() => {
-                      const isPhotoActive = settings.pageSize === '4x6' && settings.layout === '1_fit';
-                      return (
-                        <div
-                          onClick={() => {
-                            setSettings((s) => ({
-                              ...s,
-                              layout: '1_fit',
-                              pageSize: '4x6',
-                              orientation: 'portrait',
-                              alignment: 'center',
-                              scaleMode: 'fit_cell',
-                              marginMm: 5,
-                            }));
-                            setLayoutCategory('single');
-                          }}
-                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
-                            isPhotoActive
-                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
-                              : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                              <span>4 × 6" Photo</span>
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                        {/* 2. 4 × 6" PHOTO PRESET (Shown only when passport photo mode is active) */}
+                        {isPassportMode && (() => {
+                          const isPhotoActive = settings.pageSize === '4x6' && settings.layout === '1_fit';
+                          return (
+                            <div
+                              onClick={() => {
+                                setSettings((s) => ({
+                                  ...s,
+                                  layout: '1_fit',
+                                  pageSize: '4x6',
+                                  orientation: 'portrait',
+                                  alignment: 'center',
+                                  scaleMode: 'fit_cell',
+                                  marginMm: 5,
+                                }));
+                                setLayoutCategory('single');
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
+                                isPhotoActive
+                                  ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                                  : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold flex items-center gap-1.5">
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                  <span>4 × 6" Photo</span>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                     {/* 3. FULL PAGE PRESET (FIT OR FILL) */}
                     {(() => {
@@ -1020,6 +1023,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       );
                     })()}
                   </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 2. PAPER SIZE, ORIENTATION & PLACEMENT */}
