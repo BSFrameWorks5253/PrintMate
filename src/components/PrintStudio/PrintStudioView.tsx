@@ -23,7 +23,12 @@ import {
   FileText,
   CreditCard,
   Sparkles,
-  Eye
+  Eye,
+  RectangleVertical,
+  RectangleHorizontal,
+  ArrowUpToLine,
+  AlignCenter,
+  ArrowLeftRight
 } from 'lucide-react';
 import type { 
   PrintQueueItem, 
@@ -99,8 +104,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   }, [queue, settings.autoOrientation]);
 
   const filteredLayouts = PRINT_LAYOUT_OPTIONS.filter((l) => {
+    if (layoutCategory === 'id_duo') return l.id === '2_vertical' || l.id === 'front_back_duplex';
     if (layoutCategory === 'all') return true;
-    if (layoutCategory === 'id_duo') return l.category === 'id_duo' || l.category === 'id_special';
     if (layoutCategory === 'multi') return l.category === 'multi';
     if (layoutCategory === 'single') return l.category === 'single';
     return true;
@@ -733,16 +738,6 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
               <Upload className="w-4 h-4" />
               <span>Upload Image Directly</span>
             </button>
-            {onOpenRecents && (
-              <button
-                type="button"
-                onClick={onOpenRecents}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Pick from Recents</span>
-              </button>
-            )}
           </div>
         </div>
       ) : (
@@ -803,277 +798,215 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                 <div className="bg-gradient-to-br from-blue-50/70 via-indigo-50/50 to-white dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 border border-blue-200/90 dark:border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>Quick Presets</span>
+                      <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>PAGE Presets</span>
                     </h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                      1-Click
-                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSettings((s) => ({
-                          ...s,
-                          layout: '2_vertical',
-                          pageSize: 'a4',
-                          orientation: 'portrait',
-                          alignment: 'top_center',
-                          scaleMode: 'exact_id',
-                          marginMm: 10,
-                          spacingMm: 5,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <CreditCard className="w-3 h-3" />
-                          <span>ID Duo</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          CR80
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
-                          ? 'text-blue-100'
-                          : 'text-slate-500'
-                      }`}>
-                        A4 Top-Stack (85.6×54mm)
-                      </span>
-                    </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* 1. ID CARD PRESET (100% SCALE) */}
+                    {(() => {
+                      const isIdActive = settings.scaleMode === 'exact_id' && (settings.layout === '2_vertical' || settings.layout === '1_real_size');
+                      return (
+                        <div
+                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+                            isIdActive
+                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                              : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSettings((s) => ({
+                                ...s,
+                                layout: s.layout === '1_real_size' ? '1_real_size' : '2_vertical',
+                                pageSize: 'a4',
+                                orientation: 'portrait',
+                                alignment: s.layout === '1_real_size' ? 'center' : 'top_center',
+                                scaleMode: 'exact_id',
+                                marginMm: 10,
+                                spacingMm: 5,
+                              }));
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold flex items-center gap-1.5">
+                                <CreditCard className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                <span>ID Card</span>
+                              </span>
+                            </div>
+                          </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSettings((s) => ({
-                          ...s,
-                          layout: '1_real_size',
-                          pageSize: 'a4',
-                          orientation: 'portrait',
-                          alignment: 'center',
-                          scaleMode: 'exact_id',
-                          marginMm: 10,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.layout === '1_real_size'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <Maximize2 className="w-3 h-3" />
-                          <span>Single ID</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.layout === '1_real_size'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          100%
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.layout === '1_real_size'
-                          ? 'text-blue-100'
-                          : 'text-slate-500'
-                      }`}>
-                        Exact 85.60 × 53.98 mm
-                      </span>
-                    </button>
+                          {/* Duo vs Single Option (only shown when ID Card preset is selected) */}
+                          {isIdActive && (
+                            <div className="flex items-center gap-1 mt-2 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 animate-in fade-in">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSettings((s) => ({
+                                    ...s,
+                                    layout: '2_vertical',
+                                    scaleMode: 'exact_id',
+                                    alignment: 'top_center',
+                                  }));
+                                }}
+                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                  settings.layout === '2_vertical' && settings.scaleMode === 'exact_id'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                }`}
+                              >
+                                Duo
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSettings((s) => ({
+                                    ...s,
+                                    layout: '1_real_size',
+                                    scaleMode: 'exact_id',
+                                    alignment: 'center',
+                                  }));
+                                }}
+                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                  settings.layout === '1_real_size'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                }`}
+                              >
+                                Single
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSettings((s) => ({
-                          ...s,
-                          layout: 'front_back_fold',
-                          pageSize: 'a4',
-                          orientation: 'portrait',
-                          alignment: 'top_center',
-                          scaleMode: 'exact_id',
-                          marginMm: 10,
-                          spacingMm: 0,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.layout === 'front_back_fold'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <Scissors className="w-3 h-3" />
-                          <span>Fold & Laminate</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.layout === 'front_back_fold'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                        }`}>
-                          Pouch
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.layout === 'front_back_fold'
-                          ? 'text-blue-100'
-                          : 'text-slate-500 dark:text-slate-400'
-                      }`}>
-                        Center fold line for pouch
-                      </span>
-                    </button>
+                    {/* 2. 4 × 6" PHOTO PRESET */}
+                    {(() => {
+                      const isPhotoActive = settings.pageSize === '4x6' && settings.layout === '1_fit';
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSettings((s) => ({
+                              ...s,
+                              layout: '1_fit',
+                              pageSize: '4x6',
+                              orientation: 'portrait',
+                              alignment: 'center',
+                              scaleMode: 'fit_cell',
+                              marginMm: 5,
+                            }));
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
+                            isPhotoActive
+                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                              : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold flex items-center gap-1.5">
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                              <span>4 × 6" Photo</span>
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })()}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSettings((s) => ({
-                          ...s,
-                          layout: '1_fit',
-                          pageSize: '4x6',
-                          orientation: 'portrait',
-                          alignment: 'center',
-                          scaleMode: 'fit_cell',
-                          marginMm: 5,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.pageSize === '4x6' && settings.layout === '1_fit'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <FileSpreadsheet className="w-3 h-3" />
-                          <span>4 × 6" Photo</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.pageSize === '4x6' && settings.layout === '1_fit'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
-                        }`}>
-                          Photo
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.pageSize === '4x6' && settings.layout === '1_fit'
-                          ? 'text-blue-100'
-                          : 'text-slate-500 dark:text-slate-400'
-                      }`}>
-                        Glossy 4R sheet fit
-                      </span>
-                    </button>
+                    {/* 3. FULL PAGE PRESET (FIT OR FILL) */}
+                    {(() => {
+                      const isFullActive = settings.layout === '1_fit' || settings.layout === '1_fill';
+                      return (
+                        <div
+                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+                            isFullActive
+                              ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
+                              : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div
+                            className="cursor-pointer"
+                            onClick={() => {
+                              const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
+                              setSettings((s) => ({
+                                ...s,
+                                layout: s.layout === '1_fill' ? '1_fill' : '1_fit',
+                                alignment: 'center',
+                                scaleMode: 'fit_cell',
+                                marginMm: s.layout === '1_fill' ? 0 : 5,
+                                orientation: isItemLandscape ? 'landscape' : 'portrait',
+                              }));
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                                <span>Full Page</span>
+                              </span>
+                            </div>
+                          </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
-                        setSettings((s) => ({
-                          ...s,
-                          layout: '1_fit',
-                          alignment: 'center',
-                          scaleMode: 'fit_cell',
-                          marginMm: 6,
-                          orientation: isItemLandscape ? 'landscape' : 'portrait',
-                          autoOrientation: true,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.layout === '1_fit'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          <span>Full Page Fit</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.layout === '1_fit'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
-                        }`}>
-                          Fit
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.layout === '1_fit'
-                          ? 'text-blue-100'
-                          : 'text-slate-500 dark:text-slate-400'
-                      }`}>
-                        Auto ratio & margins
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
-                        setSettings((s) => ({
-                          ...s,
-                          layout: '1_fill',
-                          alignment: 'center',
-                          scaleMode: 'fit_cell',
-                          marginMm: 0,
-                          orientation: isItemLandscape ? 'landscape' : 'portrait',
-                          autoOrientation: true,
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        settings.layout === '1_fill'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
-                          : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-bold flex items-center gap-1">
-                          <Maximize2 className="w-3 h-3" />
-                          <span>Full Page Fill</span>
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                          settings.layout === '1_fill'
-                            ? 'bg-white/20 text-white'
-                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                        }`}>
-                          Fill
-                        </span>
-                      </div>
-                      <span className={`text-[10px] leading-tight ${
-                        settings.layout === '1_fill'
-                          ? 'text-blue-100'
-                          : 'text-slate-500 dark:text-slate-400'
-                      }`}>
-                        Borderless edge-to-edge
-                      </span>
-                    </button>
+                          {/* Fit vs Fill Sub-Option (only shown when Full Page preset is selected) */}
+                          {isFullActive && (
+                            <div className="flex items-center gap-1 mt-2 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 animate-in fade-in">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSettings((s) => ({
+                                    ...s,
+                                    layout: '1_fit',
+                                    marginMm: 5,
+                                    scaleMode: 'fit_cell',
+                                  }));
+                                }}
+                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                  settings.layout === '1_fit'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                }`}
+                              >
+                                Fit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSettings((s) => ({
+                                    ...s,
+                                    layout: '1_fill',
+                                    marginMm: 0,
+                                    scaleMode: 'fit_cell',
+                                  }));
+                                }}
+                                className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer text-center ${
+                                  settings.layout === '1_fill'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                                }`}
+                              >
+                                Fill
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* 2. PAPER SIZE, ORIENTATION & PHYSICAL SCALE */}
+                {/* 2. PAPER SIZE, ORIENTATION & PLACEMENT */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                       <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Paper & Orientation</span>
                     </h4>
-                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-                      {pageWidthMm} × {pageHeightMm} mm
-                    </span>
                   </div>
 
                   {/* Visual Paper Size Pills */}
@@ -1083,8 +1016,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       {[
                         { id: 'a4', label: 'A4', desc: '210 × 297 mm' },
                         { id: '4x6', label: '4 × 6"', desc: '102 × 152 mm' },
-                        { id: 'letter', label: 'US Letter', desc: '8.5 × 11 in' },
                         { id: '5x7', label: '5 × 7"', desc: '127 × 178 mm' },
+                        { id: 'a3', label: 'A3', desc: '297 × 420 mm' },
                       ].map((p) => {
                         const isSelected = settings.pageSize === p.id;
                         return (
@@ -1111,7 +1044,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       <select
                         value={settings.pageSize}
                         onChange={(e) => setSettings((s) => ({ ...s, pageSize: e.target.value as any }))}
-                        className="bg-slate-50 border border-slate-200 text-xs font-semibold rounded-lg px-2 py-1 text-slate-800 focus:outline-none cursor-pointer"
+                        className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
                       >
                         {PAGE_SIZES.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -1122,131 +1055,70 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Orientation & Placement Segmented Buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
+                  {/* Orientation & Placement Segmented Buttons with clean SVG icons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Orientation:</label>
-                        {settings.autoOrientation && (
-                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                            Auto Matching
-                          </span>
-                        )}
-                      </div>
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Orientation:</label>
                       <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 gap-1">
                         <button
                           type="button"
                           onClick={() => setSettings((s) => ({ ...s, orientation: 'portrait', autoOrientation: false }))}
-                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
-                            settings.orientation === 'portrait' && !settings.autoOrientation
+                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            settings.orientation === 'portrait'
                               ? 'bg-blue-600 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          ▯ Portrait
+                          <RectangleVertical className="w-3.5 h-3.5" />
+                          <span>Portrait</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setSettings((s) => ({ ...s, orientation: 'landscape', autoOrientation: false }))}
-                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
-                            settings.orientation === 'landscape' && !settings.autoOrientation
+                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                            settings.orientation === 'landscape'
                               ? 'bg-blue-600 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          ▭ Landscape
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
-                            setSettings((s) => ({
-                              ...s,
-                              autoOrientation: true,
-                              orientation: isItemLandscape ? 'landscape' : 'portrait'
-                            }));
-                          }}
-                          className={`px-2.5 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
-                            settings.autoOrientation
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                          title="Automatically flips page orientation to match image aspect ratio"
-                        >
-                          ⚡ Auto
+                          <RectangleHorizontal className="w-3.5 h-3.5" />
+                          <span>Landscape</span>
                         </button>
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-600">Placement:</label>
-                      <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Placement:</label>
+                      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 gap-1">
                         <button
                           type="button"
                           onClick={() => setSettings((s) => ({ ...s, alignment: 'top_center' }))}
-                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                             settings.alignment === 'top_center'
                               ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-slate-900'
+                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
-                          title="Places cards at top, saving lower half of page for re-feeding"
+                          title="Places cards at top, saving lower half of paper"
                         >
-                          ⬆️ Top (Save)
+                          <ArrowUpToLine className="w-3.5 h-3.5" />
+                          <span>Top</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setSettings((s) => ({ ...s, alignment: 'center' }))}
-                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+                          className={`flex-1 py-1.5 text-xs rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                             settings.alignment === 'center'
                               ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-slate-900'
+                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          🎯 Center
+                          <AlignCenter className="w-3.5 h-3.5" />
+                          <span>Center</span>
                         </button>
                       </div>
                     </div>
                   </div>
-
-                  {/* 100% Real ID Scale Switch */}
-                  <div 
-                    onClick={() => setSettings((s) => ({ ...s, scaleMode: s.scaleMode === 'exact_id' ? 'fit_cell' : 'exact_id' }))}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                      settings.scaleMode === 'exact_id'
-                        ? 'bg-blue-50/80 border-blue-300 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                        settings.scaleMode === 'exact_id' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        🪪
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <span>100% Real ID Scale (CR80)</span>
-                          {settings.scaleMode === 'exact_id' && (
-                            <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-bold">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          Exact ISO 85.60 × 53.98 mm physical card dimensions
-                        </div>
-                      </div>
-                    </div>
-
-                    <input
-                      type="checkbox"
-                      checked={settings.scaleMode === 'exact_id'}
-                      onChange={() => {}} // handled by parent onClick
-                      className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                    />
-                  </div>
                 </div>
-
                 {/* 3. MULTI-UP SHEET LAYOUTS */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
@@ -1254,9 +1126,6 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Choose Sheet Layout</span>
                     </h4>
-                    <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full">
-                      {PRINT_LAYOUT_OPTIONS.find((l) => l.id === settings.layout)?.name.split('(')[0].trim() || 'Selected'}
-                    </span>
                   </div>
 
                   {/* Category Filter Tabs */}
@@ -1265,7 +1134,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       { id: 'id_duo', label: '🪪 ID Duo' },
                       { id: 'multi', label: '📑 Grids' },
                       { id: 'single', label: '📄 Single' },
-                      { id: 'all', label: 'All (13)' },
+                      { id: 'all', label: 'All' },
                     ].map((cat) => (
                       <button
                         key={cat.id}
@@ -1291,72 +1160,116 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                           key={layout.id}
                           type="button"
                           onClick={() => setSettings((prev) => ({ ...prev, layout: layout.id as PrintLayoutType }))}
-                          className={`text-left p-2.5 rounded-xl transition-all border flex items-start gap-2.5 cursor-pointer ${
+                          className={`text-left p-2.5 rounded-xl transition-all border flex items-center gap-2.5 cursor-pointer ${
                             isSelected
                               ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
                               : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                           }`}
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
                             isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                           }`}>
                             {isSelected ? <Check className="w-4 h-4 text-white" /> : getLayoutIcon(layout.id)}
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900 dark:text-blue-300' : 'text-slate-900 dark:text-white'}`}>
-                                {layout.name.split('(')[0].trim()}
-                              </span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                                isSelected ? 'bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-200' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                              }`}>
-                                {layout.slots} slot{layout.slots === 1 ? '' : 's'}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-500 leading-tight mt-0.5 line-clamp-2">
-                              {layout.description}
-                            </p>
+                            <span className={`text-xs font-bold truncate block ${isSelected ? 'text-blue-900 dark:text-blue-300' : 'text-slate-900 dark:text-white'}`}>
+                              {layout.name.split('(')[0].trim()}
+                            </span>
                           </div>
                         </button>
                       );
                     })}
                   </div>
 
-                  {/* Duplex Preview Side Switcher if duplex layout is selected */}
+                  {/* Duplex Interactive Reorder & Side Switcher (Item 600a47) */}
                   {settings.layout === 'front_back_duplex' && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/70 border border-purple-200 text-xs animate-in fade-in">
-                      <div className="space-y-0.5">
-                        <span className="font-bold text-purple-950 flex items-center gap-1.5">
-                          <Printer className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Duplex 2-Sided Preview</span>
+                    <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                          <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                          <span>Duplex Card Reorder & Preview</span>
                         </span>
-                        <p className="text-[10px] text-purple-700">Preview front or back coordinate sheet</p>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 1 }))}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              settings.duplexActivePage === 1 
+                                ? 'bg-purple-600 text-white shadow-xs' 
+                                : 'bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-300'
+                            }`}
+                          >
+                            Page 1 (Front)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 2 }))}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              settings.duplexActivePage === 2 
+                                ? 'bg-purple-600 text-white shadow-xs' 
+                                : 'bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-300'
+                            }`}
+                          >
+                            Page 2 (Back)
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 1 }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            settings.duplexActivePage === 1 
-                              ? 'bg-purple-600 text-white shadow-sm' 
-                              : 'bg-white border border-purple-200 text-purple-800 hover:bg-purple-100'
-                          }`}
-                        >
-                          Page 1 (Front)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSettings((s) => ({ ...s, duplexActivePage: 2 }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            settings.duplexActivePage === 2 
-                              ? 'bg-purple-600 text-white shadow-sm' 
-                              : 'bg-white border border-purple-200 text-purple-800 hover:bg-purple-100'
-                          }`}
-                        >
-                          Page 2 (Back)
-                        </button>
+
+                      {/* Card Reorder Strip */}
+                      <div className="grid grid-cols-2 gap-2 items-center bg-white dark:bg-slate-900 p-2 rounded-xl border border-purple-200/80 dark:border-purple-800/80">
+                        {/* Slot 0 (Front) */}
+                        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          {getImageForSlot(0) ? (
+                            <img src={getImageForSlot(0)?.dataUrl} alt="Front" className="w-9 h-6 object-contain rounded border border-slate-300 dark:border-slate-600 shrink-0 bg-white" />
+                          ) : (
+                            <div className="w-9 h-6 rounded border border-dashed border-slate-300 flex items-center justify-center text-[9px] text-slate-400">Empty</div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-bold text-slate-900 dark:text-white block truncate">Slot 1: Front</span>
+                            <span className="text-[9px] text-slate-500 truncate block">{getImageForSlot(0)?.name || 'First Card'}</span>
+                          </div>
+                        </div>
+
+                        {/* Slot 1 (Back) */}
+                        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          {getImageForSlot(1) ? (
+                            <img src={getImageForSlot(1)?.dataUrl} alt="Back" className="w-9 h-6 object-contain rounded border border-slate-300 dark:border-slate-600 shrink-0 bg-white" />
+                          ) : (
+                            <div className="w-9 h-6 rounded border border-dashed border-slate-300 flex items-center justify-center text-[9px] text-slate-400">Empty</div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-bold text-slate-900 dark:text-white block truncate">Slot 2: Back</span>
+                            <span className="text-[9px] text-slate-500 truncate block">{getImageForSlot(1)?.name || 'Second Card'}</span>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Swap Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const item0 = getImageForSlot(0);
+                          const item1 = getImageForSlot(1);
+                          if (item0 && item1) {
+                            setSlotOverrides((prev) => ({
+                              ...prev,
+                              0: item1.id,
+                              1: item0.id,
+                            }));
+                          } else if (queue.length >= 2) {
+                            setSlotOverrides((prev) => ({
+                              ...prev,
+                              0: queue[1].id,
+                              1: queue[0].id,
+                            }));
+                          }
+                        }}
+                        className="w-full py-1.5 px-3 rounded-lg bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/60 dark:hover:bg-purple-800/60 text-purple-900 dark:text-purple-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5 text-purple-700 dark:text-purple-300" />
+                        <span>⇄ Swap Front & Back Card</span>
+                      </button>
                     </div>
                   )}
 
@@ -1428,7 +1341,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
               </div>
             )}
 
-            {/* TAB 2: SPACING, COPIES & CUTTING MARKS */}
+            {/* TAB 2: SPACING, COPIES & CONTAINER FIT */}
             {sidebarTab === 'spacing' && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 {/* 1. COPIES CONTROLS */}
@@ -1436,11 +1349,8 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                       <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <span>Print Sheet Copies</span>
+                      <span>Quantity</span>
                     </h4>
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                      {settings.copies} {settings.copies === 1 ? 'Sheet' : 'Sheets'}
-                    </span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1468,37 +1378,53 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     >
                       +
                     </button>
-
-                    <div className="flex items-center gap-1 ml-auto">
-                      {[1, 2, 4, 8].map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setSettings((s) => ({ ...s, copies: c }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            settings.copies === c
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          {c}x
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
-                {/* 2. MARGINS & GAP SLIDERS */}
+                {/* 2. IMAGE CONTAINER FIT (FIT OR FILL WITH TICK) */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Maximize2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Image Container Fit</span>
+                    </h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, slotFit: 'contain' }))}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        settings.slotFit !== 'cover'
+                          ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-blue-900 dark:text-white shadow-xs font-bold ring-1 ring-blue-500/20'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">Fit (Full Image)</span>
+                      {settings.slotFit !== 'cover' && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, slotFit: 'cover' }))}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                        settings.slotFit === 'cover'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">Fill (No Side Gaps)</span>
+                      {settings.slotFit === 'cover' && <Check className="w-4 h-4 text-white" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. MARGINS & GAP SLIDERS */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4 shadow-sm">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-semibold text-slate-700 dark:text-slate-300">Page Margin (Outer Border):</span>
-                      <span className="font-mono text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                        {settings.marginMm} mm
-                      </span>
                     </div>
                     <div className="flex gap-1.5">
-                      {[5, 10, 15, 20].map((m) => (
+                      {[0, 3, 5, 10, 15].map((m) => (
                         <button
                           key={m}
                           type="button"
@@ -1515,7 +1441,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     </div>
                     <input
                       type="range"
-                      min="5"
+                      min="0"
                       max="30"
                       value={settings.marginMm}
                       onChange={(e) => setSettings((s) => ({ ...s, marginMm: Number(e.target.value) }))}
@@ -1526,13 +1452,11 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-semibold text-slate-700 dark:text-slate-300">Card Gap (Between Items):</span>
-                      <span className="font-mono text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                        {settings.spacingMm} mm
-                      </span>
                     </div>
                     <div className="flex gap-1.5">
                       {[
                         { val: 0, label: '0mm (Flush)' },
+                        { val: 3, label: '3mm' },
                         { val: 5, label: '5mm' },
                         { val: 10, label: '10mm' }
                       ].map((g) => (
@@ -1561,16 +1485,13 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   </div>
                 </div>
 
-                {/* 3. CUTTING & CROP MARKS (GUILLOTINE-READY) */}
+                {/* 4. CUTTING & CROP GUIDES */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                       <Scissors className="w-4 h-4 text-emerald-600" />
                       <span>Cutting & Crop Guides</span>
                     </h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Guillotine Ready
-                    </span>
                   </div>
 
                   {/* Screen Cut Lines (Alignment Dashes) */}
@@ -1608,44 +1529,6 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       checked={settings.showCutLines}
                       onChange={() => {}} // handled by parent onClick
                       className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Printable Hairline Corner Crop Marks */}
-                  <div 
-                    onClick={() => setSettings((s) => ({ ...s, printCutMarks: !s.printCutMarks }))}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                      settings.printCutMarks
-                        ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                        settings.printCutMarks ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        <Scissors className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <span>Printable Corner Crop Marks</span>
-                          {settings.printCutMarks && (
-                            <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-bold">
-                              Printed
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          Sharp L-ticks at card corners for scissors & paper cutters
-                        </div>
-                      </div>
-                    </div>
-
-                    <input
-                      type="checkbox"
-                      checked={settings.printCutMarks}
-                      onChange={() => {}} // handled by parent onClick
-                      className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
                     />
                   </div>
                 </div>
@@ -1801,31 +1684,9 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
             {/* Top Toolbar */}
             <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Print Sheet Preview
-                  </h3>
-                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 rounded-full">
-                    {selectedPageDef.name.split('(')[0]} • {pageWidthMm} × {pageHeightMm} mm
-                  </span>
-                  {settings.scaleMode === 'exact_id' && (
-                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <span>✓ 100% Real ID (CR80)</span>
-                    </span>
-                  )}
-                  {settings.printCutMarks ? (
-                    <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 px-2.5 py-0.5 rounded-full">
-                      Crop Marks: ON
-                    </span>
-                  ) : (
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full">
-                      Clean Output
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {settings.printCutMarks ? 'Hairline corner ticks will be printed on physical paper for cutters' : 'Zero guides or marks on paper • 100% clean images only'}
-                </p>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Print Sheet Preview
+                </h3>
               </div>
 
               {/* Actions & Zoom Controls */}
@@ -1902,9 +1763,6 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                     Sheet {currentSheetIndex + 1} of {totalSheets}
                   </span>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-medium">
-                    ({expandedQueue.length} card{expandedQueue.length !== 1 ? 's' : ''} total)
-                  </span>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -1943,15 +1801,11 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     Next
                   </button>
                 </div>
-
-                <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-medium">
-                  ✓ All {totalSheets} sheets will be printed automatically
-                </div>
               </div>
             )}
 
             {/* PHYSICAL PAPER SHEET PREVIEW (Zoomable / Scaled to fit container) */}
-            <div className="print-page-wrapper bg-slate-100 p-4 sm:p-8 rounded-2xl border border-slate-200 flex flex-col justify-center items-center overflow-auto min-h-[580px]">
+            <div className="print-page-wrapper bg-slate-100 dark:paper-light-table p-4 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center items-center overflow-auto min-h-[580px] transition-colors">
               {/* Dynamic print-media page size injection */}
               <style>{`
                 @media print {
@@ -1971,7 +1825,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
 
                 return (
                   <div
-                    key={sheetIdx}
+                    key={`${settings.layout}-${sheetIdx}`}
                     ref={sheetIdx === 0 ? printSheetRef : undefined}
                     className={`print-studio-sheet layout-${settings.layout} bg-white text-black shadow-2xl relative transition-all duration-300 ${
                       isCurrent ? 'block' : 'hidden'
@@ -2313,7 +2167,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       </div>
                     ) : settings.layout === '1_fit' || settings.layout === '1_real_size' ? (
                       /* 5. LAYOUT: 1 IMAGE (FIT TO MARGINS OR REAL ID SIZE) */
-                      <div className="w-full h-full flex items-center justify-center p-1">
+                      <div className="w-full h-full flex items-center justify-center">
                         {(() => {
                           const item = getImageForSlot(0, sheetOffset);
                           if (!item) return null;
@@ -2347,15 +2201,19 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                 src={item.dataUrl}
                                 alt="Single"
                                 className={`card-exact-id block rounded-none ${
-                                  isRealSize ? 'w-full h-full object-contain' : 'max-w-full max-h-full object-contain'
+                                  isRealSize
+                                    ? 'w-full h-full object-contain'
+                                    : settings.slotFit === 'cover'
+                                    ? 'w-full h-full object-cover'
+                                    : 'max-w-full max-h-full object-contain'
                                 }`}
                                 style={{
-                                  objectFit: 'contain',
+                                  objectFit: isRealSize ? 'contain' : (settings.slotFit === 'cover' ? 'cover' : 'contain'),
                                   ...(isRealSize ? {} : {
                                     maxWidth: '100%',
                                     maxHeight: '100%',
-                                    width: 'auto',
-                                    height: 'auto',
+                                    width: settings.slotFit === 'cover' ? '100%' : 'auto',
+                                    height: settings.slotFit === 'cover' ? '100%' : 'auto',
                                   })
                                 }}
                               />
@@ -2401,7 +2259,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                 <div
                                   key={slotIdx}
                                   onClick={() => setActiveSlotModal(sheetOffset + slotIdx)}
-                                  className={`relative cursor-pointer group flex items-center justify-center w-full h-full p-1 ${
+                                  className={`relative cursor-pointer group flex items-center justify-center w-full h-full p-0.5 ${
                                     settings.showCutLines ? 'screen-cut-guide' : ''
                                   } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                                   style={{ boxSizing: 'border-box' }}
@@ -2410,12 +2268,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                   <img
                                     src={item.dataUrl}
                                     alt={`Card ${slotIdx + 1}`}
-                                    className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
+                                    className={`card-exact-id block rounded-none ${
+                                      settings.scaleMode === 'exact_id'
+                                        ? 'max-w-full max-h-full object-contain'
+                                        : settings.slotFit === 'cover'
+                                        ? 'w-full h-full object-cover'
+                                        : 'max-w-full max-h-full object-contain'
+                                    }`}
                                     style={{
                                       width: settings.scaleMode === 'exact_id'
                                         ? (isItemPortrait ? '53.98mm' : '85.6mm')
-                                        : '95%',
-                                      aspectRatio: item.aspectRatio || 85.6 / 53.98,
+                                        : (settings.slotFit === 'cover' ? '100%' : '98%'),
+                                      height: settings.slotFit === 'cover' ? '100%' : 'auto',
+                                      aspectRatio: settings.slotFit === 'cover' ? undefined : (item.aspectRatio || 85.6 / 53.98),
+                                      objectFit: settings.slotFit === 'cover' ? 'cover' : 'contain',
                                     }}
                                   />
 

@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development electron .",
-    "electron:build": "cross-env BUILD_TARGET=electron npm run build && electron-builder --win"
+    "electron:build": "cross-env BUILD_TARGET=electron npm run build && electron-builder --win",
+    "live": "node .agent/skills/live-edit/scripts/live.mjs start --target http://localhost:5174"
   },
   "build": {
     "appId": "com.printmate.studio",

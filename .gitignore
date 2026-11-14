@@ -31,3 +31,6 @@ dist/downloads/*.exe
 *.njsproj
 *.sln
 *.sw?
+.live/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

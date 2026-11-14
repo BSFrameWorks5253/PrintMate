@@ -951,7 +951,7 @@ export const IdCardStudioView: React.FC<IdCardStudioViewProps> = ({ onSendToPrin
                   {sheetPreviewUrl ? (
                     <img
                       src={sheetPreviewUrl}
-                      alt="Print Sheet Preview"
+                      alt="Print Preview"
                       className="max-h-[160px] w-auto object-contain rounded-md shadow-xs bg-white"
                     />
                   ) : (

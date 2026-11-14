@@ -206,7 +206,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
           style={{ transform: `translate3d(0, ${-scrollY * 0.22}px, 0)` }}
         >
           <div className="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-xs shadow-2xs">
-            📐
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </div>
           <div>
             <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">300 DPI Studio Output</div>
@@ -220,7 +220,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
           style={{ transform: `translate3d(0, ${-scrollY * 0.3}px, 0)` }}
         >
           <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs shadow-2xs">
-            💳
+            <CreditCard className="w-3.5 h-3.5" />
           </div>
           <div>
             <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">CR80 85.6 × 54 mm</div>
@@ -234,7 +234,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
           style={{ transform: `translate3d(0, ${scrollY * 0.12 - 40}px, 0)` }}
         >
           <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs shadow-2xs">
-            ⚡
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
           <div>
             <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">Portal Size Clamping</div>
@@ -248,7 +248,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
           style={{ transform: `translate3d(0, ${-scrollY * 0.16 + 140}px, 0)` }}
         >
           <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center font-black text-xs shadow-2xs">
-            🏪
+            <Building2 className="w-3.5 h-3.5" />
           </div>
           <div>
             <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">SMB Xerox Partner</div>
@@ -287,23 +287,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto space-y-5">
             
-            {/* Version & Partner Pill */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold tracking-wide shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              <span>Studio Pro v2.5 • Developed in Collaboration with SMB Xerox Mumbai</span>
-            </div>
-
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-950 dark:text-white tracking-tight leading-tight md:leading-[1.15]">
-              Turn Any Document or Photo into{' '}
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Perfect Print-Ready Sheets
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-950 dark:text-white tracking-tight leading-tight md:leading-[1.12]">
+              Precision Document & ID{' '}
+              <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-600 bg-clip-text text-transparent">
+                Print Studio
               </span>
             </h1>
 
-            {/* Sub-headline */}
-            <p className="text-sm sm:text-base md:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto">
-              Automatic edge detection, 4-corner perspective unwarping, ISO CR80 PVC ID cards, ICAO passport photo sheets, and byte-precise government form size reducer.
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              Calibrated to 1:1 physical millimeter standards for Indian government portals, ISO ID cards, and studio photo sheets.
             </p>
 
             {/* Primary Action Buttons */}
@@ -316,24 +309,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
                 <Crop className="w-4 h-4" />
                 <span>Scan & Crop Document</span>
                 <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigate('idcard')}
-                className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm border border-slate-300/80 dark:border-slate-700 shadow-md hover:shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <IdCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>ID Card & PVC Studio</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigate('sizereducer')}
-                className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm border border-slate-300/80 dark:border-slate-700 shadow-md hover:shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <SlidersHorizontal className="w-4 h-4 text-amber-500" />
-                <span>Govt Size Reducer</span>
               </button>
 
               <button
@@ -353,83 +328,147 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
                 <Printer className="w-4 h-4 text-cyan-400" />
                 <span>Print Studio</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigate('converter')}
-                className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm border border-slate-300/80 dark:border-slate-700 shadow-md hover:shadow-lg flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <FileText className="w-4 h-4 text-emerald-500" />
-                <span>Converter & CAD</span>
-              </button>
-            </div>
-
-            {/* Quick Demo Samples Helper */}
-            <div className="pt-2 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Need a quick test? Try 1-click samples:</span>
-              <button
-                onClick={() => onOpenSample('id_front')}
-                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
-              >
-                Slanted ID Card
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => onOpenSample('paper')}
-                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
-              >
-                A4 Certificate
-              </button>
             </div>
 
           </div>
 
-          {/* PARALLAX 3D TILT PREVIEW BANNER */}
-          <div 
-            className="mt-12 max-w-5xl mx-auto rounded-3xl bg-slate-900 dark:bg-slate-900 p-3 sm:p-5 shadow-2xl border border-slate-800 ring-1 ring-white/10 transition-transform duration-200 ease-out"
-            style={{
-              transform: `perspective(1000px) rotateY(${mouseOffset.x * 6}deg) rotateX(${-mouseOffset.y * 6}deg)`,
-            }}
-          >
-            <div className="bg-slate-950 rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-slate-800/90">
+          {/* DEDICATED PARTNER & CREATOR TRIBUTE: SMB XEROX & PHOTO PRINTING (BROUGHT TO TOP) */}
+          <div className="mt-10 max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
+            {/* Header Badge */}
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 text-white relative overflow-hidden">
+              <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="relative z-10 space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-white text-xs font-bold tracking-wide">
+                  <Award className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Official Field Testing Partner • Mumbai</span>
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  SMB Xerox & Photo Printing
+                </h3>
+                <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
+                  PrintMate was battle-tested and refined in direct partnership with SMB Xerox & Photo Printing near J.J. Hospital, Mumbai—engineering solutions directly for daily Xerox shop challenges.
+                </p>
+              </div>
+            </div>
+
+            {/* Shop Details Grid */}
+            <div className="p-6 sm:p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* Step 1 */}
-                <div className="flex flex-col items-center text-center p-2">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center mb-3">
-                    <Crop className="w-6 h-6" />
+                {/* Location & Address */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    <MapPin className="w-4 h-4 text-rose-500" />
+                    <span>Shop Address & Landmarks</span>
                   </div>
-                  <h3 className="font-bold text-base text-white">1. Snap / Upload Slanted Document</h3>
-                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                    AI automatically locks onto document corners, unwarps 3D perspective angles, and removes shadowy background clutter.
-                  </p>
+
+                  {/* Option 1 Landmark */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                      <span>Primary Location (Gate No. 2):</span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pl-3.5">
+                      Opposite J.J. Hospital Gate Number 2, 75/77, Ramchandra Bhatt Marg, Noor Baug - Umerkhadi, Mumbai, Maharashtra 400009
+                    </p>
+                  </div>
+
+                  {/* Option 2 Landmark */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                      <span>Alternate Landmark (Gate No. 6):</span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pl-3.5">
+                      Opposite J.J. Hospital Gate No. 6, next to Sheetal Medical, JJ Hospital Road / JJ Road, Dongri / Mumbai Central, Mumbai, Maharashtra 400009
+                    </p>
+                  </div>
                 </div>
 
-                {/* Step 2 */}
-                <div className="flex flex-col items-center text-center p-2 md:pl-6">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-400 flex items-center justify-center mb-3">
-                    <IdCard className="w-6 h-6" />
+                {/* Contact, Timings & Services */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    <Phone className="w-4 h-4 text-emerald-500" />
+                    <span>Contact & Operating Hours</span>
                   </div>
-                  <h3 className="font-bold text-base text-white">2. Automatic Standard Framing</h3>
-                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                    Lock to ISO CR80 PVC ID (85.6 × 54mm), ICAO 35×45mm passport grids, or A4 certificates with cutting margin guides.
-                  </p>
-                </div>
 
-                {/* Step 3 */}
-                <div className="flex flex-col items-center text-center p-2 md:pl-6">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center mb-3">
-                    <Printer className="w-6 h-6" />
+                  <div className="space-y-3">
+                    {/* Phone Number with click to call */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">Phone Number</div>
+                        <a 
+                          href="tel:+918828887850" 
+                          className="text-base font-extrabold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
+                        >
+                          <Phone className="w-4 h-4" />
+                          <span>+91 88288 87850</span>
+                        </a>
+                      </div>
+                      <a
+                        href="https://wa.me/918828887850"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                        title="Chat on WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+
+                    {/* Operating Timings */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">Store Hours</div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          Open Daily: <span className="text-emerald-600 dark:text-emerald-400 font-mono">7:00 AM – 8:00 PM</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Collaboration Note */}
+                    <div className="p-3 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 text-[11px] text-blue-900 dark:text-blue-200 leading-relaxed">
+                      💡 <em>"From true-scale PVC ID card tray cuts to government exam photo size limits, every millimeter feature in PrintMate was calibrated on the shop floor at SMB Xerox."</em>
+                    </div>
                   </div>
-                  <h3 className="font-bold text-base text-white">3. True 1:1 Millimeter Scale Print</h3>
-                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                    Print directly on A4 or 4×6 photo studio paper with physical millimeter lock—zero printer auto-fit scaling errors.
-                  </p>
                 </div>
 
               </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <span>Xerox • Color Printing • Lamination • ID Cards • Cyber Cafe Services</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="tel:+918828887850"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call Shop</span>
+                  </a>
+                  <a
+                    href="https://maps.google.com/?q=J.J.+Hospital+Gate+Number+2,+75/77,+Ramchandra+Bhatt+Marg,+Mumbai+400009"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Directions on Map</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </a>
+                </div>
+              </div>
+
             </div>
+
           </div>
 
         </div>
@@ -568,152 +607,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onOpenSample }) 
               </button>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* DEDICATED PARTNER & CREATOR TRIBUTE: SMB XEROX & PHOTO PRINTING */}
-      <section className="py-16 bg-gradient-to-b from-slate-100/80 via-white to-slate-100/80 dark:from-slate-900/60 dark:via-slate-950 dark:to-slate-900/60 border-y border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-            
-            {/* Header Badge */}
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 text-white relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="relative z-10 space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-white text-xs font-bold tracking-wide">
-                  <Award className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Official Field Testing Partner • Mumbai</span>
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
-                  SMB Xerox & Photo Printing
-                </h3>
-                <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
-                  PrintMate was battle-tested and refined in direct partnership with SMB Xerox & Photo Printing near J.J. Hospital, Mumbai—engineering solutions directly for daily Xerox shop challenges.
-                </p>
-              </div>
-            </div>
-
-            {/* Shop Details Grid */}
-            <div className="p-6 sm:p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Location & Address */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    <MapPin className="w-4 h-4 text-rose-500" />
-                    <span>Shop Address & Landmarks</span>
-                  </div>
-
-                  {/* Option 1 Landmark */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                      <span>Primary Location (Gate No. 2):</span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pl-3.5">
-                      Opposite J.J. Hospital Gate Number 2, 75/77, Ramchandra Bhatt Marg, Noor Baug - Umerkhadi, Mumbai, Maharashtra 400009
-                    </p>
-                  </div>
-
-                  {/* Option 2 Landmark */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
-                      <span>Alternate Landmark (Gate No. 6):</span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pl-3.5">
-                      Opposite J.J. Hospital Gate No. 6, next to Sheetal Medical, JJ Hospital Road / JJ Road, Dongri / Mumbai Central, Mumbai, Maharashtra 400009
-                    </p>
-                  </div>
-                </div>
-
-                {/* Contact, Timings & Services */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    <Phone className="w-4 h-4 text-emerald-500" />
-                    <span>Contact & Operating Hours</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {/* Phone Number with click to call */}
-                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Phone Number</div>
-                        <a 
-                          href="tel:+918828887850" 
-                          className="text-base font-extrabold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
-                        >
-                          <Phone className="w-4 h-4" />
-                          <span>+91 88288 87850</span>
-                        </a>
-                      </div>
-                      <a
-                        href="https://wa.me/918828887850"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                        title="Chat on WhatsApp"
-                      >
-                        <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>WhatsApp</span>
-                      </a>
-                    </div>
-
-                    {/* Operating Timings */}
-                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                        <Clock className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Store Hours</div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">
-                          Open Daily: <span className="text-emerald-600 dark:text-emerald-400 font-mono">7:00 AM – 8:00 PM</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Collaboration Note */}
-                    <div className="p-3 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 text-[11px] text-blue-900 dark:text-blue-200 leading-relaxed">
-                      💡 <em>"From true-scale PVC ID card tray cuts to government exam photo size limits, every millimeter feature in PrintMate was calibrated on the shop floor at SMB Xerox."</em>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4 text-blue-600" />
-                  <span>Xerox • Color Printing • Lamination • ID Cards • Cyber Cafe Services</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <a
-                    href="tel:+918828887850"
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>Call Shop</span>
-                  </a>
-                  <a
-                    href="https://maps.google.com/?q=J.J.+Hospital+Gate+Number+2,+75/77,+Ramchandra+Bhatt+Marg,+Mumbai+400009"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Directions on Map</span>
-                    <ExternalLink className="w-3 h-3 text-slate-400" />
-                  </a>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
         </div>
       </section>
 

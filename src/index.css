@@ -389,3 +389,24 @@ html.dark .converter-workspace select option,
   color: #ffffff !important;
 }
 
+/* ==========================================================================
+   Cinematic Optical Darkroom & Light-Table Utilities
+   ========================================================================== */
+.cinematic-glass-card {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+}
+
+.paper-light-table {
+  background-color: #090e1a;
+  background-image: 
+    radial-gradient(circle at 50% 30%, rgba(37, 99, 235, 0.12) 0%, transparent 70%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px, 24px 24px;
+}
+
+

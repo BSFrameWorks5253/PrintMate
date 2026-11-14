@@ -23,7 +23,8 @@ import {
   Menu,
   RefreshCw,
   SlidersHorizontal,
-  IdCard
+  IdCard,
+  Wrench
 } from 'lucide-react';
 import type { PrintQueueItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -105,9 +106,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white">
                   PrintMate
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 tracking-wide">
-                  STUDIO
-                </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden md:block">
                 Auto-Crop, Straighten & Multi-Layout Print Studio
@@ -130,16 +128,14 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* Navigation Tabs (Active Label Always Visible, Smooth Label Expand & Crisp Tooltip on Hover) */}
+          {/* Navigation Tabs (Clear Labels & High-Contrast Icons) */}
           <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0 relative">
             {[
               { id: 'home' as const, label: 'Home', shortLabel: 'Home', icon: Home, desc: 'Overview & Studio Tools' },
-              { id: 'scanner' as const, label: 'Scan & Crop', shortLabel: 'Scan', icon: Crop, desc: 'Perspective Unwarp & Straighten' },
+              { id: 'scanner' as const, label: 'Edit Image', shortLabel: 'Edit', icon: Crop, desc: 'Perspective Unwarp & Straighten' },
               { id: 'print' as const, label: 'Print Studio', shortLabel: 'Print', icon: Printer, desc: '1:1 Millimeter Scale Printing', count: queue.length },
               { id: 'passport' as const, label: 'Passport Maker', shortLabel: 'Passport', icon: CreditCard, desc: 'ICAO/ISO Passport Photo Grid' },
-              { id: 'idcard' as const, label: 'ID & PVC Studio', shortLabel: 'PVC ID', icon: IdCard, desc: 'e-Aadhaar, PAN & ISO CR80 PVC' },
-              { id: 'sizereducer' as const, label: 'Size Reducer', shortLabel: 'Reducer', icon: SlidersHorizontal, desc: 'UPSC, SSC, NEET Portal Size Clamping' },
-              { id: 'converter' as const, label: 'Converter', shortLabel: 'Convert', icon: FileText, desc: 'PDF Tools, Merge, Split & CAD' },
+              { id: 'converter' as const, label: 'Utility', shortLabel: 'Utility', icon: Wrench, desc: 'PDF Tools, Size Reducer & Conversion' },
             ].map((item) => {
               const isActive = activeTab === item.id;
               const IconComp = item.icon;
@@ -153,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`flex items-center px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer relative select-none ${
                       isActive
-                        ? 'shadow-sm shadow-blue-500/25 ring-1 ring-white/20'
+                        ? 'shadow-sm shadow-blue-500/25 ring-1 ring-white/20 font-bold'
                         : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
                     }`}
                     title={item.label}
@@ -161,23 +157,13 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <IconComp className="w-4 h-4 shrink-0" />
                     
-                    {/* Active page name is ALWAYS fully visible. Inactive tabs smoothly expand and reveal page name on hover! */}
-                    <span 
-                      className={`inline-block whitespace-nowrap transition-all duration-200 overflow-hidden ${
-                        isActive
-                          ? 'max-w-[160px] opacity-100 ml-1.5 font-bold text-white'
-                          : 'max-w-0 opacity-0 group-hover:max-w-[160px] group-hover:opacity-100 group-hover:ml-1.5 font-medium'
-                      }`}
-                    >
+                    {/* Page names are clearly visible at all times */}
+                    <span className="ml-1.5 font-medium whitespace-nowrap hidden sm:inline-block">
                       {item.label}
                     </span>
-
-                    {/* Count badge for print queue if any */}
-                    {typeof item.count === 'number' && item.count > 0 && (
-                      <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white shrink-0">
-                        {item.count}
-                      </span>
-                    )}
+                    <span className="ml-1.5 font-medium whitespace-nowrap sm:hidden inline-block">
+                      {item.shortLabel}
+                    </span>
                   </button>
 
                   {/* Clean High-Contrast Hover Tooltip (Never clipped) */}
@@ -226,8 +212,8 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Desktop / PWA Download & Install Button */}
-            {isElectron ? (
+            {/* Desktop App Indicator */}
+            {isElectron && (
               <div 
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold shrink-0" 
                 title="Running as Native Desktop Application"
@@ -235,18 +221,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <Monitor className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="hidden md:inline">Desktop App</span>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleInstallClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
-                title="Download Windows .EXE or Install PWA Offline App"
-              >
-                <Download className="w-3.5 h-3.5 text-cyan-200" />
-                <span className="hidden lg:inline">Download App</span>
-                <span className="lg:hidden hidden sm:inline">Download</span>
-                <span className="sm:hidden">App</span>
-              </button>
             )}
 
             {/* Refresh Session Button */}

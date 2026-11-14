@@ -51,7 +51,7 @@ function createWindow() {
   });
 
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5174';
 
   if (isDev && process.env.ELECTRON_START_URL) {
     mainWindow.loadURL(process.env.ELECTRON_START_URL);

@@ -86,7 +86,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
                 <RefreshCw className="size-4" />
-                <span>Clear Cache & Reload Studio</span>
+                <span>Reload</span>
               </button>
 
               <button

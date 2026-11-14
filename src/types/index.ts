@@ -82,6 +82,7 @@ export interface PrintSettings {
   spacingMm: number;
   copies: number;
   alignment: 'center' | 'top_center' | 'top_left';
+  slotFit?: 'contain' | 'cover';
   customCols: number;
   customRows: number;
   duplexActivePage: 1 | 2;

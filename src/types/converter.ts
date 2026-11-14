@@ -1,6 +1,7 @@
 export type NavigationTab = 
   | 'all-tools'
   | 'workspace'
+  | 'size-reducer'
   | 'pdf-editor'
   | 'pdf-merge'
   | 'pdf-split'

@@ -132,7 +132,7 @@ export const PRINT_LAYOUT_OPTIONS = [
   },
   {
     id: '1_real_size',
-    name: '1 Image (100% Real ID Card Scale)',
+    name: 'Single Card (100% ID Scale)',
     description: 'Printed at exact ISO 85.6 × 54mm dimensions',
     slots: 1,
     icon: 'Maximize2',
@@ -140,7 +140,7 @@ export const PRINT_LAYOUT_OPTIONS = [
   },
   {
     id: '1_fit',
-    name: '1 Image (Full Page Fit)',
+    name: 'Fit Page (Preserves Ratio)',
     description: 'Scales to full page margins while preserving aspect ratio',
     slots: 1,
     icon: 'FileText',
@@ -148,7 +148,7 @@ export const PRINT_LAYOUT_OPTIONS = [
   },
   {
     id: '1_fill',
-    name: '1 Image (Full Page Fill / Borderless)',
+    name: 'Fill Page (Borderless)',
     description: 'Fills the entire sheet edge-to-edge with zero white borders',
     slots: 1,
     icon: 'Maximize2',

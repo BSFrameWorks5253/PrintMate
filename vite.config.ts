@@ -10,7 +10,8 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   envPrefix: ['VITE_', 'SUPABASE_'],
   server: {
-    port: 5173,
+    port: 5174,
+    strictPort: true,
     host: true,
   },
   build: {

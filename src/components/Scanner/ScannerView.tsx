@@ -1328,19 +1328,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   </button>
                 </div>
               </div>
-
-              {/* Feature Pills */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-6 text-[11px] text-slate-500 dark:text-slate-400">
-                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
-                  ✓ Auto-Crop & Perspective Deskew
-                </span>
-                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
-                  ✓ Front & Back 2-Card Batching
-                </span>
-                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium">
-                  ✓ Direct In-Place Raw Image Overwrite
-                </span>
-              </div>
             </div>
           </div>
         </div>
@@ -1692,7 +1679,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   {/* Fine Tilt Angle Slider */}
                   <div className="flex items-center gap-2 pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">Tilt Deskew:</span>
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">Title Image</span>
                     <button
                       type="button"
                       onClick={() => updateCurrentCard((c) => ({
@@ -1771,10 +1758,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   </div>
 
                   {/* Filter Color Presets */}
-                  <div className="grid grid-cols-5 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {[
                       { id: 'none', label: 'Original' },
-                      { id: 'id_pop', label: 'ID Pop' },
                       { id: 'auto_enhance', label: 'Enhanced' },
                       { id: 'scan_bw', label: 'Clean B&W' },
                       { id: 'grayscale', label: 'Grayscale' },
@@ -2032,19 +2018,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       <Printer className="w-3.5 h-3.5" />
                       <span>Print Now</span>
                     </button>
-
-                    {/* Overwrite PC File if available */}
-                    {currentCard.fileHandle && (
-                      <button
-                        type="button"
-                        onClick={() => handleSaveOverwrite()}
-                        className="py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
-                        title="Directly overwrite source image on PC"
-                      >
-                        <Save className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>Overwrite</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>

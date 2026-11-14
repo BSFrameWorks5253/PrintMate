@@ -482,7 +482,6 @@ const MainAppContent: React.FC = () => {
           <div className="flex items-center gap-2">
             <img src="/logo.svg" alt="PrintMate Logo" className="w-5 h-5 object-contain" />
             <span className="font-semibold text-slate-800 dark:text-slate-200">PrintMate</span>
-            <span>• Auto Border Detection, Deskew & Multi-Up Print Studio</span>
           </div>
 
           {/* Creator Credit & Issue/Feature Request Actions */}
@@ -511,10 +510,6 @@ const MainAppContent: React.FC = () => {
               <MessageSquarePlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span>Address an Issue / Request Feature</span>
             </button>
-          </div>
-
-          <div className="text-[11px] text-slate-400 dark:text-slate-500">
-            A4 • A3 • Letter • Duplex • CR80 ID Standard Scale
           </div>
         </div>
       </footer>

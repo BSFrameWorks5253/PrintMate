@@ -11,6 +11,7 @@ import { ReverseConverterStudio } from './features/ReverseConverterStudio';
 import { ImageGalleryStudio } from './features/ImageGalleryStudio';
 import { OfficeConverterStudio } from './features/OfficeConverterStudio';
 import { CadToPdfStudio } from './features/CadToPdfStudio';
+import { SizeReducerStudio } from '../SizeReducer/SizeReducerStudio';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import type { NavigationTab } from '../../types/converter';
 
@@ -36,6 +37,10 @@ export const ConverterView: React.FC = () => {
 
           {currentTab === 'workspace' && (
             <ContextSmartWorkspace />
+          )}
+
+          {currentTab === 'size-reducer' && (
+            <SizeReducerStudio />
           )}
 
           {currentTab === 'pdf-editor' && (
