@@ -31,7 +31,7 @@ export const PVC_CARD_SPEC = {
 export const ID_CARD_PRESETS: Record<SupportedIdCardType, IdCardPresetDef> = {
   aadhaar: {
     id: 'aadhaar',
-    name: 'Aadhaar Card (UIDAI)',
+    name: 'Aadhaar Card',
     description: 'Standard e-Aadhaar PDF. Front & Back positioned at bottom section.',
     // Standard e-Aadhaar PDF bottom cards:
     // Left side = Front card, Right side = Back card
@@ -40,14 +40,14 @@ export const ID_CARD_PRESETS: Record<SupportedIdCardType, IdCardPresetDef> = {
   },
   pan: {
     id: 'pan',
-    name: 'PAN Card (NSDL / UTIITSL)',
+    name: 'PAN Card',
     description: 'e-PAN PDF format with pre-formatted card at bottom or center.',
     defaultFrontCrop: { x: 0.08, y: 0.66, w: 0.42, h: 0.30 },
     defaultBackCrop: { x: 0.52, y: 0.66, w: 0.42, h: 0.30 },
   },
   voter: {
     id: 'voter',
-    name: 'Voter ID (e-EPIC / NVSP)',
+    name: 'Voter ID',
     description: 'Election Commission of India Voter ID card layout.',
     defaultFrontCrop: { x: 0.08, y: 0.15, w: 0.42, h: 0.34 },
     defaultBackCrop: { x: 0.52, y: 0.15, w: 0.42, h: 0.34 },
@@ -75,7 +75,7 @@ export const ID_CARD_PRESETS: Record<SupportedIdCardType, IdCardPresetDef> = {
   },
   apaar: {
     id: 'apaar',
-    name: 'APAAR Card / ABC ID (One Nation One Student)',
+    name: 'APAAR Card',
     description: 'Ministry of Education Student ID card format.',
     defaultFrontCrop: { x: 0.08, y: 0.55, w: 0.42, h: 0.36 },
     defaultBackCrop: { x: 0.52, y: 0.55, w: 0.42, h: 0.36 },

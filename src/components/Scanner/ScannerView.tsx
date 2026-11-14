@@ -26,7 +26,9 @@ import {
   Archive,
   Crop,
   IdCard,
-  ArrowRight
+  ArrowRight,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { useAuth } from '../../context/AuthContext';
@@ -85,6 +87,33 @@ const defaultAdjustments: ImageAdjustments = {
   filter: 'none',
 };
 
+export const resolveTargetRatio = (
+  docType: DocumentTypeId,
+  aspectMode?: 'standard' | 'portrait' | 'free',
+  naturalWidth: number = 1000,
+  naturalHeight: number = 1000
+): number => {
+  if (docType === 'custom' || aspectMode === 'free') {
+    return 0; // Completely free, unconstrained natural crop - ZERO distortion
+  }
+  const docDef = DOCUMENT_TYPES.find((d) => d.id === docType);
+  if (!docDef || docDef.id === 'custom' || docDef.aspectRatio === 0) {
+    return 0;
+  }
+  let ratio = docDef.aspectRatio;
+  if (aspectMode === 'portrait' && ratio > 0) {
+    return Math.min(ratio, 1 / ratio);
+  }
+  if (aspectMode === 'standard' && ratio > 0) {
+    if (docDef.category === 'paper') {
+      const isLandscape = naturalWidth >= naturalHeight;
+      return isLandscape ? Math.max(ratio, 1 / ratio) : Math.min(ratio, 1 / ratio);
+    }
+    return Math.max(ratio, 1 / ratio);
+  }
+  return ratio;
+};
+
 export const ScannerView: React.FC<ScannerViewProps> = ({
   onSendToPrint,
   onSendMultipleToPrint,
@@ -96,6 +125,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   // Multi-image state
   const [cards, setCards] = useState<ScannedCardItem[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState<number>(0);
+  const [reviewZoom, setReviewZoom] = useState<number>(100);
 
   // Interaction handles
   const [activeHandle, setActiveHandle] = useState<{ type: 'corner' | 'edge'; index: number } | null>(null);
@@ -189,18 +219,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     img: HTMLImageElement, 
     name: string, 
     side: 'front' | 'back' | 'single' = 'single',
-    docType: DocumentTypeId = 'paper_a4',
+    docType: DocumentTypeId = 'custom',
     rawFileName?: string,
     fileHandle?: any
   ): ScannedCardItem => {
     const detected = autoDetectDocumentCorners(img, 'auto');
-    const docDef = DOCUMENT_TYPES.find((d) => d.id === docType);
     const isLandscape = img.naturalWidth >= img.naturalHeight;
-    const initialAspectMode: 'standard' | 'portrait' = isLandscape ? 'standard' : 'portrait';
-    let targetRatio = docDef?.aspectRatio || 210 / 297;
-    if (docDef?.category === 'paper') {
-      targetRatio = isLandscape ? Math.max(targetRatio, 1 / targetRatio) : Math.min(targetRatio, 1 / targetRatio);
-    }
+    const initialAspectMode: 'standard' | 'portrait' | 'free' = docType === 'custom' ? 'free' : (isLandscape ? 'standard' : 'portrait');
+    const targetRatio = resolveTargetRatio(docType, initialAspectMode, img.naturalWidth, img.naturalHeight);
 
     let processed: HTMLCanvasElement | null = null;
     let dataUrl: string | undefined = undefined;
@@ -667,23 +693,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     const timer = setTimeout(() => {
       setIsProcessing(true);
       try {
-        const docDef = DOCUMENT_TYPES.find((d) => d.id === currentDocType);
-        let targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
-
-        if (currentAspectMode === 'free') {
-          targetRatio = 0;
-        } else if (currentAspectMode === 'portrait' && targetRatio > 0) {
-          targetRatio = Math.min(targetRatio, 1 / targetRatio);
-        } else if (currentAspectMode === 'standard' && targetRatio > 0) {
-          if (docDef?.category === 'paper') {
-            const isLandscape = currentSourceImage.naturalWidth >= currentSourceImage.naturalHeight;
-            targetRatio = isLandscape
-              ? Math.max(targetRatio, 1 / targetRatio)
-              : Math.min(targetRatio, 1 / targetRatio);
-          } else {
-            targetRatio = Math.max(targetRatio, 1 / targetRatio);
-          }
-        }
+        const targetRatio = resolveTargetRatio(
+          currentDocType || 'custom',
+          currentAspectMode,
+          currentSourceImage.naturalWidth,
+          currentSourceImage.naturalHeight
+        );
 
         const cornersKey = `${currentCorners.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('_')}`;
         let unwarped: HTMLCanvasElement;
@@ -884,8 +899,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     if (!currentCard) return;
     let canvas = currentCard.processedCanvas;
     if (!canvas) {
-      const docDef = DOCUMENT_TYPES.find((d) => d.id === currentCard.docType);
-      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const targetRatio = resolveTargetRatio(currentCard.docType, currentCard.aspectMode, currentCard.sourceImage.naturalWidth, currentCard.sourceImage.naturalHeight);
       const unwarped = warpPerspectiveCrop(currentCard.sourceImage, currentCard.corners, targetRatio, 2000, currentCard.aspectMode);
       canvas = applyAdjustments(unwarped, currentCard.adjustments);
     }
@@ -929,8 +943,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     cards.forEach((card) => {
       let canvas = card.processedCanvas;
       if (!canvas) {
-        const docDef = DOCUMENT_TYPES.find((d) => d.id === card.docType);
-        const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+        const targetRatio = resolveTargetRatio(card.docType, card.aspectMode, card.sourceImage.naturalWidth, card.sourceImage.naturalHeight);
         const unwarped = warpPerspectiveCrop(card.sourceImage, card.corners, targetRatio, 2000, card.aspectMode);
         canvas = applyAdjustments(unwarped, card.adjustments);
       }
@@ -971,8 +984,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     if (!cardToSave) return;
     let canvas = cardToSave.processedCanvas;
     if (!canvas) {
-      const docDef = DOCUMENT_TYPES.find((d) => d.id === cardToSave.docType);
-      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const targetRatio = resolveTargetRatio(cardToSave.docType, cardToSave.aspectMode, cardToSave.sourceImage.naturalWidth, cardToSave.sourceImage.naturalHeight);
       const unwarped = warpPerspectiveCrop(cardToSave.sourceImage, cardToSave.corners, targetRatio, 2000, cardToSave.aspectMode);
       canvas = applyAdjustments(unwarped, cardToSave.adjustments);
     }
@@ -1032,8 +1044,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const handleDownload = () => {
     let canvas = currentCard?.processedCanvas;
     if (!canvas && currentCard) {
-      const docDef = DOCUMENT_TYPES.find((d) => d.id === currentCard.docType);
-      const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+      const targetRatio = resolveTargetRatio(currentCard.docType, currentCard.aspectMode, currentCard.sourceImage.naturalWidth, currentCard.sourceImage.naturalHeight);
       const unwarped = warpPerspectiveCrop(currentCard.sourceImage, currentCard.corners, targetRatio, 2000, currentCard.aspectMode);
       canvas = applyAdjustments(unwarped, currentCard.adjustments);
     }
@@ -1067,8 +1078,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         const card = cards[i];
         let canvas = card.processedCanvas;
         if (!canvas) {
-          const docDef = DOCUMENT_TYPES.find((d) => d.id === card.docType);
-          const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+          const targetRatio = resolveTargetRatio(card.docType, card.aspectMode, card.sourceImage.naturalWidth, card.sourceImage.naturalHeight);
           const unwarped = warpPerspectiveCrop(card.sourceImage, card.corners, targetRatio, 2000, card.aspectMode);
           canvas = applyAdjustments(unwarped, card.adjustments);
         }
@@ -1130,8 +1140,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       const card = cards[i];
       let canvas = card.processedCanvas;
       if (!canvas) {
-        const docDef = DOCUMENT_TYPES.find((d) => d.id === card.docType);
-        const targetRatio = docDef?.aspectRatio || 85.6 / 53.98;
+        const targetRatio = resolveTargetRatio(card.docType, card.aspectMode, card.sourceImage.naturalWidth, card.sourceImage.naturalHeight);
         const unwarped = warpPerspectiveCrop(card.sourceImage, card.corners, targetRatio, 2000, card.aspectMode);
         canvas = applyAdjustments(unwarped, card.adjustments);
       }
@@ -1197,49 +1206,29 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         style={{ display: 'none' }}
       />
 
-      {/* SCANNER VIEW TITLE & REFRESH ACTION BAR (ALWAYS PROMINENTLY VISIBLE) */}
+      {/* SCANNER VIEW TITLE BAR */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800 transition-colors">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Document Scanner & Straightener
-            </h1>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-              AI AUTO-DESKEW
-            </span>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            Document Scanner & Straightener
+          </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {cards.length > 0 
-              ? `Session active: ${cards.length} image${cards.length > 1 ? 's' : ''} loaded. Edits persist across tab switches until you click Refresh.`
-              : 'Auto-detect 4 corners, straighten slanted perspective, and balance lighting for crisp printing.'}
+            Auto-detect 4 corners, straighten slanted perspective, and balance lighting for crisp printing.
           </p>
         </div>
 
-        {/* ALWAYS-VISIBLE PROMINENT REFRESH BUTTON */}
-        <div className="flex items-center gap-2">
-          {cards.length > 0 ? (
+        {cards.length === 0 && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowResetModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
-              title="Clear current scan session and start fresh"
+              onClick={() => loadSampleDirectly('id_front')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             >
-              <RefreshCw className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:rotate-180 transition-transform duration-300" />
-              <span>Refresh / New Scan</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Try Demo ID Card</span>
             </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => loadSampleDirectly('id_front')}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Try Demo ID Card</span>
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* If no images uploaded yet */}
@@ -1400,7 +1389,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 title="Add another document or page"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Page / Document</span>
+                <span>+ Add Page | Document</span>
               </button>
             </div>
 
@@ -1409,18 +1398,27 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               {/* Document Standard Type Pills */}
               {currentCard && (
                 <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                  {DOCUMENT_TYPES.filter((d) => d.category !== 'id').map((dt) => (
+                  {[
+                    { id: 'paper_a4', name: 'A4 Document', desc: 'Full document or certificate sheet (1:1.414)' },
+                    { id: 'id_standard', name: 'ID Card', desc: 'CR80 standard card (85.6 x 53.98 mm)' },
+                    { id: 'receipt', name: 'Receipt', desc: 'Elongated thermal paper receipt or slip' },
+                    { id: 'custom', name: 'Custom', desc: 'Unconstrained free natural crop - no distortion' },
+                  ].map((dt) => (
                     <button
                       key={dt.id}
-                      onClick={() => updateCurrentCard((c) => ({ ...c, docType: dt.id }))}
+                      onClick={() => updateCurrentCard((c) => ({ 
+                        ...c, 
+                        docType: dt.id as DocumentTypeId,
+                        aspectMode: dt.id === 'custom' ? 'free' : c.aspectMode
+                      }))}
                       className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         currentCard.docType === dt.id
                           ? 'bg-blue-600 text-white font-bold shadow-xs'
                           : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
-                      title={dt.description}
+                      title={dt.desc}
                     >
-                      {dt.name.split('/')[0].trim()}
+                      {dt.name}
                     </button>
                   ))}
                 </div>
@@ -1437,17 +1435,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <span>Send All ({cards.length}) to Print</span>
                 </button>
               )}
-
-              {/* Session Refresh / Start New Scan Button */}
-              <button
-                type="button"
-                onClick={() => setShowResetModal(true)}
-                className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 text-slate-700 dark:text-slate-300 hover:text-rose-700 dark:hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer group"
-                title="Clear session and start fresh with new image"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 group-hover:rotate-180 transition-transform" />
-                <span>Refresh / New Scan</span>
-              </button>
             </div>
           </div>
 
@@ -1614,15 +1601,42 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <div className="flex items-center gap-2">
                     <FileCheck className="w-4 h-4 text-emerald-500" />
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Deskewed Result (Doc {activeCardIndex + 1})
+                      Review
                     </h4>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {isProcessing && (
-                      <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 animate-pulse">
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 animate-pulse mr-1">
                         <Sparkles className="w-3.5 h-3.5" /> Applying Tone...
                       </span>
                     )}
+                    {/* Zoom in/out controls for review */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setReviewZoom((z) => Math.max(50, z - 25))}
+                        className="p-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewZoom(100)}
+                        className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600"
+                        title="Reset 100% Zoom"
+                      >
+                        {reviewZoom}%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewZoom((z) => Math.min(300, z + 25))}
+                        className="p-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setFullPreviewOpen(true)}
@@ -1637,11 +1651,18 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 {/* Straightened Result Preview Canvas / Image */}
                 <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800 p-3">
                   {currentCard.processedDataUrl || currentCard.processedCanvas ? (
-                    <img
-                      src={currentCard.processedDataUrl || currentCard.processedCanvas?.toDataURL('image/jpeg', 0.94) || ''}
-                      alt="Straightened Result"
-                      className="max-w-full max-h-full object-contain rounded-md shadow-lg transition-all"
-                    />
+                    <div className="w-full h-full flex items-center justify-center overflow-auto">
+                      <img
+                        src={currentCard.processedDataUrl || currentCard.processedCanvas?.toDataURL('image/jpeg', 0.94) || ''}
+                        alt="Review Straightened Result"
+                        style={{
+                          transform: `scale(${reviewZoom / 100})`,
+                          transformOrigin: 'center',
+                          transition: 'transform 0.15s ease-out',
+                        }}
+                        className="max-w-full max-h-full object-contain rounded-md shadow-lg"
+                      />
+                    </div>
                   ) : (
                     <div className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 animate-spin text-blue-500" />
@@ -1649,9 +1670,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     </div>
                   )}
 
-                  <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30">
-                    {currentCard.cardSide.toUpperCase()} • {DOCUMENT_TYPES.find((d) => d.id === currentCard.docType)?.name}
-                    {currentCard.processedCanvas && ` • ${currentCard.processedCanvas.width}×${currentCard.processedCanvas.height}px`}
+                  <div className="absolute top-2 left-2 bg-slate-900/85 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30 shadow-xs">
+                    Cropped: {currentCard.processedCanvas?.width || 0}×{currentCard.processedCanvas?.height || 0}px • Original: {currentCard.sourceImage.naturalWidth}×{currentCard.sourceImage.naturalHeight}px
                   </div>
                 </div>
 
@@ -1701,23 +1721,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
                   {/* Fine Tilt Angle Slider */}
                   <div className="flex items-center gap-2 pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">Title Image</span>
-                    <button
-                      type="button"
-                      onClick={() => updateCurrentCard((c) => ({
-                        ...c,
-                        adjustments: { ...c.adjustments, fineAngle: Math.max(-25, Math.round(((c.adjustments.fineAngle || 0) - 1) * 10) / 10) }
-                      }))}
-                      className="px-1.5 py-0.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
-                      title="Tilt -1°"
-                    >
-                      -1°
-                    </button>
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">Straighten Angle</span>
                     <input
                       type="range"
                       min="-25"
                       max="25"
-                      step="0.5"
+                      step="0.2"
                       value={currentCard.adjustments.fineAngle || 0}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
@@ -1726,20 +1735,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           adjustments: { ...c.adjustments, fineAngle: val }
                         }));
                       }}
-                      className="flex-1 cursor-pointer"
+                      className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
                     />
-                    <button
-                      type="button"
-                      onClick={() => updateCurrentCard((c) => ({
-                        ...c,
-                        adjustments: { ...c.adjustments, fineAngle: Math.min(25, Math.round(((c.adjustments.fineAngle || 0) + 1) * 10) / 10) }
-                      }))}
-                      className="px-1.5 py-0.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
-                      title="Tilt +1°"
-                    >
-                      +1°
-                    </button>
-                    <span className="text-xs font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 min-w-[45px] text-center">
+                    <span className="text-xs font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 min-w-[48px] text-center">
                       {(currentCard.adjustments.fineAngle || 0) > 0 
                         ? `+${(currentCard.adjustments.fineAngle || 0).toFixed(1)}°` 
                         : `${(currentCard.adjustments.fineAngle || 0).toFixed(1)}°`}
@@ -1751,7 +1749,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           ...c,
                           adjustments: { ...c.adjustments, fineAngle: 0 }
                         }))}
-                        className="px-1.5 py-0.5 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 cursor-pointer"
+                        className="px-2 py-0.5 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded text-xs font-bold border border-rose-200 dark:border-rose-800 cursor-pointer shadow-2xs"
                         title="Reset tilt to 0°"
                       >
                         0°
@@ -1841,7 +1839,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           ...c,
                           adjustments: { ...c.adjustments, brightness: Number(e.target.value) }
                         }))}
-                        className="w-full cursor-pointer"
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
                       />
                     </div>
 
@@ -1879,7 +1877,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           ...c,
                           adjustments: { ...c.adjustments, contrast: Number(e.target.value) }
                         }))}
-                        className="w-full cursor-pointer"
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
                       />
                     </div>
 
@@ -1917,7 +1915,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           ...c,
                           adjustments: { ...c.adjustments, exposure: Number(e.target.value) }
                         }))}
-                        className="w-full cursor-pointer"
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
                       />
                     </div>
 
@@ -1955,7 +1953,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                           ...c,
                           adjustments: { ...c.adjustments, saturation: Number(e.target.value) }
                         }))}
-                        className="w-full cursor-pointer"
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
                       />
                     </div>
                   </div>

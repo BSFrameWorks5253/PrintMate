@@ -618,15 +618,9 @@ export const IdCardStudioView: React.FC<IdCardStudioViewProps> = ({ onSendToPrin
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white">
-                  ID Card & PVC Studio
+                  ID Card
                 </h1>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 uppercase tracking-wider">
-                  ISO CR80 Ready
-                </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                1-Click e-Aadhaar, PAN, Voter ID & Driving License to perfect 85.6 × 53.98 mm PVC printing
-              </p>
             </div>
           </div>
         </div>
@@ -682,25 +676,23 @@ export const IdCardStudioView: React.FC<IdCardStudioViewProps> = ({ onSendToPrin
         <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
           Select Document Format Preset:
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {(Object.keys(ID_CARD_PRESETS) as SupportedIdCardType[]).map((type) => {
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {(['aadhaar', 'pan', 'voter', 'apaar'] as SupportedIdCardType[]).map((type) => {
             const preset = ID_CARD_PRESETS[type];
+            if (!preset) return null;
             const isSelected = selectedCardType === type;
             return (
               <button
                 key={type}
                 type="button"
                 onClick={() => handleSelectCardType(type)}
-                className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                className={`p-3 rounded-2xl text-center sm:text-left border transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-500 ring-2 ring-blue-500/20 text-blue-900 dark:text-blue-100 shadow-xs'
                     : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                 }`}
               >
                 <div className="font-extrabold text-xs truncate">{preset.name}</div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                  {preset.description}
-                </div>
               </button>
             );
           })}
@@ -728,12 +720,9 @@ export const IdCardStudioView: React.FC<IdCardStudioViewProps> = ({ onSendToPrin
             <div className="w-20 h-20 rounded-3xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform shadow-xs">
               <Upload className="w-10 h-10" />
             </div>
-            <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-2">
-              Upload e-Aadhaar PDF or Scanned ID Image
+            <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-6">
+              Upload Scanned ID Image
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
-              Drag & drop your downloaded Aadhaar PDF, PAN PDF, or scanned photo here. Password-protected PDFs are unlocked directly on your device.
-            </p>
             <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20">
               <CreditCard className="w-4 h-4" />
               <span>Select File from Computer</span>

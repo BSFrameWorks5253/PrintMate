@@ -85,8 +85,36 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
   const [slotOverrides, setSlotOverrides] = useState<Record<number, string>>({});
   const [activeSlotModal, setActiveSlotModal] = useState<number | null>(null);
   const [activePreviewSheet, setActivePreviewSheet] = useState<number>(0);
-  const [layoutCategory, setLayoutCategory] = useState<'id_duo' | 'multi' | 'single' | 'all'>('id_duo');
+  const [layoutCategory, setLayoutCategory] = useState<'id_duo' | 'multi' | 'single' | 'all'>('single');
   const [sidebarTab, setSidebarTab] = useState<'layout' | 'spacing' | 'queue'>('layout');
+
+  const initialLayoutSetRef = useRef(false);
+  useEffect(() => {
+    if (!initialLayoutSetRef.current && queue.length > 0) {
+      initialLayoutSetRef.current = true;
+      const hasIdCard = queue.some((q) => q.docType === 'id_standard' || q.docType === 'pan_card' || q.docType === 'driving_license');
+      if (hasIdCard) {
+        setSettings((s) => ({
+          ...s,
+          layout: '2_vertical',
+          scaleMode: 'exact_id',
+          alignment: 'top_center',
+          marginMm: 10,
+          spacingMm: 5,
+        }));
+        setLayoutCategory('id_duo');
+      } else {
+        setSettings((s) => ({
+          ...s,
+          layout: '1_fit',
+          scaleMode: 'fit_cell',
+          marginMm: 5,
+          alignment: 'center',
+        }));
+        setLayoutCategory('single');
+      }
+    }
+  }, [queue]);
 
   // Auto-adapt page orientation to matching image aspect ratio
   useEffect(() => {
@@ -809,33 +837,30 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       const isIdActive = settings.scaleMode === 'exact_id' && (settings.layout === '2_vertical' || settings.layout === '1_real_size');
                       return (
                         <div
-                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+                          onClick={() => {
+                            setSettings((s) => ({
+                              ...s,
+                              layout: s.layout === '1_real_size' ? '1_real_size' : '2_vertical',
+                              pageSize: 'a4',
+                              orientation: 'portrait',
+                              alignment: s.layout === '1_real_size' ? 'center' : 'top_center',
+                              scaleMode: 'exact_id',
+                              marginMm: 10,
+                              spacingMm: 5,
+                            }));
+                            setLayoutCategory('id_duo');
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
                             isIdActive
                               ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
                               : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                           }`}
                         >
-                          <div 
-                            className="cursor-pointer"
-                            onClick={() => {
-                              setSettings((s) => ({
-                                ...s,
-                                layout: s.layout === '1_real_size' ? '1_real_size' : '2_vertical',
-                                pageSize: 'a4',
-                                orientation: 'portrait',
-                                alignment: s.layout === '1_real_size' ? 'center' : 'top_center',
-                                scaleMode: 'exact_id',
-                                marginMm: 10,
-                                spacingMm: 5,
-                              }));
-                            }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold flex items-center gap-1.5">
-                                <CreditCard className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                <span>ID Card</span>
-                              </span>
-                            </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              <span>ID Card</span>
+                            </span>
                           </div>
 
                           {/* Duo vs Single Option (only shown when ID Card preset is selected) */}
@@ -889,8 +914,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                     {(() => {
                       const isPhotoActive = settings.pageSize === '4x6' && settings.layout === '1_fit';
                       return (
-                        <button
-                          type="button"
+                        <div
                           onClick={() => {
                             setSettings((s) => ({
                               ...s,
@@ -901,6 +925,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                               scaleMode: 'fit_cell',
                               marginMm: 5,
                             }));
+                            setLayoutCategory('single');
                           }}
                           className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
                             isPhotoActive
@@ -914,7 +939,7 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                               <span>4 × 6" Photo</span>
                             </span>
                           </div>
-                        </button>
+                        </div>
                       );
                     })()}
 
@@ -923,32 +948,29 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                       const isFullActive = settings.layout === '1_fit' || settings.layout === '1_fill';
                       return (
                         <div
-                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+                          onClick={() => {
+                            const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
+                            setSettings((s) => ({
+                              ...s,
+                              layout: s.layout === '1_fill' ? '1_fill' : '1_fit',
+                              alignment: 'center',
+                              scaleMode: 'fit_cell',
+                              marginMm: s.layout === '1_fill' ? 0 : 5,
+                              orientation: isItemLandscape ? 'landscape' : 'portrait',
+                            }));
+                            setLayoutCategory('single');
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
                             isFullActive
                               ? 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-600 text-slate-900 dark:text-white shadow-sm ring-2 ring-blue-500/20'
                               : 'bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                           }`}
                         >
-                          <div
-                            className="cursor-pointer"
-                            onClick={() => {
-                              const isItemLandscape = queue[0] ? queue[0].aspectRatio > 1.05 : false;
-                              setSettings((s) => ({
-                                ...s,
-                                layout: s.layout === '1_fill' ? '1_fill' : '1_fit',
-                                alignment: 'center',
-                                scaleMode: 'fit_cell',
-                                marginMm: s.layout === '1_fill' ? 0 : 5,
-                                orientation: isItemLandscape ? 'landscape' : 'portrait',
-                              }));
-                            }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold flex items-center gap-1.5">
-                                <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                                <span>Full Page</span>
-                              </span>
-                            </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                              <span>Full Page</span>
+                            </span>
                           </div>
 
                           {/* Fit vs Fill Sub-Option (only shown when Full Page preset is selected) */}
@@ -1012,31 +1034,42 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                   {/* Visual Paper Size Pills */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Select Paper:</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {[
+                    {(() => {
+                      const isPassportPhoto = queue.some((q) => q.name.toLowerCase().includes('passport') || q.docType === 'passport_page') || settings.pageSize === '4x6' || settings.pageSize === '5x7';
+                      const paperOptions = isPassportPhoto ? [
                         { id: 'a4', label: 'A4', desc: '210 × 297 mm' },
                         { id: '4x6', label: '4 × 6"', desc: '102 × 152 mm' },
                         { id: '5x7', label: '5 × 7"', desc: '127 × 178 mm' },
                         { id: 'a3', label: 'A3', desc: '297 × 420 mm' },
-                      ].map((p) => {
-                        const isSelected = settings.pageSize === p.id;
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setSettings((s) => ({ ...s, pageSize: p.id as any }))}
-                            className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold ring-1 ring-blue-500/20'
-                                : 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-                            }`}
-                          >
-                            <div className="text-xs font-bold leading-tight">{p.label}</div>
-                            <div className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>{p.desc}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                      ] : [
+                        { id: 'a4', label: 'A4', desc: '210 × 297 mm' },
+                        { id: 'a3', label: 'A3', desc: '297 × 420 mm' },
+                      ];
+
+                      return (
+                        <div className={`grid gap-1.5 ${isPassportPhoto ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+                          {paperOptions.map((p) => {
+                            const isSelected = settings.pageSize === p.id;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setSettings((s) => ({ ...s, pageSize: p.id as any }))}
+                                className={`p-2 rounded-xl text-center border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-bold ring-1 ring-blue-500/20'
+                                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                                }`}
+                              >
+                                <div className="text-xs font-bold leading-tight">{p.label}</div>
+                                <div className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>{p.desc}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
 
                     {/* More sizes selector */}
                     <div className="pt-1 flex items-center justify-between text-xs">
@@ -1053,7 +1086,6 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                         ))}
                       </select>
                     </div>
-                  </div>
 
                   {/* Orientation & Placement Segmented Buttons with clean SVG icons */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
@@ -1869,17 +1901,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                 settings.showCutLines ? 'screen-cut-guide' : ''
                               } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                               style={{
-                                width: settings.scaleMode === 'exact_id' ? screenW : '90%',
+                                width: settings.scaleMode === 'exact_id' ? screenW : undefined,
+                                maxWidth: settings.scaleMode === 'exact_id' ? undefined : '92%',
+                                maxHeight: settings.scaleMode === 'exact_id' ? undefined : '92%',
+                                height: settings.scaleMode === 'exact_id' ? undefined : '92%',
                                 aspectRatio: activeItem.aspectRatio || 85.6 / 53.98,
-                                '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '90%',
-                                '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                                '--card-print-w': settings.scaleMode === 'exact_id' ? printW : 'auto',
+                                '--card-print-h': settings.scaleMode === 'exact_id' ? printH : '92%',
                               } as React.CSSProperties}
                             >
                               {renderCropTicks()}
                               <img
                                 src={activeItem.dataUrl}
                                 alt="Duplex Card"
-                                className="card-exact-id w-full h-full object-contain block rounded-none"
+                                className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
                               />
                               {onRotateItem && (
                                 <div 
@@ -1919,17 +1954,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                   settings.showCutLines ? 'screen-cut-guide' : ''
                                 } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                                 style={{
-                                  width: settings.scaleMode === 'exact_id' ? screenW : '45%',
+                                  width: settings.scaleMode === 'exact_id' ? screenW : undefined,
+                                  maxWidth: settings.scaleMode === 'exact_id' ? undefined : '46%',
+                                  maxHeight: settings.scaleMode === 'exact_id' ? undefined : '90%',
+                                  height: settings.scaleMode === 'exact_id' ? undefined : '90%',
                                   aspectRatio: frontItem.aspectRatio || 85.6 / 53.98,
-                                  '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '45%',
-                                  '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                                  '--card-print-w': settings.scaleMode === 'exact_id' ? printW : 'auto',
+                                  '--card-print-h': settings.scaleMode === 'exact_id' ? printH : '90%',
                                 } as React.CSSProperties}
                               >
                                 {renderCropTicks()}
                                 <img
                                   src={frontItem.dataUrl}
                                   alt="Front"
-                                  className="card-exact-id w-full h-full object-contain block rounded-none"
+                                  className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
                                 />
                                 {onRotateItem && (
                                   <div 
@@ -1972,17 +2010,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                   settings.showCutLines ? 'screen-cut-guide' : ''
                                 } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                                 style={{
-                                  width: settings.scaleMode === 'exact_id' ? screenW : '45%',
+                                  width: settings.scaleMode === 'exact_id' ? screenW : undefined,
+                                  maxWidth: settings.scaleMode === 'exact_id' ? undefined : '46%',
+                                  maxHeight: settings.scaleMode === 'exact_id' ? undefined : '90%',
+                                  height: settings.scaleMode === 'exact_id' ? undefined : '90%',
                                   aspectRatio: backItem.aspectRatio || 85.6 / 53.98,
-                                  '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '45%',
-                                  '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                                  '--card-print-w': settings.scaleMode === 'exact_id' ? printW : 'auto',
+                                  '--card-print-h': settings.scaleMode === 'exact_id' ? printH : '90%',
                                 } as React.CSSProperties}
                               >
                                 {renderCropTicks()}
                                 <img
                                   src={backItem.dataUrl}
                                   alt="Back"
-                                  className="card-exact-id w-full h-full object-contain block rounded-none"
+                                  className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
                                 />
                                 {onRotateItem && (
                                   <div 
@@ -2030,17 +2071,20 @@ export const PrintStudioView: React.FC<PrintStudioViewProps> = ({
                                 settings.showCutLines ? 'screen-cut-guide' : ''
                               } ${settings.printCutMarks ? 'print-crop-marks' : ''}`}
                               style={{
-                                width: settings.scaleMode === 'exact_id' ? screenW : '88%',
+                                width: settings.scaleMode === 'exact_id' ? screenW : undefined,
+                                maxWidth: settings.scaleMode === 'exact_id' ? undefined : '90%',
+                                maxHeight: settings.scaleMode === 'exact_id' ? undefined : `calc(50% - ${settings.spacingMm + 4}mm)`,
+                                height: settings.scaleMode === 'exact_id' ? undefined : `calc(50% - ${settings.spacingMm + 4}mm)`,
                                 aspectRatio: item.aspectRatio || 85.6 / 53.98,
-                                '--card-print-w': settings.scaleMode === 'exact_id' ? printW : '88%',
-                                '--card-print-h': settings.scaleMode === 'exact_id' ? printH : 'auto',
+                                '--card-print-w': settings.scaleMode === 'exact_id' ? printW : 'auto',
+                                '--card-print-h': settings.scaleMode === 'exact_id' ? printH : `calc(50% - ${settings.spacingMm + 4}mm)`,
                               } as React.CSSProperties}
                             >
                               {renderCropTicks()}
                               <img
                                 src={item.dataUrl}
                                 alt={`Slot ${slotIdx + 1}`}
-                                className="card-exact-id w-full h-full object-contain block rounded-none"
+                                className="card-exact-id max-w-full max-h-full object-contain block rounded-none"
                               />
 
                               {/* Screen-only hover actions */}
