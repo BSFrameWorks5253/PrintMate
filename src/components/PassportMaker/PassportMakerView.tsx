@@ -151,7 +151,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // Sheet configuration
   const [paperSize, setPaperSize] = useState<PaperSizeKey>('4x6');
   const [photoCount, setPhotoCount] = useState<number>(8); // Default 8 photos on 4x6 (matching Image 2!)
-  const [borderStyle, setBorderStyle] = useState<BorderStyleType>('studio_classic');
+  const [borderStyle, setBorderStyle] = useState<BorderStyleType>('borderless');
   const [backgroundColor, setBackgroundColor] = useState<string>('original');
   const [showCutDividers, setShowCutDividers] = useState<boolean>(true);
   const [cleanSinglePhotoUrl, setCleanSinglePhotoUrl] = useState<string>('');
@@ -570,8 +570,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.restore();
     }
 
-    // Borders along the exact 35mm x 45mm photo perimeter
-    if (includeBorders) {
+    // Borders along the exact 35mm x 45mm photo perimeter (only if requested and not borderless)
+    if (includeBorders && borderStyle !== 'borderless') {
       if (borderStyle === 'studio_classic') {
         // Studio Classic: Crisp hairline outline frame along the exact 35mm x 45mm photo perimeter
         const bw = Math.max(1.5, Math.round(width * 0.005));
@@ -611,11 +611,11 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rendered = renderSinglePassportCanvas(undefined, undefined, true, showEditorGuidelines);
+    const rendered = renderSinglePassportCanvas(undefined, undefined, borderStyle !== 'borderless', showEditorGuidelines);
     canvas.width = rendered.width;
     canvas.height = rendered.height;
     ctx.drawImage(rendered, 0, 0);
-  }, [presetStandard, showEditorGuidelines, renderSinglePassportCanvas]);
+  }, [presetStandard, showEditorGuidelines, renderSinglePassportCanvas, borderStyle]);
 
   // Update clean single photo preview data URL whenever editing state changes
   useEffect(() => {
@@ -623,9 +623,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       setCleanSinglePhotoUrl('');
       return;
     }
-    const canvas = renderSinglePassportCanvas(undefined, undefined, true, keepGuidelinesInExport);
+    const canvas = renderSinglePassportCanvas(undefined, undefined, borderStyle !== 'borderless', keepGuidelinesInExport);
     setCleanSinglePhotoUrl(canvas.toDataURL('image/jpeg', 0.95));
-  }, [imageObj, presetStandard, keepGuidelinesInExport, renderSinglePassportCanvas]);
+  }, [imageObj, presetStandard, keepGuidelinesInExport, renderSinglePassportCanvas, borderStyle]);
 
   // Pointer panning handler for face positioning
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -778,17 +778,18 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     }
   };
 
-  // 2. Download Single Passport Photo (With selected studio border styling)
+  // 2. Download Single Passport Photo (Borderless or with selected studio border styling)
   const handleDownloadSingle = () => {
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const single = renderSinglePassportCanvas(undefined, undefined, true, keepGuidelinesInExport);
+    const isBorderless = borderStyle === 'borderless';
+    const single = renderSinglePassportCanvas(undefined, undefined, !isBorderless, keepGuidelinesInExport);
     const link = document.createElement('a');
-    link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_with_border_300DPI.jpg`;
+    link.download = `${photoName}_${std.widthMm}x${std.heightMm}mm_${isBorderless ? 'borderless' : 'with_border'}_300DPI.jpg`;
     link.href = single.toDataURL('image/jpeg', 0.98);
     link.click();
     try {
       analytics.trackDownload({
-        type: `Single ${std.name} Passport Photo (With Border)`,
+        type: `Single ${std.name} Passport Photo (${isBorderless ? 'Borderless' : 'With Border'})`,
         fileName: photoName,
         page: 'passport',
       });
@@ -839,20 +840,22 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   const handleSendToPrintStudio = () => {
     if (!onSendToPrint) return;
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-    const single = renderSinglePassportCanvas(undefined, undefined, true, keepGuidelinesInExport);
+    const single = renderSinglePassportCanvas(undefined, undefined, borderStyle !== 'borderless', keepGuidelinesInExport);
     const singleDataUrl = single.toDataURL('image/jpeg', 0.98);
     const ratio = single.width / single.height;
     onSendToPrint({
       dataUrl: singleDataUrl,
       name: `${photoName} (${std.name})`,
-      docType: 'id_standard',
+      docType: 'passport_page',
       cardSide: 'single',
       aspectRatio: ratio,
-    });
+      widthMm: std.widthMm,
+      heightMm: std.heightMm,
+    } as any);
     userStorageService.addRecent(user?.id, {
       name: `${photoName} (${std.name})`,
       dataUrl: singleDataUrl,
-      docType: 'id_standard',
+      docType: 'passport_page',
       source: 'passport',
       aspectRatio: ratio,
     });
@@ -1134,10 +1137,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     <div className="space-y-1.5 pt-1">
                       <div className="grid grid-cols-2 gap-1.5">
                         {[
+                          { id: 'borderless', label: 'Borderless (No Border)' },
                           { id: 'studio_classic', label: 'Studio Classic' },
                           { id: 'black_border', label: 'Thin Black Border' },
                           { id: 'white_margin', label: 'White Border' },
-                          { id: 'borderless', label: 'Borderless' },
                         ].map((b) => (
                           <button
                             key={b.id}
@@ -1368,7 +1371,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                     <button
                       onClick={handleDownloadSingle}
                       className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Download 1 single cropped photo (with border)"
+                      title={borderStyle === 'borderless' ? 'Download 1 single cropped photo (borderless)' : 'Download 1 single cropped photo (with border)'}
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Single Photo</span>
@@ -1594,6 +1597,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           '--passport-sheet-ratio': `${selectedPaper.widthMm} / ${selectedPaper.heightMm}`,
                           '--grid-cols': layout.cols,
                           '--grid-rows': layout.rows,
+                          '--passport-photo-w': `${layout.photoWidthMm}mm`,
+                          '--passport-photo-h': `${layout.photoHeightMm}mm`,
                           '--photo-w-mm': `${layout.photoWidthMm}mm`,
                           '--photo-h-mm': `${layout.photoHeightMm}mm`,
                           '--gap-mm': `${layout.gapMm}mm`,

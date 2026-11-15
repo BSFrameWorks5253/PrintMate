@@ -112,8 +112,8 @@
   /* Centered photo grid on physical paper - exact millimeter matching */
   .passport-print-grid {
     display: grid !important;
-    grid-template-columns: repeat(var(--grid-cols, 4), 35mm) !important;
-    grid-template-rows: repeat(var(--grid-rows, 2), 45mm) !important;
+    grid-template-columns: repeat(var(--grid-cols, 4), var(--passport-photo-w, 35mm)) !important;
+    grid-template-rows: repeat(var(--grid-rows, 2), var(--passport-photo-h, 45mm)) !important;
     gap: var(--gap-mm, 2mm) !important;
     justify-content: center !important;
     align-content: center !important;
@@ -122,12 +122,12 @@
   }
 
   .passport-photo-cell {
-    width: 35mm !important;
-    height: 45mm !important;
-    min-width: 35mm !important;
-    min-height: 45mm !important;
-    max-width: 35mm !important;
-    max-height: 45mm !important;
+    width: var(--passport-photo-w, 35mm) !important;
+    height: var(--passport-photo-h, 45mm) !important;
+    min-width: var(--passport-photo-w, 35mm) !important;
+    min-height: var(--passport-photo-h, 45mm) !important;
+    max-width: var(--passport-photo-w, 35mm) !important;
+    max-height: var(--passport-photo-h, 45mm) !important;
     box-sizing: border-box !important;
     border: none !important;
     outline: none !important;
@@ -138,8 +138,8 @@
   }
 
   .passport-photo-cell img {
-    width: 35mm !important;
-    height: 45mm !important;
+    width: var(--passport-photo-w, 35mm) !important;
+    height: var(--passport-photo-h, 45mm) !important;
     object-fit: fill !important;
     display: block !important;
     -webkit-print-color-adjust: exact !important;
