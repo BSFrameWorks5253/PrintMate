@@ -3,12 +3,44 @@ import { Header } from './components/Header';
 import { ScannerView } from './components/Scanner/ScannerView';
 import { PrintStudioView } from './components/PrintStudio/PrintStudioView';
 import { RecentImagesModal } from './components/Recents/RecentImagesModal';
-// Lazily load heavier studio modules so the main page bundle is ultra-fast and lightweight
-const IdCardStudioView = lazy(() => import('./components/IdCardStudio/IdCardStudioView').then(m => ({ default: m.IdCardStudioView })));
-const ConverterView = lazy(() => import('./components/Converter/ConverterView').then(m => ({ default: m.ConverterView })));
-const PassportMakerView = lazy(() => import('./components/PassportMaker/PassportMakerView').then(m => ({ default: m.PassportMakerView })));
-const SizeReducerStudio = lazy(() => import('./components/SizeReducer/SizeReducerStudio').then(m => ({ default: m.SizeReducerStudio })));
-const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+// Helper: resilient dynamic module loader with automatic 1-click fallback reload on stale deployment chunks
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error: any) {
+      const isDynamicImportError =
+        error?.message?.includes('dynamically imported module') ||
+        error?.message?.includes('Failed to fetch') ||
+        error?.message?.includes('Loading chunk') ||
+        error?.message?.includes('Importing a module script failed');
+
+      const lastReload = sessionStorage.getItem('last-chunk-reload');
+      const now = Date.now();
+      if (isDynamicImportError && (!lastReload || now - parseInt(lastReload, 10) > 10000)) {
+        sessionStorage.setItem('last-chunk-reload', now.toString());
+        if (typeof caches !== 'undefined') {
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          } catch (_) {}
+        }
+        window.location.reload();
+        return new Promise<{ default: T }>(() => {});
+      }
+      throw error;
+    }
+  });
+}
+
+// Lazily load heavier studio modules with automatic deployment-recovery
+const IdCardStudioView = lazyWithRetry(() => import('./components/IdCardStudio/IdCardStudioView').then(m => ({ default: m.IdCardStudioView })));
+const ConverterView = lazyWithRetry(() => import('./components/Converter/ConverterView').then(m => ({ default: m.ConverterView })));
+const PassportMakerView = lazyWithRetry(() => import('./components/PassportMaker/PassportMakerView').then(m => ({ default: m.PassportMakerView })));
+const SizeReducerStudio = lazyWithRetry(() => import('./components/SizeReducer/SizeReducerStudio').then(m => ({ default: m.SizeReducerStudio })));
+const AdminDashboard = lazyWithRetry(() => import('./components/Admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import type { PrintQueueItem } from './types';
 import { createSampleIdCard, createSamplePaperDocument } from './utils/sampleImages';
 import { rotateCanvas } from './utils/imageProcessing';
