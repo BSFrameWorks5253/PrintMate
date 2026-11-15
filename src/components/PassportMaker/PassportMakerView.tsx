@@ -502,15 +502,15 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     let spacer = 0;
 
     if (isStudioDouble) {
-      // Photo area strictly 32.6mm x 44.7mm matching Image 1
-      photoAreaW = Math.round(32.6 * pxPerMm);
-      photoAreaH = Math.round(44.7 * pxPerMm);
+      // Photo area strictly 32.5mm x 44.6mm matching the studio reference (Image 1 / right-hand side)
+      photoAreaW = Math.round(32.5 * pxPerMm);
+      photoAreaH = Math.round(44.6 * pxPerMm);
 
-      outerBw = Math.max(1.5, Math.round(0.35 * pxPerMm)); // ~4px at 300DPI
-      spacer = Math.max(2, Math.round(0.60 * pxPerMm));   // ~7px clean white spacer
-      innerBw = Math.max(1, Math.round(0.20 * pxPerMm));  // ~2px inner hairline stroke
+      outerBw = Math.max(1, Math.round(0.28 * pxPerMm)); // ~3px at 300DPI
+      spacer = Math.max(2, Math.round(0.52 * pxPerMm));   // ~6px clean white spacer
+      innerBw = Math.max(1, Math.round(0.18 * pxPerMm));  // ~2px inner hairline stroke
 
-      // Outer card box matching Image 1 (approx 34.5 x 46.5 mm)
+      // Outer card box matching studio slip (approx 34.1 x 46.8 mm, leaving ~2.0mm white margin to cutting line)
       cardW = photoAreaW + 2 * (outerBw + spacer + innerBw);
       cardH = photoAreaH + 2 * (outerBw + spacer + innerBw);
       cardX = Math.round((width - cardW) / 2);
@@ -579,32 +579,32 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.lineWidth = Math.max(1.5, 2 * scale);
       ctx.setLineDash([6 * scale, 4 * scale]);
 
-      // Eye Level Line (~42% from top)
+      // Eye Level Line (~38% from top - matching reference studio sheet)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
       ctx.beginPath();
-      ctx.moveTo(photoAreaX + 15 * scale, photoAreaY + photoAreaH * 0.42);
-      ctx.lineTo(photoAreaX + photoAreaW - 15 * scale, photoAreaY + photoAreaH * 0.42);
+      ctx.moveTo(photoAreaX + 15 * scale, photoAreaY + photoAreaH * 0.38);
+      ctx.lineTo(photoAreaX + photoAreaW - 15 * scale, photoAreaY + photoAreaH * 0.38);
       ctx.stroke();
 
-      // Chin Line (~80% from top)
+      // Chin Line (~72% from top - matching reference studio sheet)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
       ctx.beginPath();
-      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.80);
-      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.80);
+      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.72);
+      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.72);
       ctx.stroke();
 
-      // Crown / Top of head line (~15% from top)
+      // Crown / Top of head line (~8% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.8)';
       ctx.beginPath();
-      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.15);
-      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.15);
+      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.08);
+      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.08);
       ctx.stroke();
 
-      // Face Oval Guide
+      // Face Oval Guide (60-70% head height)
       ctx.setLineDash([6 * scale, 6 * scale]);
       ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
       ctx.beginPath();
-      ctx.ellipse(photoAreaX + photoAreaW / 2, photoAreaY + photoAreaH * 0.48, photoAreaW * 0.30, photoAreaH * 0.32, 0, 0, Math.PI * 2);
+      ctx.ellipse(photoAreaX + photoAreaW / 2, photoAreaY + photoAreaH * 0.40, photoAreaW * 0.28, photoAreaH * 0.32, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       // Center vertical guide
@@ -619,9 +619,9 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(2, 132, 199, 0.98)';
       ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
-      ctx.fillText('EYE LEVEL', photoAreaX + 20 * scale, photoAreaY + photoAreaH * 0.40);
-      ctx.fillText('CHIN LINE', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.78);
-      ctx.fillText('CROWN', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.13);
+      ctx.fillText('EYE LEVEL', photoAreaX + 20 * scale, photoAreaY + photoAreaH * 0.36);
+      ctx.fillText('CHIN LINE', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.70);
+      ctx.fillText('CROWN', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.07);
 
       ctx.restore();
     }
@@ -1568,24 +1568,25 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                   <div className="flex flex-col items-center">
                     {(() => {
                       const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
-                      const cardW_mm = std.widthMm;
-                      const cardH_mm = std.heightMm;
-                      const canvasW = 280;
+                      const isStudio = borderStyle === 'studio_double';
+                      const cardW_mm = isStudio ? 38.1 : std.widthMm;
+                      const cardH_mm = isStudio ? 50.8 : std.heightMm;
+                      const canvasW = 270;
                       const canvasH = Math.round(canvasW * (cardH_mm / cardW_mm));
                       return (
                         <div className="flex flex-col items-center">
                           {/* Dimension Indicator Bar */}
                           <div className="w-full flex items-center justify-between text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 px-1 mb-1.5">
-                            <span className="flex items-center gap-1">↔ {cardW_mm} mm Width</span>
+                            <span className="flex items-center gap-1">↔ {isStudio ? '38.1 mm Slip' : `${cardW_mm} mm Width`}</span>
                             <span className="bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-2 py-0.2 rounded-full font-sans font-semibold text-[10px]">
-                              Official Standard
+                              {isStudio ? 'Studio Double (32.5×44.6mm Photo)' : 'Official Standard'}
                             </span>
-                            <span className="flex items-center gap-1">↕ {cardH_mm} mm Height</span>
+                            <span className="flex items-center gap-1">↕ {isStudio ? '50.8 mm Slip' : `${cardH_mm} mm Height`}</span>
                           </div>
 
                           <div className="relative shadow-2xl rounded-lg overflow-hidden border-2 border-cyan-500/50 bg-white">
                             <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-mono px-2 py-0.5 rounded-full z-20 pointer-events-none">
-                              {cardW_mm}.0 × {cardH_mm}.0 mm (300 DPI)
+                              {isStudio ? 'Slip 38.1×50.8 mm • Photo 32.5×44.6 mm' : `${cardW_mm}.0 × ${cardH_mm}.0 mm (300 DPI)`}
                             </div>
                             <canvas
                               ref={cropCanvasRef}
