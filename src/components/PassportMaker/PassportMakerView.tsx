@@ -29,7 +29,7 @@ interface PassportMakerViewProps {
   onSendToPrint?: (item: Omit<PrintQueueItem, 'id' | 'createdAt'>) => void;
 }
 
-export type BorderStyleType = 'studio_classic' | 'black_border' | 'white_margin' | 'borderless';
+export type BorderStyleType = 'studio_double' | 'borderless' | 'studio_classic' | 'black_border' | 'white_margin';
 export type PaperSizeKey = '5x7' | 'a4' | '4x6';
 export type PassportStandardKey = '35x45' | '51x51' | '30x40' | '33x48' | '34x45';
 
@@ -151,7 +151,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
   // Sheet configuration
   const [paperSize, setPaperSize] = useState<PaperSizeKey>('4x6');
   const [photoCount, setPhotoCount] = useState<number>(8); // Default 8 photos on 4x6 (matching Image 2!)
-  const [borderStyle, setBorderStyle] = useState<BorderStyleType>('borderless');
+  const [borderStyle, setBorderStyle] = useState<BorderStyleType>('studio_double');
   const [backgroundColor, setBackgroundColor] = useState<string>('original');
   const [showCutDividers, setShowCutDividers] = useState<boolean>(true);
   const [cleanSinglePhotoUrl, setCleanSinglePhotoUrl] = useState<string>('');
@@ -400,6 +400,20 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       }
     }
 
+    if (borderStyle === 'studio_double') {
+      const cellW = paperW / cols;
+      const cellH = paperH / rows;
+      return {
+        cols,
+        rows,
+        photoWidthMm: Math.round(cellW * 10) / 10,
+        photoHeightMm: Math.round(cellH * 10) / 10,
+        isShrunk: false,
+        marginMm: 0,
+        gapMm: 0,
+      };
+    }
+
     const marginMm = count <= 8 ? 2.5 : 2.0;
     const gapMm = count <= 8 ? 2.0 : 1.2;
 
@@ -459,16 +473,58 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
     const std = PASSPORT_STANDARDS[presetStandard] || PASSPORT_STANDARDS['35x45'];
     const canvas = document.createElement('canvas');
 
-    // Strict 35mm x 45mm (413 x 531 px at 300 DPI)
-    const width = wPx || std.widthPx300Dpi;
-    const height = hPx || std.heightPx300Dpi;
+    const isStudioDouble = borderStyle === 'studio_double' && includeBorders;
+
+    // Strict 35mm x 45mm (413 x 531 px at 300 DPI) or Studio 38.1 x 50.8 mm (450 x 600 px at 300 DPI)
+    const defaultW = isStudioDouble ? 450 : std.widthPx300Dpi;
+    const defaultH = isStudioDouble ? 600 : std.heightPx300Dpi;
+    const width = wPx || defaultW;
+    const height = hPx || defaultH;
 
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return canvas;
 
-    // Background fill (white, blue, grey, offwhite, etc.)
+    // Millimeter scale
+    const pxPerMm = isStudioDouble ? (height / 50.8) : (width / (std.widthMm || 35));
+
+    let photoAreaX = 0;
+    let photoAreaY = 0;
+    let photoAreaW = width;
+    let photoAreaH = height;
+    let cardX = 0;
+    let cardY = 0;
+    let cardW = width;
+    let cardH = height;
+    let outerBw = 0;
+    let innerBw = 0;
+    let spacer = 0;
+
+    if (isStudioDouble) {
+      // Photo area strictly 32.6mm x 44.7mm matching Image 1
+      photoAreaW = Math.round(32.6 * pxPerMm);
+      photoAreaH = Math.round(44.7 * pxPerMm);
+
+      outerBw = Math.max(1.5, Math.round(0.35 * pxPerMm)); // ~4px at 300DPI
+      spacer = Math.max(2, Math.round(0.60 * pxPerMm));   // ~7px clean white spacer
+      innerBw = Math.max(1, Math.round(0.20 * pxPerMm));  // ~2px inner hairline stroke
+
+      // Outer card box matching Image 1 (approx 34.5 x 46.5 mm)
+      cardW = photoAreaW + 2 * (outerBw + spacer + innerBw);
+      cardH = photoAreaH + 2 * (outerBw + spacer + innerBw);
+      cardX = Math.round((width - cardW) / 2);
+      cardY = Math.round((height - cardH) / 2);
+
+      photoAreaX = cardX + outerBw + spacer + innerBw;
+      photoAreaY = cardY + outerBw + spacer + innerBw;
+    }
+
+    // Slip / paper background fill is always pure white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Photo background fill (white, blue, grey, offwhite, etc.)
     const bgFill = backgroundColor === 'white' 
       ? '#ffffff' 
       : backgroundColor === 'blue' 
@@ -480,19 +536,19 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       : '#ffffff';
 
     ctx.fillStyle = bgFill;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(photoAreaX, photoAreaY, photoAreaW, photoAreaH);
 
-    // Draw photo covering the full 35mm x 45mm area
+    // Draw photo covering the photo area
     if (imageObj) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(0, 0, width, height);
+      ctx.rect(photoAreaX, photoAreaY, photoAreaW, photoAreaH);
       ctx.clip();
 
       ctx.filter = `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`;
 
-      const centerX = width / 2 + (pan.x * width);
-      const centerY = height / 2 + (pan.y * height);
+      const centerX = photoAreaX + photoAreaW / 2 + (pan.x * photoAreaW);
+      const centerY = photoAreaY + photoAreaH / 2 + (pan.y * photoAreaH);
 
       const effectiveRotation = rotation + straightenAngle;
 
@@ -508,7 +564,7 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       const effectiveW = imageObj.width * cos + imageObj.height * sin;
       const effectiveH = imageObj.width * sin + imageObj.height * cos;
 
-      const scale = Math.max(width / (effectiveW || 1), height / (effectiveH || 1)) * zoom;
+      const scale = Math.max(photoAreaW / (effectiveW || 1), photoAreaH / (effectiveH || 1)) * zoom;
       const drawW = imageObj.width * scale;
       const drawH = imageObj.height * scale;
 
@@ -516,63 +572,74 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.restore();
     }
 
-    // Biometric Face Guidelines directly inside the 35mm x 45mm photo
+    // Biometric Face Guidelines directly inside the photo area
     if (includeGuidelines) {
       ctx.save();
-      const scale = width / (std.widthPx300Dpi || 413);
+      const scale = photoAreaW / (std.widthPx300Dpi || 413);
       ctx.lineWidth = Math.max(1.5, 2 * scale);
       ctx.setLineDash([6 * scale, 4 * scale]);
 
       // Eye Level Line (~42% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
       ctx.beginPath();
-      ctx.moveTo(15 * scale, height * 0.42);
-      ctx.lineTo(width - 15 * scale, height * 0.42);
+      ctx.moveTo(photoAreaX + 15 * scale, photoAreaY + photoAreaH * 0.42);
+      ctx.lineTo(photoAreaX + photoAreaW - 15 * scale, photoAreaY + photoAreaH * 0.42);
       ctx.stroke();
 
       // Chin Line (~80% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.95)';
       ctx.beginPath();
-      ctx.moveTo(30 * scale, height * 0.80);
-      ctx.lineTo(width - 30 * scale, height * 0.80);
+      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.80);
+      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.80);
       ctx.stroke();
 
       // Crown / Top of head line (~15% from top)
       ctx.strokeStyle = 'rgba(14, 165, 233, 0.8)';
       ctx.beginPath();
-      ctx.moveTo(30 * scale, height * 0.15);
-      ctx.lineTo(width - 30 * scale, height * 0.15);
+      ctx.moveTo(photoAreaX + 30 * scale, photoAreaY + photoAreaH * 0.15);
+      ctx.lineTo(photoAreaX + photoAreaW - 30 * scale, photoAreaY + photoAreaH * 0.15);
       ctx.stroke();
 
       // Face Oval Guide
       ctx.setLineDash([6 * scale, 6 * scale]);
       ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
       ctx.beginPath();
-      ctx.ellipse(width / 2, height * 0.48, width * 0.30, height * 0.32, 0, 0, Math.PI * 2);
+      ctx.ellipse(photoAreaX + photoAreaW / 2, photoAreaY + photoAreaH * 0.48, photoAreaW * 0.30, photoAreaH * 0.32, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       // Center vertical guide
       ctx.setLineDash([4 * scale, 6 * scale]);
       ctx.strokeStyle = 'rgba(100, 116, 139, 0.7)';
       ctx.beginPath();
-      ctx.moveTo(width / 2, 10 * scale);
-      ctx.lineTo(width / 2, height - 10 * scale);
+      ctx.moveTo(photoAreaX + photoAreaW / 2, photoAreaY + 10 * scale);
+      ctx.lineTo(photoAreaX + photoAreaW / 2, photoAreaY + photoAreaH - 10 * scale);
       ctx.stroke();
 
       // Text labels
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(2, 132, 199, 0.98)';
       ctx.font = `bold ${Math.round(11 * scale)}px sans-serif`;
-      ctx.fillText('EYE LEVEL', 20 * scale, height * 0.40);
-      ctx.fillText('CHIN LINE', 35 * scale, height * 0.78);
-      ctx.fillText('CROWN', 35 * scale, height * 0.13);
+      ctx.fillText('EYE LEVEL', photoAreaX + 20 * scale, photoAreaY + photoAreaH * 0.40);
+      ctx.fillText('CHIN LINE', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.78);
+      ctx.fillText('CROWN', photoAreaX + 35 * scale, photoAreaY + photoAreaH * 0.13);
 
       ctx.restore();
     }
 
-    // Borders along the exact 35mm x 45mm photo perimeter (only if requested and not borderless)
+    // Borders (only if requested and not borderless)
     if (includeBorders && borderStyle !== 'borderless') {
-      if (borderStyle === 'studio_classic') {
+      if (borderStyle === 'studio_double') {
+        // Studio Double Border (Image 1):
+        // 1. Outer solid black border (0.35mm / ~4px at 300DPI)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = outerBw;
+        ctx.strokeRect(cardX + outerBw / 2, cardY + outerBw / 2, cardW - outerBw, cardH - outerBw);
+
+        // 2. Inner hairline black border (0.20mm / ~2px at 300DPI)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = innerBw;
+        ctx.strokeRect(photoAreaX - innerBw / 2, photoAreaY - innerBw / 2, photoAreaW + innerBw, photoAreaH + innerBw);
+      } else if (borderStyle === 'studio_classic') {
         // Studio Classic: Crisp hairline outline frame along the exact 35mm x 45mm photo perimeter
         const bw = Math.max(1.5, Math.round(width * 0.005));
         ctx.strokeStyle = '#000000';
@@ -693,12 +760,13 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
       ctx.drawImage(singlePhoto, x, y, photoPxW, photoPxH);
     }
 
-    // Draw full-page dark slate dashed cutting guidelines across entire sheet
+    // Draw full-page cutting guidelines across entire sheet
     if (showCutDividers) {
       ctx.save();
-      ctx.strokeStyle = '#475569'; // Slate-600: dark, crisp, visible on physical white paper in print & downloads
-      ctx.lineWidth = Math.max(2.5, Math.round(pxPerMm * 0.22)); // High-visibility ~0.22mm hairline for 300DPI
-      ctx.setLineDash([14, 10]); // High-contrast dash pattern for scissors and paper trimmers
+      const isStudioDouble = borderStyle === 'studio_double';
+      ctx.strokeStyle = isStudioDouble ? '#000000' : '#475569';
+      ctx.lineWidth = isStudioDouble ? Math.max(1, Math.round(pxPerMm * 0.20)) : Math.max(2.5, Math.round(pxPerMm * 0.22));
+      ctx.setLineDash(isStudioDouble ? [] : [14, 10]);
 
       // Vertical full-page cutting lines
       const vCutPositions = [startX - gapPx / 2];
@@ -729,6 +797,10 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
         ctx.lineTo(sheetCanvas.width, yPos);
         ctx.stroke();
       });
+
+      if (isStudioDouble) {
+        ctx.strokeRect(0.5, 0.5, sheetCanvas.width - 1, sheetCanvas.height - 1);
+      }
 
       ctx.restore();
     }
@@ -1135,24 +1207,28 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
 
                     {/* Border Styles */}
                     <div className="space-y-1.5 pt-1">
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         {[
-                          { id: 'borderless', label: 'Borderless (No Border)' },
-                          { id: 'studio_classic', label: 'Studio Classic' },
-                          { id: 'black_border', label: 'Thin Black Border' },
-                          { id: 'white_margin', label: 'White Border' },
+                          { id: 'studio_double', label: 'Studio Double Border (Classic)', desc: 'Exact 32.6×44.7mm photo inside double border + solid cut lines' },
+                          { id: 'borderless', label: 'Borderless (Full 35×45mm)', desc: 'Photo edge-to-edge without border' },
+                          { id: 'studio_classic', label: 'Single Hairline Frame', desc: 'Thin 1px perimeter outline' },
+                          { id: 'black_border', label: 'Thin Black Border', desc: 'Solid black boundary' },
+                          { id: 'white_margin', label: 'White Studio Margin', desc: '1mm white perimeter border' },
                         ].map((b) => (
                           <button
                             key={b.id}
                             type="button"
                             onClick={() => setBorderStyle(b.id as BorderStyleType)}
-                            className={`p-2 rounded-xl border text-left transition-all ${
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
                               borderStyle === b.id
-                                ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-sm'
+                                ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-sm ring-2 ring-blue-400/30'
                                 : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                             }`}
                           >
                             <div className="text-xs font-semibold">{b.label}</div>
+                            <div className={`text-[10px] mt-0.5 line-clamp-1 ${borderStyle === b.id ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                              {b.desc}
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -1669,6 +1745,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                           }
                           hLinesMm.push(startMmY + (layout.rows * (layout.photoHeightMm + layout.gapMm)) - layout.gapMm / 2);
 
+                          const isStudioDouble = borderStyle === 'studio_double';
+
                           return (
                             <svg
                               className="passport-cut-overlay absolute inset-0 pointer-events-none w-full h-full z-10"
@@ -1685,8 +1763,8 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                                   x2={xVal}
                                   y2={paperH}
                                   stroke="#000000"
-                                  strokeWidth="0.35"
-                                  strokeDasharray="2.5 1.5"
+                                  strokeWidth={isStudioDouble ? "0.22" : "0.35"}
+                                  strokeDasharray={isStudioDouble ? "none" : "2.5 1.5"}
                                 />
                               ))}
 
@@ -1699,10 +1777,22 @@ export const PassportMakerView: React.FC<PassportMakerViewProps> = ({ onSendToPr
                                   x2={paperW}
                                   y2={yVal}
                                   stroke="#000000"
-                                  strokeWidth="0.35"
-                                  strokeDasharray="2.5 1.5"
+                                  strokeWidth={isStudioDouble ? "0.22" : "0.35"}
+                                  strokeDasharray={isStudioDouble ? "none" : "2.5 1.5"}
                                 />
                               ))}
+
+                              {isStudioDouble && (
+                                <rect
+                                  x="0"
+                                  y="0"
+                                  width={paperW}
+                                  height={paperH}
+                                  fill="none"
+                                  stroke="#000000"
+                                  strokeWidth="0.22"
+                                />
+                              )}
                             </svg>
                           );
                         })()}
